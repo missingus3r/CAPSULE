@@ -364,4 +364,57 @@ describe("relay network", () => {
     }
     expect(latecomer.app.capsulePeers.list()[0]?.url).toBe(seedUrl);
   }, 15_000);
+
+  it("refuses an announcement for an address that does not host that relay", async () => {
+    const relay = await startRelay();
+    const other = await startRelay();
+    const announcement = other.app.capsulePeers.selfAnnouncement();
+    expect(announcement).toBeDefined();
+
+    // A valid signature proves who wrote the message, not who owns the
+    // address in it. Announcing an address that answers as somebody else — or
+    // does not answer at all — must not put it in the directory.
+    const elsewhere = {
+      ...announcement,
+      url: "http://127.0.0.1:1",
+      signature: other.app.capsuleIdentity.sign(
+        announceMessage(
+          "http://127.0.0.1:1",
+          announcement!.relayId,
+          announcement!.announcedAt,
+          announcement!.nonce,
+        ),
+      ),
+    };
+    const refused = await relay.app.inject({
+      method: "POST",
+      url: "/v1/peers/announce",
+      payload: elsewhere,
+    });
+    expect(refused.statusCode).toBe(400);
+    expect(relay.app.capsulePeers.size).toBe(0);
+
+    // The relay's real address is accepted, because it answers as itself.
+    const accepted = await relay.app.inject({
+      method: "POST",
+      url: "/v1/peers/announce",
+      payload: { ...announcement },
+    });
+    expect(accepted.statusCode).toBe(202);
+    expect(relay.app.capsulePeers.list()[0]?.url).toBe(other.url);
+  });
+
+  it("refuses peer addresses that point back into the operator's network", async () => {
+    // With the local-network escape hatch closed, loopback is refused even
+    // when the announcement itself is perfectly valid.
+    const relay = await startRelay({ allowPrivatePeers: false });
+    const other = await startRelay({ allowPrivatePeers: false });
+    const response = await relay.app.inject({
+      method: "POST",
+      url: "/v1/peers/announce",
+      payload: { ...other.app.capsulePeers.selfAnnouncement() },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(relay.app.capsulePeers.size).toBe(0);
+  });
 });

@@ -1,4 +1,5 @@
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -10,6 +11,7 @@ import {
   deleteCapsule,
   discoverRelays,
   downloadCapsule,
+  fetchRelayPeers,
   resumeUpload,
   selectRelays,
   uploadCapsule,
@@ -103,7 +105,10 @@ describe("CAPSULE network end-to-end", () => {
     mirror.config.peers = [primary.url];
     await mirror.app.capsulePeers.sync();
 
-    const network = await discoverRelays({ seeds: [primary.url] });
+    const network = await discoverRelays({
+      seeds: [primary.url],
+      allowPrivateRelays: true,
+    });
     expect(network).toHaveLength(2);
     const [chosen] = selectRelays(network, {
       count: 1,
@@ -332,6 +337,112 @@ describe("CAPSULE network end-to-end", () => {
     });
     expect(finished.capability.capsuleId).toBe(ticket!.targets[0]!.capsuleId);
 
+    const received = await downloadCapsule({ capability: finished.capability });
+    expect(new Uint8Array(await received.blob.arrayBuffer())).toEqual(original);
+  });
+
+  it("does not follow a relay that points clients at their own network", async () => {
+    const honest = await startRelay();
+    // A relay's peer list is written by that relay. This one answers with
+    // loopback addresses, which is how a hostile relay would turn a visitor's
+    // browser into a scanner of the visitor's own machine.
+    const hostile = createServer((request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      if (request.url === "/v1/info") {
+        response.end(
+          JSON.stringify({
+            version: 1,
+            relayId: "h".repeat(43),
+            publicKey: "k".repeat(43),
+            limits: {
+              maxCapsuleBytes: 1024,
+              maxChunkBytes: 1024,
+              maxManifestBytes: 1024,
+              maxChunkCount: 8,
+            },
+            defaultTtlSeconds: 60,
+            maxTtlSeconds: 3600,
+          }),
+        );
+        return;
+      }
+      response.end(
+        JSON.stringify({
+          version: 1,
+          peers: [
+            { url: "http://127.0.0.1:9200" },
+            { url: "http://[::ffff:7f00:1]:9201" },
+            { url: "http://169.254.169.254" },
+            { url: honest.url },
+          ],
+        }),
+      );
+    });
+    await new Promise<void>((resolve) =>
+      hostile.listen(0, "127.0.0.1", resolve),
+    );
+    const address = hostile.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Unexpected address");
+    }
+    const hostileUrl = `http://127.0.0.1:${address.port}`;
+
+    try {
+      const followed = await fetchRelayPeers(hostileUrl);
+      expect(followed).toEqual([]);
+
+      // With the local-network opt-in the same list is followed, because the
+      // operator said they are working inside one.
+      const local = await fetchRelayPeers(hostileUrl, {
+        allowPrivateRelays: true,
+      });
+      expect(local.length).toBeGreaterThan(0);
+    } finally {
+      await new Promise<void>((resolve) => hostile.close(() => resolve()));
+    }
+  });
+
+  it("refuses to resume with a different file of the same size", async () => {
+    const relay = await startRelay();
+    const original = new Uint8Array(200_000).fill(1);
+    const impostor = new Uint8Array(200_000).fill(2);
+
+    let ticket: UploadTicket | undefined;
+    const controller = new AbortController();
+    await expect(
+      uploadCapsule({
+        data: new Blob([original.slice().buffer]),
+        filename: "original.bin",
+        ttlSeconds: 600,
+        relayUrl: relay.url,
+        appUrl: "https://capsule.test/",
+        chunkSize: 32 * 1024,
+        signal: controller.signal,
+        onTicket: (issued) => {
+          ticket = issued;
+        },
+        onProgress: (progress) => {
+          if (progress.completedChunks === 2) controller.abort();
+        },
+      }),
+    ).rejects.toThrow();
+    expect(ticket?.contentDigest).toBeTruthy();
+
+    // Resuming with different bytes would encrypt new plaintext under a nonce
+    // the original already used. The ticket commits to the contents, so this
+    // is refused before a single byte is sent.
+    await expect(
+      resumeUpload(ticket!, new Blob([impostor.slice().buffer]), {
+        appUrl: "https://capsule.test/",
+      }),
+    ).rejects.toThrow("does not match");
+
+    // The original still resumes.
+    const finished = await resumeUpload(
+      ticket!,
+      new Blob([original.slice().buffer]),
+      { appUrl: "https://capsule.test/" },
+    );
     const received = await downloadCapsule({ capability: finished.capability });
     expect(new Uint8Array(await received.blob.arrayBuffer())).toEqual(original);
   });

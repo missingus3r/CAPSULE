@@ -124,12 +124,6 @@ function announcementFromBody(body: unknown): RelayAnnouncement {
       throw badRequest("invalid_announcement", `${field} must be a string`);
     }
   }
-  if (
-    candidate.nickname !== undefined &&
-    typeof candidate.nickname !== "string"
-  ) {
-    throw badRequest("invalid_announcement", "nickname must be a string");
-  }
   return {
     url: candidate.url as string,
     relayId: candidate.relayId as string,
@@ -137,9 +131,6 @@ function announcementFromBody(body: unknown): RelayAnnouncement {
     announcedAt: candidate.announcedAt as string,
     nonce: candidate.nonce as string,
     signature: candidate.signature as string,
-    ...(candidate.nickname
-      ? { nickname: (candidate.nickname as string).slice(0, 64) }
-      : {}),
   };
 }
 

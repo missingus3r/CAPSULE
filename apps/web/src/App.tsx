@@ -12,6 +12,7 @@ import {
 import {
   decodeShareCapability,
   encodeOwnerCapability,
+  isPublicRelayOrigin,
   wrapWithPassphrase,
 } from "@capsule/protocol";
 import QRCode from "qrcode";
@@ -325,7 +326,14 @@ export default function App() {
       .catch(() => {
         if (!cancelled) setRelayConfig(null);
       });
-    discoverRelays({ seeds: [relayUrl], maxRelays: 12 })
+    discoverRelays({
+      seeds: [relayUrl],
+      maxRelays: 12,
+      // A relay can put anything in its peer list. Following it into the
+      // visitor's own network is only acceptable when this app is already
+      // pointed at a local relay, which means a local setup.
+      ...(isPublicRelayOrigin(relayUrl) ? {} : { allowPrivateRelays: true }),
+    })
       .then((relays) => {
         if (!cancelled) setNetwork(relays);
       })
@@ -768,8 +776,9 @@ export default function App() {
                       </button>
                     </div>
                     <small>
-                      No la compartas: CAPSULE no puede recuperarla si la
-                      perdés.
+                      No la compartas. CAPSULE no puede recuperarla por vos: si
+                      la vas a necesitar más adelante, protegela con una
+                      contraseña acá abajo.
                     </small>
 
                     <div className="recovery-block">

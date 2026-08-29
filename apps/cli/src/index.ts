@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 import {
   combineShares,
   decodeOwnerCapability,
+  isPublicRelayOrigin,
   decodeShare,
   decodeShareCapability,
   encodeOwnerCapability,
@@ -94,6 +95,19 @@ function parseSeed(value: string): RelaySeed {
   const [url, relayId] = value.split("#");
   if (!url) throw new Error(`Invalid seed relay: ${value}`);
   return relayId ? { url, relayId } : url;
+}
+
+/**
+ * Following a relay's peer list into loopback or a private network is only
+ * reasonable when the operator is already working inside one — which is
+ * exactly what a private seed says.
+ */
+function discoveryScope(seeds: RelaySeed[]): { allowPrivateRelays?: boolean } {
+  const anyPrivate = seeds.some((seed) => {
+    const url = typeof seed === "string" ? seed : seed.url;
+    return !isPublicRelayOrigin(url);
+  });
+  return anyPrivate ? { allowPrivateRelays: true } : {};
 }
 
 async function readTicket(path: string): Promise<UploadTicket | undefined> {
@@ -269,6 +283,7 @@ program
             : [commandOptions.relay];
         const network = await discoverRelays({
           seeds,
+          ...discoveryScope(seeds),
           ...(fetchImpl ? { fetchImpl } : {}),
         });
         const chosen = selectRelays(network, {
@@ -528,6 +543,7 @@ program
     const relays = await discoverRelays({
       seeds,
       maxRelays,
+      ...discoveryScope(seeds),
       ...(fetchImpl ? { fetchImpl } : {}),
     });
 

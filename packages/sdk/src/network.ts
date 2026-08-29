@@ -8,7 +8,11 @@
  * relay is only ever a candidate the client may choose to use.
  */
 
-import { RELAY_API_VERSION, isRelayOrigin } from "@capsule/protocol";
+import {
+  RELAY_API_VERSION,
+  isPublicRelayOrigin,
+  isRelayOrigin,
+} from "@capsule/protocol";
 
 export type FetchLike = (
   input: string,
@@ -49,6 +53,14 @@ export interface DiscoverRelaysOptions {
   fetchImpl?: FetchLike;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /**
+   * Follow relays on loopback and private addresses. Off by default: a relay
+   * can put anything in its peer list, and following it into the client's own
+   * network is how a relay turns a client into a port scanner. Turn it on only
+   * for a local network you already run, which is also the only place a
+   * private address can be a real relay.
+   */
+  allowPrivateRelays?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -131,8 +143,18 @@ export function parseRelayInfo(value: unknown, url: string): RelayInfo {
       )
     : [1];
 
+  // A relay may point at a different address than the one we reached, but only
+  // a public one: otherwise any relay could redirect a client at the client's
+  // own loopback interface. A relay we reached at a private address is already
+  // one the caller chose to talk to, so its own address is kept.
+  const declared = typeof info.url === "string" ? info.url : undefined;
+  const address =
+    declared && (isPublicRelayOrigin(declared) || declared === url)
+      ? declared
+      : url;
+
   return {
-    url: normalizeOrigin(typeof info.url === "string" ? info.url : url),
+    url: normalizeOrigin(address),
     relayId: info.relayId,
     publicKey: info.publicKey,
     ...(typeof info.nickname === "string" && info.nickname.trim()
@@ -190,6 +212,7 @@ export async function fetchRelayPeers(
     fetchImpl?: FetchLike;
     signal?: AbortSignal;
     timeoutMs?: number;
+    allowPrivateRelays?: boolean;
   } = {},
 ): Promise<string[]> {
   const origin = normalizeOrigin(relayUrl);
@@ -205,7 +228,13 @@ export async function fetchRelayPeers(
   const urls: string[] = [];
   for (const peer of body.peers) {
     const candidate = (peer as { url?: unknown }).url;
-    if (typeof candidate === "string" && isRelayOrigin(candidate)) {
+    // A relay's peer list is written entirely by that relay. Following it
+    // blindly would let any relay in the graph aim every client at the
+    // client's own network.
+    if (typeof candidate !== "string") continue;
+    if (isPublicRelayOrigin(candidate)) {
+      urls.push(candidate);
+    } else if (options.allowPrivateRelays && isRelayOrigin(candidate)) {
       urls.push(candidate);
     }
   }
@@ -247,6 +276,7 @@ export async function discoverRelays(
     ...(options.timeoutMs !== undefined
       ? { timeoutMs: options.timeoutMs }
       : {}),
+    ...(options.allowPrivateRelays ? { allowPrivateRelays: true } : {}),
   };
 
   // One gossip hop past the seeds keeps discovery bounded and predictable.

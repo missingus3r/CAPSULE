@@ -1,6 +1,11 @@
+import { lookup } from "node:dns/promises";
 import { readFile, writeFile } from "node:fs/promises";
-import { isIP } from "node:net";
 import { join } from "node:path";
+import {
+  classifyHost,
+  classifyRelayOrigin,
+  parseIpv4,
+} from "@capsule/protocol";
 import type { RelayConfig } from "./config.js";
 import {
   announceMessage,
@@ -26,6 +31,12 @@ const PROBE_TIMEOUT_MS = 8000;
 const MAX_CANDIDATES_PER_ROUND = 16;
 const MAX_FAILURES = 5;
 
+/**
+ * A relay's claim that it exists at an address. Everything else about the
+ * relay — its name, its limits — is read from the address itself rather than
+ * taken from the claim, so there is nothing in here that is worth forging
+ * beyond the address, and the address is verified before it is believed.
+ */
 export interface RelayAnnouncement {
   url: string;
   relayId: string;
@@ -34,7 +45,6 @@ export interface RelayAnnouncement {
   /** Proof-of-work nonce; part of the signed message. */
   nonce: string;
   signature: string;
-  nickname?: string;
 }
 
 export interface PeerRecord {
@@ -62,49 +72,67 @@ interface PeerDirectoryOptions {
   log?: (message: string, details?: Record<string, unknown>) => void;
 }
 
-const PRIVATE_IPV4 =
-  /^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/u;
-
 /**
  * Peer addresses arrive from untrusted relays, so anything that points back
  * into the operator's own infrastructure is refused before it is ever probed.
+ * The syntactic half of the check lives in the protocol package, which knows
+ * about every way of spelling a loopback address; this adds the half that
+ * needs a resolver.
  */
 export function isRoutablePeerUrl(
   value: string,
   allowPrivate: boolean,
 ): boolean {
-  let url: URL;
+  if (allowPrivate) {
+    // Local networks and the test suite deliberately peer over loopback.
+    const url = tryParseOrigin(value);
+    return url !== undefined;
+  }
+  return classifyRelayOrigin(value).routable;
+}
+
+function tryParseOrigin(value: string): URL | undefined {
   try {
-    url = new URL(value);
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.username || url.password || url.search || url.hash)
+      return undefined;
+    if (url.pathname !== "/" && url.pathname !== "") return undefined;
+    if (url.origin !== value.replace(/\/$/u, "")) return undefined;
+    return url;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Resolves a peer hostname and refuses it when any address it resolves to is
+ * one we would not have dialled directly. A name is the last way left to reach
+ * an internal service once the literals are covered.
+ *
+ * A name could still be re-resolved to a different address between this check
+ * and the request. Closing that window needs the connection pinned to the
+ * address we checked, which the platform's fetch does not expose; the residual
+ * risk is recorded in the threat model rather than hidden here.
+ */
+async function resolvesToPublicAddress(
+  value: string,
+  allowPrivate: boolean,
+): Promise<boolean> {
+  if (allowPrivate) return true;
+  const url = tryParseOrigin(value);
+  if (!url) return false;
+  const verdict = classifyHost(url.hostname);
+  if (!verdict.routable) return false;
+  if (verdict.kind !== "name") return true;
+
+  try {
+    const addresses = await lookup(url.hostname, { all: true });
+    if (addresses.length === 0) return false;
+    return addresses.every((address) => classifyHost(address.address).routable);
   } catch {
     return false;
   }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-  if (url.username || url.password || url.search || url.hash) return false;
-  if (url.pathname !== "/" && url.pathname !== "") return false;
-  if (url.origin !== value.replace(/\/$/u, "")) return false;
-  if (allowPrivate) return true;
-
-  const host = url.hostname.toLowerCase();
-  if (
-    host === "localhost" ||
-    host.endsWith(".local") ||
-    host.endsWith(".localhost")
-  ) {
-    return false;
-  }
-  const version = isIP(host.replace(/^\[|\]$/gu, ""));
-  if (version === 4) return !PRIVATE_IPV4.test(`${host}.`);
-  if (version === 6) {
-    const normalized = host.replace(/^\[|\]$/gu, "");
-    return !(
-      normalized === "::1" ||
-      normalized.startsWith("fc") ||
-      normalized.startsWith("fd") ||
-      normalized.startsWith("fe80")
-    );
-  }
-  return true;
 }
 
 function nowIso(): string {
@@ -119,7 +147,10 @@ function nowIso(): string {
 export function operatorHint(url: string): string {
   try {
     const host = new URL(url).hostname.toLowerCase();
-    if (isIP(host.replace(/^\[|\]$/gu, "")) !== 0) return host;
+    const kind = classifyHost(host);
+    if (kind.routable && kind.kind !== "name") return host;
+    if (!kind.routable && !host.includes(".")) return host;
+    if (parseIpv4(host) !== undefined || host.includes(":")) return host;
     return host.split(".").slice(-2).join(".");
   } catch {
     return url;
@@ -220,11 +251,19 @@ export class PeerDirectory {
           nonce,
         ),
       ),
-      ...(this.config.nickname ? { nickname: this.config.nickname } : {}),
     };
   }
 
-  /** Accepts an announcement pushed by another relay. */
+  /**
+   * Accepts an announcement pushed by another relay.
+   *
+   * A valid signature only proves that whoever holds the key wrote the
+   * message; it says nothing about whether the address in it belongs to that
+   * relay. So the address is asked directly, and the announcement is believed
+   * only if that address answers with the same identity. Without this, any
+   * relay could fill every directory in the network with addresses it does
+   * not control.
+   */
   async accept(announcement: RelayAnnouncement): Promise<boolean> {
     if (announcement.relayId === this.identity.relayId) return false;
     if (!isRoutablePeerUrl(announcement.url, this.config.allowPrivatePeers)) {
@@ -241,16 +280,10 @@ export class PeerDirectory {
       return false;
     }
 
-    if (
-      !this.remember({
-        url: announcement.url,
-        relayId: announcement.relayId,
-        publicKey: announcement.publicKey,
-        ...(announcement.nickname ? { nickname: announcement.nickname } : {}),
-      })
-    ) {
-      return false;
-    }
+    const probed = await this.probe(announcement.url);
+    if (!probed || probed.relayId !== announcement.relayId) return false;
+    if (!this.remember(probed)) return false;
+
     await this.persist();
     return true;
   }
@@ -304,8 +337,12 @@ export class PeerDirectory {
   }
 
   private async probe(url: string): Promise<PeerRecord | undefined> {
-    if (!isRoutablePeerUrl(url, this.config.allowPrivatePeers))
+    if (!isRoutablePeerUrl(url, this.config.allowPrivatePeers)) {
       return undefined;
+    }
+    if (!(await resolvesToPublicAddress(url, this.config.allowPrivatePeers))) {
+      return undefined;
+    }
     try {
       const response = await this.request(`${url}/v1/info`, {
         signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),

@@ -10,6 +10,7 @@ import {
   shardLengthFor,
 } from "./erasure.js";
 
+export * from "./address.js";
 export * from "./bytes.js";
 export * from "./erasure.js";
 export * from "./gf256.js";

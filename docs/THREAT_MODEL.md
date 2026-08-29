@@ -1,8 +1,13 @@
-# CAPSULE v0.1 — Modelo de amenazas
+# CAPSULE — Modelo de amenazas
 
-**Estado:** borrador de seguridad  
+**Estado:** vigente para CAPSULE 1.0  
 **Fecha:** 2026-08-29  
-**Alcance:** protocolo v1, aplicación web, CLI y relay de referencia
+**Alcance:** protocolo v1, v2 y v3; aplicación web, CLI, SDK y relay de referencia
+
+Las secciones 1 a 11 describen el modelo de v0.1 y siguen siendo la base. La
+sección 12 cubre lo que cambió en v0.2 (anonimización parcial, cápsulas sin
+vencimiento, red abierta) y la 13 lo de v1.0 (reparto `k de n`, recuperación,
+y los hallazgos de la revisión de seguridad con sus correcciones).
 
 ## 1. Resumen ejecutivo
 
@@ -344,3 +349,136 @@ Lo que la red **no** resuelve: correlación entre relays, diversidad
 jurisdiccional real, ni la reputación de un operador. Un directorio grande no es
 evidencia de independencia. Elegir un espejo sigue siendo confiar en un tercero
 con el tamaño y el horario de la transferencia.
+
+## 13. Cambios introducidos en v1.0
+
+v1.0 congela el protocolo y agrega tres capacidades sobre v0.2: reparto por
+erasure coding, recuperación opcional de capabilities, y un endurecimiento de
+la red que salió de una revisión de seguridad del propio código.
+
+### 13.1 Reparto `k de n`: qué cambia en el modelo
+
+Con réplica completa, **cada** relay tiene la cápsula entera: quien logre
+comprometer o presionar a uno solo tiene todo el ciphertext, y sólo le falta la
+llave del enlace. Con reparto `k de n`, un relay tiene un shard que por sí solo
+no permite reconstruir un byte, y hacen falta `k` operadores distintos.
+
+| Situación                           | Réplica completa           | Reparto `k de n`               |
+| ----------------------------------- | -------------------------- | ------------------------------ |
+| Un relay incautado                  | Tiene todo el ciphertext   | Tiene un shard inservible solo |
+| `k - 1` relays coludidos            | Tienen todo                | No reconstruyen nada           |
+| `n - k + 1` relays caídos           | Sirve cualquiera que quede | La cápsula no se puede leer    |
+| Costo de almacenamiento             | `n` veces                  | `n/k` veces                    |
+| Operadores que ven tamaño y horario | `n`                        | `n` (igual)                    |
+
+Lo que **no** cambia: los `n` relays siguen viendo que hubo una transferencia,
+cuándo y de qué clase de tamaño. Repartir protege el contenido frente a un
+subconjunto de operadores, no protege la metadata frente a ninguno.
+
+Un relay que entrega shards alterados no puede corromper la cápsula: la
+reconstrucción produce ruido y el tag AES-GCM lo rechaza, y el lector prueba
+otra combinación de `k` shards. Sí puede negar el servicio, que es la
+contrapartida honesta de exigir `k` de `n`.
+
+### 13.2 Recuperación: una puerta más, por elección
+
+Proteger una capability con una frase de acceso, o repartirla en partes,
+**agrega un camino al secreto**. Eso es deseable cuando la alternativa es
+perder una cápsula sin vencimiento para siempre, y es un riesgo cuando la frase
+es débil o las partes terminan todas en el mismo cajón.
+
+- La frase se deriva con PBKDF2-HMAC-SHA-256 a 600 000 iteraciones. Es el único
+  KDF de contraseñas disponible en Web Crypto en todas las plataformas donde
+  corre CAPSULE. **Frente a un atacante con GPU es más débil que Argon2id**: una
+  frase corta se rompe. El formato lleva un identificador de KDF para poder
+  agregar una función memory-hard después sin romper lo ya guardado.
+- Las partes Shamir no llevan ningún digest del secreto, precisamente para que
+  tener una parte no permita verificar conjeturas offline. Menos de `k` partes
+  no revelan nada, y eso es una propiedad de la construcción, no una suposición
+  sobre el atacante.
+- El relay no participa en ninguna de las dos formas y no se entera de que
+  existen.
+
+### 13.3 Hallazgos de la revisión de seguridad de v1.0
+
+Se revisó el código nuevo con foco en criptografía, autorización, parsers
+binarios y superficie de red. Se encontraron dos problemas explotables y tres
+apuntes menores. Todos están corregidos; se documentan porque el hallazgo y la
+corrección son parte del historial de seguridad.
+
+**1. El filtro de direcciones del relay era esquivable (medio).** La lista
+negra comparaba cadenas, así que `127.0.0.1` quedaba bloqueado pero
+`[::ffff:7f00:1]` —la misma dirección escrita en IPv6— pasaba y alcanzaba el
+mismo socket. Verificado en ejecución. Como anunciarse no requiere permiso,
+cualquiera podía hacer que un relay público consultara servicios internos de su
+operador, y que republicara esa dirección a toda la red.
+
+_Corrección:_ se reemplazó por un analizador de direcciones que normaliza toda
+forma equivalente (IPv4 en decimal, IPv6 comprimido, IPv4 embebida en IPv6,
+NAT64) y bloquea los rangos privados, de loopback, link-local, CGNAT,
+multicast, reservados y de documentación, más los nombres locales. El relay
+además **resuelve** los nombres y rechaza los que apuntan a esas direcciones.
+
+**2. El descubrimiento del cliente no tenía ese filtro, y la CSP lo permitía
+(medio).** La lista de peers de un relay la escribe ese relay. Un relay hostil
+podía devolver direcciones de loopback y el navegador de quien abriera la
+aplicación las consultaba, convirtiéndolo en un escáner de puertos de su propia
+máquina. La CSP de v0.2 había sido ampliada a `http://localhost:*` y
+`http://127.0.0.1:*`, que es exactamente lo que hacía falta para lograrlo.
+
+_Corrección:_ el SDK aplica el mismo filtro de direcciones a los peers
+descubiertos y a la dirección que un relay declara para sí mismo; seguir
+direcciones privadas es ahora una opción explícita (`allowPrivateRelays`) que
+la aplicación sólo activa cuando su propio relay ya es local. La CSP de
+producción volvió a `connect-src 'self' https:`; el servidor de desarrollo
+agrega loopback y el build no.
+
+**3. La firma del anuncio no cubría el nombre del relay (bajo).** Se resolvió
+sacando el nombre del anuncio: el anuncio afirma sólo "soy `relayId` en `url`",
+y todo lo demás se lee de esa dirección.
+
+**4. Un anuncio válido no probaba el control de la dirección anunciada
+(bajo).** Una firma prueba quién escribió el mensaje, no quién controla la
+dirección que contiene, así que un directorio podía llenarse de direcciones
+ajenas. Ahora el receptor consulta la dirección antes de creerle y sólo la
+guarda si responde con la misma identidad.
+
+**5. Reanudar con otro archivo del mismo tamaño podía reutilizar un nonce
+(bajo en la revisión, corregido igual).** Con varios relays en distinto punto
+de avance, dos textos claros distintos podían quedar cifrados bajo la misma
+pareja `(clave, nonce)`, lo que rompe AES-GCM. Ahora el ticket de reanudación
+lleva un compromiso con el contenido del archivo y se rechaza cualquier otro
+antes de enviar un solo byte; además, un chunk se reenvía a **todos** los
+relays en cuanto a alguno le falta, de modo que quien ya lo tenía verifica que
+los bytes coinciden.
+
+**Revisado y sin hallazgos:** la aritmética GF(256), Reed-Solomon y Shamir
+(verificados exhaustivamente por ejecución), el espacio de nonces AES-GCM, el
+ligado del AAD a la versión, los parámetros de PBKDF2, la validación de TLS a
+través del proxy SOCKS5, la autorización y el manejo de rutas en el relay, los
+siete parsers binarios (28 000 entradas de fuzzing sin excepciones ni cuelgues)
+y la ausencia de secretos en logs.
+
+### 13.4 Riesgos residuales conocidos
+
+Se listan porque siguen ahí, no porque sean aceptables para siempre.
+
+- **Reasignación de DNS.** El relay resuelve un nombre y verifica las
+  direcciones antes de conectarse, pero la plataforma no permite fijar la
+  conexión a la dirección verificada. Entre la comprobación y la petición, un
+  nombre puede pasar a resolver a otra dirección. Cerrarlo requiere un
+  conector propio; hasta entonces, un operador que aloje servicios internos
+  sensibles debería aislar el relay en red.
+- **PDF `/Info`.** Se blanquean los paquetes XMP sin mover un byte, pero el
+  diccionario `/Info` puede vivir dentro de un flujo de objetos comprimido y no
+  se toca. La interfaz lo dice explícitamente en vez de dar el archivo por
+  limpio.
+- **Formatos no soportados.** TIFF, HEIF exóticos y contenedores propietarios
+  se envían sin cambios, y así se reporta.
+- **La aplicación web no enruta por Tor.** Sólo la CLI puede. Decir lo
+  contrario sería falso: el navegador usa la red de quien lo abre.
+- **Horario y volumen.** Siguen siendo observables por cada relay involucrado.
+  El relleno protege el tamaño; nada protege todavía el momento.
+- **Diversidad de operadores.** El tope por operador aparente y la prueba de
+  trabajo encarecen el Sybil, no lo impiden. Un directorio grande no es
+  evidencia de independencia jurisdiccional ni operativa.

@@ -10,11 +10,13 @@ import {
   encodeShards,
   encryptChunk,
   encryptMetadata,
+  fromBase64Url,
   ownerLocations,
   paddedLengthFor,
   shardCombinations,
   shardLengthFor,
   shareLocations,
+  sha256Base64Url,
   sizeClassStep,
   toBase64Url,
   transportLength,
@@ -147,6 +149,15 @@ export interface UploadedCapsule {
 export interface UploadTicket {
   version: 1;
   createdAt: string;
+  /**
+   * Commitment to the exact bytes this ticket was issued for.
+   *
+   * Resuming with a different file would encrypt different plaintext under a
+   * nonce already used for the original — and with several relays at
+   * different points in the upload, both ciphertexts would exist. Reusing a
+   * nonce breaks AES-GCM outright, so the file is checked rather than trusted.
+   */
+  contentDigest: string;
   secrets: CapsuleSecrets;
   metadata: CapsuleMetadata;
   encryptedManifest: string;
@@ -246,6 +257,29 @@ function minimumLimits(targets: UploadTarget[]): RelayPublicConfig {
     }),
     { ...first },
   );
+}
+
+/**
+ * A commitment to the contents of a blob, computed one chunk at a time so a
+ * large file never has to be held in memory: the digest of the concatenated
+ * per-chunk digests.
+ */
+async function contentDigestOf(
+  payload: Blob,
+  chunkSize: number,
+): Promise<string> {
+  const digests: Uint8Array[] = [];
+  for (let offset = 0; offset < payload.size; offset += chunkSize) {
+    const slice = new Uint8Array(
+      await payload
+        .slice(offset, Math.min(offset + chunkSize, payload.size))
+        .arrayBuffer(),
+    );
+    digests.push(fromBase64Url(await sha256Base64Url(slice)));
+  }
+  const combined = new Uint8Array(digests.length * 32);
+  digests.forEach((digest, index) => combined.set(digest, index * 32));
+  return sha256Base64Url(combined);
 }
 
 /** Reads one padded chunk of plaintext, zero-filling past the end of the file. */
@@ -490,6 +524,9 @@ export async function uploadCapsule(
   const ticket: UploadTicket = {
     version: 1,
     createdAt: now.toISOString(),
+    contentDigest: options.onTicket
+      ? await contentDigestOf(payload, chunkSize)
+      : "",
     secrets,
     metadata,
     encryptedManifest: createRequest.encryptedManifest,
@@ -570,6 +607,17 @@ export async function resumeUpload(
     payload = (await scrubBlobMetadata(payload)).blob;
   }
   if (payload.size !== ticket.metadata.byteLength) {
+    throw new Error(
+      "This file does not match the one the ticket was created for",
+    );
+  }
+  if (!ticket.contentDigest) {
+    throw new Error("This ticket predates content checking and cannot be used");
+  }
+  if (
+    (await contentDigestOf(payload, ticket.metadata.chunkSize)) !==
+    ticket.contentDigest
+  ) {
     throw new Error(
       "This file does not match the one the ticket was created for",
     );
@@ -668,7 +716,13 @@ async function transferChunks(
       totalChunks: chunkCount,
     });
 
-    const pending = surviving.filter((target) => !target.present?.has(index));
+    // A chunk is re-sent to every target as soon as one of them is missing it,
+    // not only to the ones missing it. A relay that already holds the chunk
+    // then verifies the bytes are identical, which turns a mismatched resume
+    // into a refusal instead of a capsule stitched from two different files.
+    const pending = surviving.some((target) => !target.present?.has(index))
+      ? [...surviving]
+      : [];
     if (pending.length > 0) {
       const plaintext = await readChunk(
         payload,

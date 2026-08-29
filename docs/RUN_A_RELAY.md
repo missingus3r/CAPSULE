@@ -1,6 +1,6 @@
 # Levantá tu propio relay
 
-**Estado:** guía operativa para CAPSULE 0.2
+**Estado:** guía operativa para CAPSULE 1.0
 **Fecha:** 2026-08-29
 
 No hay registro, lista blanca ni permiso que pedir. Un relay de CAPSULE es
@@ -65,21 +65,41 @@ Opcionales:
 ```bash
 CAPSULE_RELAY_NAME="relay del club de barrio"   # etiqueta visible en el directorio
 CAPSULE_MAX_PEERS=200                            # tope del directorio local
+CAPSULE_MAX_PEERS_PER_OPERATOR=4                 # tope por dominio aparente
 CAPSULE_PEER_SYNC_INTERVAL_MS=300000             # cada cuánto saluda a sus peers
+CAPSULE_ANNOUNCE_POW_BITS=18                     # trabajo exigido a quien se anuncia
 CAPSULE_ALLOW_PRIVATE_PEERS=false                # true sólo en redes locales
 ```
+
+`CAPSULE_ANNOUNCE_POW_BITS` es lo que le cuesta a un relay nuevo presentarse:
+cada bit duplica el trabajo. En 18 bits un relay honesto tarda una fracción de
+segundo por ronda de gossip, y llenar tu directorio de relays inventados cuesta
+esa misma fracción **por cada uno**. Subilo si ves anuncios basura; bajalo a 0
+sólo en una red cerrada.
+
+`CAPSULE_ALLOW_PRIVATE_PEERS` **no** es una comodidad: es el interruptor que
+permite que una dirección anunciada apunte de vuelta a tu propia red. Déjalo en
+`false` en cualquier relay expuesto a Internet.
 
 Cada ronda de gossip el relay:
 
 1. saluda a los peers configurados y a los que ya conoce;
-2. les manda un anuncio firmado con su clave privada;
+2. les manda un anuncio firmado, con su prueba de trabajo resuelta;
 3. recibe la lista de relays que ellos conocen;
 4. prueba cada dirección nueva con `GET /v1/info` y la guarda sólo si esa
    dirección responde con una identidad coherente con lo que anunció.
 
-Una dirección aprendida de un tercero nunca se guarda por confiar en quien la
-pasó. Eso impide que un peer invente relays; no convierte a ningún relay en
-confiable.
+Ninguna dirección se guarda por confiar en quien la pasó, **ni siquiera cuando
+viene firmada**: una firma prueba quién escribió el mensaje, no quién controla
+la dirección que contiene. Por eso hasta un anuncio directo se verifica
+consultando la dirección anunciada antes de creerle.
+
+El relay tampoco se conecta a una dirección que apunte a su propia red:
+descarta loopback, enlaces locales, rangos privados, CGNAT y direcciones
+reservadas, incluidas las formas escritas en IPv6 (`[::ffff:7f00:1]` es
+`127.0.0.1`), y **resuelve** los nombres para rechazar los que apunten ahí.
+Si arrancás el relay en una máquina que además aloja servicios internos,
+aislarlo en red sigue siendo lo prudente.
 
 Verificá desde otra máquina:
 
@@ -95,8 +115,14 @@ decisión de costo y de responsabilidad que sólo puede tomar quien paga el disc
 
 ```bash
 CAPSULE_ALLOW_PERSISTENT_CAPSULES=true
-CAPSULE_MAX_PERSISTENT_BYTES=10737418240   # 10 GiB de tope
+CAPSULE_MAX_PERSISTENT_BYTES=10737418240              # 10 GiB de tope
+CAPSULE_MAX_PERSISTENT_BYTES_PER_SENDER=1073741824    # 1 GiB por remitente
 ```
+
+El tope por remitente evita que la primera persona que llegue se lleve todo el
+espacio. Para distinguir remitentes sin llevar una lista de quiénes son, el
+relay cuenta contra un hash con sal de la dirección, y la sal se descarta y se
+regenera cada ventana: al rotar, los contadores se olvidan. Es a propósito.
 
 Al habilitarlo:
 
@@ -146,7 +172,20 @@ tamaño, tiempo y frecuencia, publicar una política y una vía de contacto, y
 borrar por `capsuleId` cuando recibas un reclamo fundado. Anotá esa decisión en
 tu propia política antes de recibir el primer reclamo, no después.
 
-## 7. Checklist antes de anunciarte
+## 7. Cápsulas repartidas
+
+Si varios relays de la red aceptan cápsulas, quien envía puede **repartir** una
+en vez de copiarla: con `k de n`, cada relay guarda un fragmento que por sí
+solo no permite reconstruir nada, y hacen falta `k` operadores distintos para
+leerla.
+
+Para vos como operador eso significa dos cosas concretas: guardás alrededor de
+`1/k` de cada cápsula en vez de una copia entera, y si te incautan el disco no
+tenés el ciphertext completo de nada. No requiere configuración: es una
+decisión de quien envía, y tu relay ve fragmentos opacos igual que veía
+cápsulas opacas.
+
+## 8. Checklist antes de anunciarte
 
 - [ ] HTTPS válido y `CAPSULE_PUBLIC_URL` con el origen real.
 - [ ] `identity.json` respaldado y con permisos `0600`.
@@ -155,4 +194,5 @@ tu propia política antes de recibir el primer reclamo, no después.
 - [ ] Límites de tamaño y TTL acordes a tu disco.
 - [ ] Decisión explícita sobre cápsulas sin vencimiento.
 - [ ] Política de abuso y contacto publicados.
+- [ ] `CAPSULE_ALLOW_PRIVATE_PEERS=false` (es el freno anti-SSRF).
 - [ ] `curl /v1/info` y `/v1/peers` responden desde fuera de tu red.

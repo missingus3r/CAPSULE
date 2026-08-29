@@ -1,14 +1,21 @@
-# CAPSULE Protocol v1 y v2
+# CAPSULE Protocol v1, v2 y v3
 
-**Estado:** especificación de interoperabilidad para CAPSULE 0.1 y 0.2  
-**Identificador de versión escrito por esta implementación:** `2`  
-**Versiones legibles:** `1`, `2`  
+**Estado:** especificación estable para CAPSULE 1.0  
+**Identificador de versión escrito por esta implementación:** `3`  
+**Versiones legibles:** `1`, `2`, `3`  
 **Fecha:** 2026-08-29
 
 Las secciones 1 a 11 describen la versión 1, que sigue siendo legible sin
-cambios. La sección 12 especifica la versión 2: relleno por clases de tamaño,
-cápsulas sin vencimiento, capabilities con relays espejo y los endpoints de red
-del relay.
+cambios. La sección 12 especifica la versión 2 (relleno por clases de tamaño,
+cápsulas sin vencimiento, relays espejo y los endpoints de red del relay) y la
+sección 13 la versión 3, que agrega erasure coding y fija las reglas de
+direcciones. La sección 14 describe las capabilities protegidas y divididas,
+que no son parte del formato de cápsula pero sí de la interoperabilidad.
+
+**Vectores de prueba oficiales:**
+[`packages/protocol/vectors/capsule-test-vectors.json`](../packages/protocol/vectors/capsule-test-vectors.json).
+Una implementación que reproduzca esos bytes es compatible con ésta. Se
+regeneran con `npm run vectors`; si un cambio los mueve, el protocolo cambió.
 
 ## 1. Objetivo y modelo
 
@@ -640,3 +647,185 @@ convierte a un relay en confiable.
 - Un cliente v1 rechaza una cápsula v2: la versión del fragmento no coincide.
 - Un relay v0.1 acepta cápsulas v2 con TTL, porque el ciphertext le es opaco;
   rechazará `expiresInSeconds: null` por no conocer el campo.
+
+## 13. Versión 3
+
+La versión 3 mantiene la primitiva, el espacio de índices, la derivación del
+nonce y el manifiesto de la versión 2. Agrega una sola cosa al formato —
+erasure coding en la capability— y fija dos reglas que antes eran implícitas.
+
+### 13.1 Erasure coding `k de n`
+
+Con `sharding` presente, cada relay listado en la capability guarda **un shard
+por chunk** en vez de una copia completa. Menos de `k` relays no pueden
+reconstruir un solo byte del ciphertext; cualquier `k` sí.
+
+```json
+{
+  "version": 3,
+  "relayUrl": "https://relay-a.example",
+  "capsuleId": "…",
+  "readToken": "…",
+  "key": "…",
+  "noncePrefix": "…",
+  "mirrors": [
+    {
+      "relayUrl": "https://relay-b.example",
+      "capsuleId": "…",
+      "readToken": "…"
+    },
+    {
+      "relayUrl": "https://relay-c.example",
+      "capsuleId": "…",
+      "readToken": "…"
+    }
+  ],
+  "sharding": { "k": 2, "n": 3, "blockBytes": 32784, "shardBytes": 16392 }
+}
+```
+
+Reglas obligatorias:
+
+- `2 <= k < n <= 16` y `n === mirrors.length + 1`. **El orden importa**: el
+  relay primario es el shard 0 y cada espejo es el shard `i + 1`.
+- `blockBytes === chunkSize + 16`, es decir el ciphertext completo de un chunk.
+- `shardBytes === ceil(blockBytes / k)`.
+- El relleno es obligatorio (`paddedLength` presente), porque todos los chunks
+  deben medir lo mismo para que un shard tenga un tamaño único.
+- El manifiesto **no** se reparte: se replica completo en los `n` relays, así
+  cualquiera de ellos puede entregarlo.
+- El `totalCiphertextBytes` declarado a cada relay es `chunkCount * shardBytes`.
+
+**Codificación.** Reed-Solomon sistemático sobre GF(2^8) con el polinomio
+`0x11d`. Las primeras `k` filas de la matriz generadora son la identidad; las
+`n - k` restantes son una matriz de Cauchy `C[i][j] = 1 / (x_i ⊕ y_j)` con
+`x_i = k + i` e `y_j = j`. Toda submatriz cuadrada de una matriz de Cauchy es
+invertible, que es lo que hace cierto "cualquier `k`" y no "casi siempre `k`".
+
+El bloque se parte en `k` shards de `shardBytes`, rellenando el último con
+ceros hasta `k * shardBytes`.
+
+**Reconstrucción.** Se toman `k` shards disponibles, se invierte la submatriz
+correspondiente a sus índices y se recuperan los shards de datos. Los shards
+**no** están autenticados individualmente: un relay que entrega un shard
+alterado produce ruido, y quien lo detecta es el tag AES-GCM del chunk. Por eso
+un lector **debe** reintentar con otra combinación de `k` shards ante un fallo
+de autenticación antes de dar la cápsula por perdida; así un relay mentiroso se
+aísla en vez de romper la descarga.
+
+### 13.2 Direcciones de relay admisibles
+
+Un relay aprende direcciones de otros relays y un cliente las aprende de los
+relays; ambos después se conectan. Una dirección sólo es admisible si es un
+origen HTTP(S) canónico, sin credenciales, ruta, query ni fragmento, y su host
+**no** es ninguna de estas cosas, escrita de cualquier forma:
+
+- IPv4 en `0.0.0.0/8`, `10/8`, `127/8`, `169.254/16`, `172.16/12`,
+  `192.168/16`, `100.64/10`, `192.0.0.0/24`, `192.0.2.0/24`, `198.18/15`,
+  `198.51.100/24`, `203.0.113/24`, `224/4` o `240/4`;
+- IPv6 `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8` o `2001:db8::/32`;
+- **una IPv4 de esa lista embebida en IPv6**: `::ffff:7f00:1` es `127.0.0.1`,
+  y también lo son `::ffff:127.0.0.1`, `::127.0.0.1` y `64:ff9b::7f00:1`;
+- `localhost`, un nombre de una sola etiqueta, o un nombre terminado en
+  `.local`, `.localhost`, `.internal`, `.home.arpa` o `.arpa`.
+
+Un nombre que resuelve a una de esas direcciones sólo puede detectarse
+resolviéndolo: **el relay debe resolver el nombre y rechazarlo si alguna
+dirección resultante no es admisible**, antes de conectarse. Un cliente en un
+navegador no puede resolver, y por lo tanto no debe seguir direcciones privadas
+salvo que el operador lo habilite explícitamente para una red local.
+
+### 13.3 Anuncios entre relays
+
+El mensaje firmado incorpora un nonce de prueba de trabajo:
+
+```text
+CAPSULE/relay-announce/v2
+<url>
+<relayId>
+<announcedAt>
+<nonce>
+```
+
+(los campos van separados por saltos de línea, en ese orden, sin espacios)
+
+- El anuncio contiene exactamente `url`, `relayId`, `publicKey`, `announcedAt`,
+  `nonce` y `signature`. **Nada más**: cualquier otro dato sobre el relay —su
+  nombre, sus límites— se lee de `/v1/info` en la dirección anunciada, no del
+  anuncio, así no hay nada que valga la pena falsificar.
+- La prueba de trabajo son los bits en cero iniciales de `SHA-256(mensaje)`. El
+  receptor exige al menos los que tenga configurados.
+- El receptor **debe** consultar `GET <url>/v1/info` y aceptar el anuncio sólo
+  si esa dirección responde con un `relayId` igual al anunciado y coherente con
+  su clave pública. Una firma válida prueba quién escribió el mensaje, no quién
+  controla la dirección que contiene.
+
+## 14. Capabilities protegidas y divididas
+
+Ninguna de estas dos formas toca el formato de cápsula: envuelven la cadena de
+una capability. Se especifican acá porque son interoperables.
+
+### 14.1 Protegida con frase de acceso
+
+```text
+capsule-recovery:<base64url(JSON)>
+```
+
+```json
+{
+  "version": 1,
+  "kdf": "pbkdf2-sha256",
+  "iterations": 600000,
+  "salt": "<base64url, 16 bytes>",
+  "nonce": "<base64url, 12 bytes>",
+  "ciphertext": "<base64url>",
+  "label": "opcional, no secreto"
+}
+```
+
+- Clave: PBKDF2-HMAC-SHA-256 sobre la frase normalizada en NFKC, con el `salt`
+  y las `iterations` del documento, hacia una clave AES-256-GCM.
+- AAD: `CAPSULE/recovery/v1/<kdf>/<iterations>/<salt>`. Liga los parámetros al
+  ciphertext, de modo que bajar `iterations` en un blob guardado no lo abre.
+- Mínimo aceptable: 100 000 iteraciones. PBKDF2 es lo único que Web Crypto
+  ofrece en todas partes; es más débil que Argon2id frente a una GPU, y el
+  campo `kdf` existe para agregar una función memory-hard sin romper lo ya
+  publicado.
+
+### 14.2 Dividida en partes
+
+```text
+capsule-share:<base64url(bytes)>
+```
+
+| Offset | Bytes | Contenido                  |
+| ------ | ----- | -------------------------- |
+| 0      | 1     | versión de formato (`1`)   |
+| 1      | 1     | umbral `k` (2..16)         |
+| 2      | 1     | índice de la parte (1..16) |
+| 3      | 8     | identificador del reparto  |
+| 11     | resto | evaluación del polinomio   |
+
+Shamir sobre GF(2^8): por cada byte del secreto se toma un polinomio de grado
+`k - 1` cuyo término independiente es ese byte y cuyos demás coeficientes
+vienen del CSPRNG; la parte `i` es el polinomio evaluado en `i`. La combinación
+es interpolación de Lagrange en cero.
+
+El identificador de reparto detecta la mezcla de partes de dos repartos
+distintos. **No** hay digest del secreto en la parte: publicarlo permitiría, a
+quien tenga una sola parte, verificar conjeturas sin conocer las demás.
+
+## 15. Estabilidad de la versión 1.0
+
+- El formato de cápsula v1, v2 y v3, la API `/v1` del relay y la codificación
+  de capabilities quedan congelados. Un cambio incompatible exige una versión
+  de protocolo nueva y una entrada en el registro de cambios.
+- Los vectores de
+  [`capsule-test-vectors.json`](../packages/protocol/vectors/capsule-test-vectors.json)
+  son la referencia normativa. Se regeneran con `npm run vectors` y un cambio
+  en ellos es, por definición, un cambio de protocolo.
+- Agregar un campo JSON opcional que un lector viejo pueda ignorar sin riesgo
+  no cambia la versión. `sharding` no calificó: un lector que lo ignore leería
+  shards como si fueran chunks, así que exigió versión nueva.
+- No hay negociación de algoritmos y no hay downgrade automático. Un lector
+  rechaza una versión que no conoce.

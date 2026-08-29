@@ -1,6 +1,6 @@
 # CAPSULE — Roadmap de producto y protocolo
 
-**Estado:** propuesta por hitos, sin fechas comprometidas  
+**Estado:** 1.0 publicada; lo siguiente es propuesta por hitos, sin fechas  
 **Fecha:** 2026-08-29
 
 ## 1. Norte del proyecto
@@ -52,6 +52,11 @@ La versión 0.1 no debe venderse como una red anónima. Su valor concreto es:
 Las etiquetas futuras son direccionales: pueden reordenarse si las pruebas
 demuestran otra dependencia. Cada hito mantiene compatibilidad de lectura o
 publica una versión de protocolo nueva.
+
+El recovery se adelantó a 1.0 porque las cápsulas sin vencimiento lo volvieron
+urgente: perder la clave de retiro de una cápsula que no vence nunca es una
+pérdida definitiva, y esperar dos hitos para resolverlo no tenía defensa. El
+detalle de lo que viene después de 1.0 está en la sección 14.
 
 ## 4. v0.1 — Mínimo ejecutable
 
@@ -240,6 +245,13 @@ patrones; permisos y APIs del sistema operativo siguen siendo puntos de confianz
 
 ## 9. v0.5 — Recovery opt-in
 
+**Estado: implementado en 1.0.** Se entregaron dos de los candidatos que
+siguen: la exportación cifrada con frase de acceso (PBKDF2-SHA-256 + AES-GCM,
+parámetros versionados y ligados al ciphertext) y la división `k de n` de una
+capability entre personas o dispositivos, sin digest del secreto en las partes.
+No se incorporó escrow central ni "restablecer por email", y no se incorporará.
+Queda pendiente Argon2id, anotado en la sección 14.1.
+
 En v0.1 una clave perdida no puede recuperarse. Añadir recuperación siempre crea
 otra ruta de acceso; por eso debe ser opcional, visible y separada del relay de
 contenido.
@@ -355,3 +367,96 @@ independencia operativa, uso real o resistencia a Sybil.
 La ruta preferida es mantener un núcleo pequeño y componible: transporte cifrado
 usable primero; distribución y cercanía después; anonimato sólo cuando su modelo,
 costo y evidencia sean honestos.
+
+## 14. Después de 1.0: opciones y mejoras para la próxima versión
+
+v1.0 cerró el transporte cifrado, la anonimización de contenido y la red
+abierta. Lo que queda se agrupa en cuatro clases, y están ordenadas por lo que
+realmente aportan a alguien que usa CAPSULE hoy, no por lo vistoso que suenan.
+
+### 14.1 Cerrar lo que quedó a medias (v1.1)
+
+Trabajo acotado, con criterio de terminado claro, sin cambio de protocolo.
+
+| Pendiente                                  | Por qué importa                                                            | Criterio de terminado                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Limpieza de `/Info` en PDF                 | Es el formato de documento más común y el que más autoría filtra           | Reescritura incremental verificada contra un corpus real, sin corromper        |
+| TIFF, HEIF exóticos, contenedores de audio | Hoy se envían sin cambios                                                  | Soporte o rechazo explícito por formato, nunca silencio                        |
+| Fijar la conexión a la dirección resuelta  | Cierra la ventana de reasignación de DNS descrita en el modelo de amenazas | Conector propio con la dirección verificada, con prueba de regresión           |
+| Argon2id como KDF de recuperación          | PBKDF2 protege mal una frase corta frente a GPU                            | `kdf: "argon2id"` con parámetros versionados, leyendo lo anterior              |
+| Backends de almacenamiento intercambiables | Un relay serio no quiere todo en un disco local                            | Interfaz de almacenamiento y una implementación no local, con pruebas de caída |
+| Métricas agregadas                         | Un operador necesita ver uso sin retener nada                              | Contadores sin IDs, sin tokens, sin IP y sin alta cardinalidad                 |
+| Builds reproducibles y firmados            | Hoy se publican checksums y SBOM, pero la firma es manual                  | Build reproducible verificable por un tercero y firma en el proceso            |
+
+### 14.2 Alcance nuevo con transporte nuevo (v1.2 en adelante)
+
+Cada uno cambia el modelo de amenazas y necesita su propia sección antes de
+escribirse una línea de código.
+
+**Transferencia P2P.** Entrega directa cuando ambos dispositivos están
+disponibles, con el relay como respaldo. Puerta de entrada: una pantalla que
+explique la exposición de IP **antes** de conectar, comportamiento correcto
+bajo NAT, y modos "sólo directo" y "con respaldo" separados sin ambigüedad. No
+se empieza sin decidir el transporte (WebRTC o QUIC) midiendo su superficie de
+identificación, no su comodidad.
+
+**Cercanía: BLE y Wi-Fi local.** Intercambio sin Internet. Puerta de entrada:
+emparejamiento autenticado por QR o código corto, identificadores efímeros y
+rotatorios en el descubrimiento, y una estrategia explícita para las
+restricciones de segundo plano de Android y iOS. BLE para descubrimiento y
+control; los archivos por Wi-Fi.
+
+**Sincronización E2EE entre dispositivos del remitente.** Hoy una capability
+vive donde se creó. Puerta de entrada: un diseño donde el segundo dispositivo
+se autoriza sin que ningún servidor pueda descifrar.
+
+### 14.3 Protección de metadata (sólo con evidencia)
+
+Es lo que más se pide y lo que menos se puede prometer. El orden es
+deliberado: primero medir, después construir.
+
+1. **Definir el adversario.** ¿El relay? ¿El ISP local? ¿Varios relays
+   coludidos? ¿Un observador global pasivo? Cada respuesta lleva a un diseño
+   distinto, y "todos" no es una respuesta.
+2. **Medir el costo aceptable** de latencia, ancho de banda y batería en redes
+   móviles reales de la región.
+3. **Elegir una construcción publicada** —paquetes tipo Sphinx, mixnet con
+   batching y retardos— en vez de diseñar criptografía nueva.
+4. **Padding temporal y tráfico de cobertura**, que es lo único que ataca lo
+   que hoy queda expuesto: el horario y el volumen.
+5. **Simulaciones y testnet públicos** antes de integrarlo en la aplicación
+   estable.
+
+Nada de esto se enciende por omisión, y ninguna versión dirá "anónimo" por
+tener más saltos. Un anonymity set chico ofrece poca protección aunque la
+topología se vea impresionante.
+
+### 14.4 Confianza verificable por terceros
+
+- **Auditoría criptográfica externa** del protocolo, los nonces, las
+  capabilities y la recuperación. La revisión de v1.0 fue interna y así está
+  etiquetada; una auditoría independiente es otra cosa.
+- **Pentest** de web, CLI, relay, CORS/CSP, almacenamiento y despliegue.
+- **Revisión de privacidad con captura de tráfico**, para contrastar lo que el
+  modelo de amenazas afirma con lo que se ve en la red.
+- **Fuzzing continuo** en integración continua, no sólo la suite actual.
+- **`security.txt`, canal de divulgación coordinada y SLA de triage** antes de
+  operar una instancia pública con usuarios reales.
+- **Historial público de incidentes** y advisories por versión.
+
+Los hallazgos críticos y altos se corrigen y revalidan antes de anunciar
+cualquier auditoría; el informe puede omitir detalles explotables durante el
+embargo, pero debe publicar alcance, método, fecha y estado de remediación.
+
+### 14.5 Lo que sigue necesitando evidencia antes de adoptarse
+
+Sin cambios respecto de v0.1, y por las mismas razones:
+
+- blockchain o token de red;
+- algoritmo criptográfico propio;
+- DHT público que exponga identificadores o facilite enumeración;
+- previsualización de archivos del lado del servidor;
+- CDN o analítica de terceros en la aplicación sensible;
+- identidad global, número de teléfono o grafo social centralizado;
+- recuperación custodial habilitada por omisión;
+- etiquetas de marketing como "anónimo", "sin rastros" o "autodestructivo".
