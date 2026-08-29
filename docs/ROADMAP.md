@@ -38,16 +38,16 @@ La versión 0.1 no debe venderse como una red anónima. Su valor concreto es:
 
 ## 3. Vista general
 
-| Hito   | Resultado principal                       | Mejora                                              | No resuelve todavía                                 |
-| ------ | ----------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
-| v0.1   | Web + CLI + relay temporal interoperables | Confidencialidad de contenido, integridad y TTL     | Anonimato, alta disponibilidad, recuperación        |
-| v0.1.x | Endurecimiento y operación reproducible   | Menos fallos, abuso y filtraciones operativas       | Dependencia de un relay                             |
-| v0.2   | Multi-relay opcional                      | Disponibilidad y resistencia a caída/censura simple | Correlación global                                  |
-| v0.3   | Transferencia P2P con fallback            | Menos almacenamiento central, rapidez local         | P2P revela IP a pares/infraestructura               |
-| v0.4   | Cercanía: BLE y Wi-Fi local               | Intercambio sin Internet                            | Anonimato de proximidad y background móvil perfecto |
-| v0.5   | Recovery opt-in                           | Menos pérdidas irreversibles                        | Recuperación sin ampliar superficie de ataque       |
-| v0.6   | Transporte mix experimental               | Protección de metadata bajo un adversario definido  | Baja latencia gratuita o anonimato con red pequeña  |
-| v1.0   | Protocolo estable y auditado              | Confianza verificable para terceros                 | Seguridad absoluta                                  |
+| Hito    | Resultado principal                                                     | Mejora                                              | No resuelve todavía                                 |
+| ------- | ----------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| v0.1 ✅ | Web + CLI + relay temporal interoperables                               | Confidencialidad de contenido, integridad y TTL     | Anonimato, alta disponibilidad, recuperación        |
+| v0.1.x  | Endurecimiento y operación reproducible                                 | Menos fallos, abuso y filtraciones operativas       | Dependencia de un relay                             |
+| v0.2 ✅ | Red abierta de relays, anonimización parcial y cápsulas sin vencimiento | Disponibilidad, menos metadata en archivo/tamaño/IP | Correlación global, anonimato de red en la web      |
+| v0.3    | Transferencia P2P con fallback                                          | Menos almacenamiento central, rapidez local         | P2P revela IP a pares/infraestructura               |
+| v0.4    | Cercanía: BLE y Wi-Fi local                                             | Intercambio sin Internet                            | Anonimato de proximidad y background móvil perfecto |
+| v0.5    | Recovery opt-in                                                         | Menos pérdidas irreversibles                        | Recuperación sin ampliar superficie de ataque       |
+| v0.6    | Transporte mix experimental                                             | Protección de metadata bajo un adversario definido  | Baja latencia gratuita o anonimato con red pequeña  |
+| v1.0    | Protocolo estable y auditado                                            | Confianza verificable para terceros                 | Seguridad absoluta                                  |
 
 Las etiquetas futuras son direccionales: pueden reordenarse si las pruebas
 demuestran otra dependencia. Cada hito mantiene compatibilidad de lectura o
@@ -134,16 +134,58 @@ Objetivo: operar v0.1 de forma honesta antes de distribuir la arquitectura.
 con fallos de limpieza y uso de disco observables, sin conservar secretos en
 telemetría.
 
-## 6. v0.2 — Multi-relay
+## 6. v0.2 — Red abierta, anonimización parcial y permanencia opcional
 
-Objetivo: que una caída o censura de un único relay no destruya la cápsula.
+**Estado: implementado.** Objetivo: que una caída o censura de un único relay no
+destruya la cápsula, que el remitente pueda decidir cuánto revela, y que quien
+quiera aportar infraestructura pueda hacerlo sin pedir permiso.
 
-### 6.1 Diseño a validar
+### 6.0 Entregado
+
+**Red abierta de relays**
+
+- Identidad Ed25519 por relay, generada al arrancar y persistida en
+  `identity.json`; `relayId` = digest de la clave pública.
+- `GET /v1/info`, `GET /v1/peers` y `POST /v1/peers/announce` con anuncios
+  firmados y ventana temporal de ±5 minutos.
+- Gossip periódico: saludo a peers configurados y conocidos, verificación de
+  cada dirección aprendida contra `/v1/info`, expulsión tras fallos repetidos y
+  tope `CAPSULE_MAX_PEERS`.
+- Defensa SSRF: se rechazan loopback, enlaces locales, rangos privados y CGNAT
+  salvo habilitación explícita para redes locales.
+- Descubrimiento del lado cliente (`discoverRelays`, `selectRelays`), replicación
+  opcional con `mirrors` en la capability, failover de lectura y borrado dirigido
+  a todos los relays con reporte honesto de los que no confirmaron.
+
+**Anonimización**
+
+- Limpieza de metadatos del archivo antes de cifrar: JPEG (APPn y comentarios),
+  PNG (`tEXt`/`zTXt`/`iTXt`/`eXIf`/`tIME`) y WebP (`EXIF`/`XMP` más los flags de
+  `VP8X`). Los formatos no soportados se reportan como tales.
+- Nombre y mime neutros en el manifiesto.
+- Relleno por clases de tamaño en pasos de un cuarto de octava con piso de
+  64 KiB; todos los chunks quedan del mismo tamaño y el receptor descarga
+  también el relleno.
+- Jitter opcional entre chunks.
+- Transporte SOCKS5/Tor en la CLI (`--proxy`, `--tor`), con resolución de nombre
+  en el proxy y soporte de `.onion`.
+- Relay sin retención de IP por defecto: sin direcciones en logs y rate limiting
+  por hash con sal rotativa.
+
+**Cápsulas sin vencimiento**
+
+- `expiresAt: null` en el manifiesto v2 y `expiresInSeconds: null` en la API.
+- Desactivado por defecto; el operador lo habilita y fija una cuota
+  (`CAPSULE_MAX_PERSISTENT_BYTES`), con `507` al agotarla.
+- La limpieza periódica nunca las toca; sólo la capability de retiro las borra.
+
+### 6.1 Diseño pendiente de validar
 
 - Capability con una lista autenticada de relays y tokens independientes.
 - Política configurable:
-  - **réplica completa**, simple pero costosa y correlacionable; o
-  - **fragmentación/erasure coding `k-of-n`**, más eficiente pero compleja.
+  - **réplica completa** (implementada), simple pero costosa y correlacionable; o
+  - **fragmentación/erasure coding `k-of-n`** (pendiente), más eficiente pero
+    compleja.
 - Descarga concurrente acotada, fallback y reconstrucción determinista.
 - Consenso del cliente sobre TTL y estado; ningún relay amplía la retención
   prometida por los demás.

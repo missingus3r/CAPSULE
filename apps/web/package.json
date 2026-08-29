@@ -1,6 +1,6 @@
 {
   "name": "@capsule/web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {
-    "@capsule/protocol": "0.1.0",
-    "@capsule/sdk": "0.1.0",
+    "@capsule/protocol": "1.0.0",
+    "@capsule/sdk": "1.0.0",
     "lucide-react": "^0.468.0",
     "qrcode": "^1.5.4",
     "react": "^19.1.1",

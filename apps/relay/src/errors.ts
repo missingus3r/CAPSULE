@@ -43,3 +43,7 @@ export function storageCorrupt(
 ): RelayHttpError {
   return new RelayHttpError(500, "storage_corrupt", message);
 }
+
+export function insufficientStorage(message: string): RelayHttpError {
+  return new RelayHttpError(507, "insufficient_storage", message);
+}

@@ -1,6 +1,6 @@
 {
   "name": "capsule",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Private, temporary and resilient encrypted capsule transport.",
   "workspaces": [
@@ -17,8 +17,10 @@
     "dev:relay": "npm run build:libs && npm run dev -w @capsule/relay",
     "dev:web": "npm run build:libs && npm run dev -w @capsule/web",
     "test": "npm run build:libs && npm run test --workspaces --if-present && npm run test:integration",
-    "test:integration": "npm run build && vitest run tests/integration.test.ts",
+    "test:integration": "npm run build && vitest run tests",
     "typecheck": "npm run build:libs && npm run typecheck --workspaces --if-present",
+    "vectors": "npm run build -w @capsule/protocol && node packages/protocol/scripts/generate-vectors.mjs",
+    "release": "npm run build && node scripts/release.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

@@ -1,8 +1,14 @@
-# CAPSULE Protocol v1
+# CAPSULE Protocol v1 y v2
 
-**Estado:** especificación de interoperabilidad para CAPSULE 0.1  
-**Identificador de versión:** `1`  
+**Estado:** especificación de interoperabilidad para CAPSULE 0.1 y 0.2  
+**Identificador de versión escrito por esta implementación:** `2`  
+**Versiones legibles:** `1`, `2`  
 **Fecha:** 2026-08-29
+
+Las secciones 1 a 11 describen la versión 1, que sigue siendo legible sin
+cambios. La sección 12 especifica la versión 2: relleno por clases de tamaño,
+cápsulas sin vencimiento, capabilities con relays espejo y los endpoints de red
+del relay.
 
 ## 1. Objetivo y modelo
 
@@ -473,3 +479,164 @@ Un cliente conforme:
   ciphertext.
 - El cifrado no vuelve seguro al archivo descargado. La aplicación no debe
   previsualizar ni ejecutar contenido activo sin aislamiento explícito.
+
+## 12. Versión 2
+
+La versión 2 no cambia la primitiva, el espacio de índices ni la derivación del
+nonce. Cambia el AAD, agrega tres campos opcionales y agrega endpoints al relay.
+Un lector debe usar la versión declarada en la capability para todo, incluido el
+AAD; nunca debe asumir la versión propia.
+
+### 12.1 Additional Authenticated Data ligado a la versión
+
+```text
+CAPSULE/v<version>/chunk/<index>
+```
+
+`<version>` es la versión de la cápsula (`1` o `2`), no la del lector. Una
+cápsula v1 descifrada con AAD v2 falla la autenticación, y viceversa: el
+downgrade de versión no es silencioso, es un error criptográfico.
+
+### 12.2 Manifiesto: `expiresAt` nulo
+
+`expiresAt` acepta `null` en v2. Significa que el remitente pidió una cápsula
+sin vencimiento y el relay la aceptó. No significa “permanente”: sigue
+existiendo mientras ese relay la conserve y la `deleteToken` la retira.
+
+- En v1 `expiresAt` debe ser una fecha posterior a `createdAt`. `null` es
+  inválido y debe rechazarse.
+- Un relay sólo acepta `expiresInSeconds: null` si su operador lo habilitó.
+  Si no, responde `400 persistent_capsules_disabled`.
+- El relay expone `persistentCapsules` en `/v1/config` y `/v1/info` para que el
+  cliente lo sepa antes de cifrar.
+
+### 12.3 Manifiesto: `paddedLength`
+
+`paddedLength` es opcional y sólo existe en v2. Cuando está presente:
+
+- `paddedLength >= byteLength`;
+- `paddedLength % chunkSize === 0`;
+- `chunkCount === paddedLength / chunkSize`.
+
+Los bytes entre `byteLength` y `paddedLength` son ceros, se cifran y se
+autentican igual que el resto, y el receptor los descarta después de descifrar.
+Todos los chunks quedan del mismo tamaño, de modo que el relay observa una
+clase de tamaño y una cantidad de chunks, no el tamaño del archivo.
+
+La clase de tamaño se calcula en pasos de un cuarto de octava con un piso de
+64 KiB, y luego se redondea a un múltiplo entero de `chunkSize`:
+
+```text
+clase(n)   = ceil(max(n, 65536) / (2^floor(log2(max(n, 65536))) / 4)) * paso
+padded(n)  = ceil(clase(n) / chunkSize) * chunkSize
+```
+
+El receptor **debe** descargar los `chunkCount` chunks aunque sepa que los
+últimos son relleno: descargar sólo los chunks útiles le devuelve al relay el
+tamaño real.
+
+### 12.4 Capability con relays espejo
+
+`CapsuleShareCapability` acepta `mirrors`, y `CapsuleOwnerCapability` acepta la
+lista equivalente con `deleteToken`:
+
+```json
+{
+  "version": 2,
+  "relayUrl": "https://relay-a.example",
+  "capsuleId": "…",
+  "readToken": "…",
+  "key": "…",
+  "noncePrefix": "…",
+  "mirrors": [
+    {
+      "relayUrl": "https://relay-b.example",
+      "capsuleId": "…",
+      "readToken": "…"
+    }
+  ]
+}
+```
+
+- Máximo 8 espejos; el fragmento se limita a 8192 caracteres.
+- Cada espejo guarda el mismo ciphertext bajo su propio `capsuleId` y sus
+  propios tokens: un relay no puede leer ni borrar la copia de otro.
+- La lectura intenta el relay primario y luego los espejos en orden. Un fallo de
+  autenticación **no** se reintenta en otro relay: el ciphertext está mal, no el
+  relay.
+- El borrado se dirige a todos y reporta honestamente cuáles no confirmaron.
+- Una capability v1 con `mirrors` es inválida.
+
+### 12.5 Relay API: red abierta
+
+Un relay es cualquier host que responde `/v1/info`. No hay registro ni
+autoridad; la identidad es una clave Ed25519 que el relay genera al arrancar y
+guarda en `identity.json` dentro de su directorio de datos.
+
+`relayId = base64url(SHA-256(clave pública cruda))`
+
+#### `GET /v1/info`
+
+```json
+{
+  "version": 1,
+  "software": "capsule-relay/0.2.0",
+  "protocolVersions": [1, 2],
+  "relayId": "…",
+  "publicKey": "…",
+  "url": "https://relay.example",
+  "nickname": "relay del club",
+  "persistentCapsules": true,
+  "limits": {
+    "maxCapsuleBytes": 0,
+    "maxChunkBytes": 0,
+    "maxManifestBytes": 0,
+    "maxChunkCount": 0
+  },
+  "defaultTtlSeconds": 86400,
+  "maxTtlSeconds": 604800,
+  "peerCount": 12
+}
+```
+
+#### `GET /v1/peers`
+
+Devuelve `self` y la lista de relays conocidos (`url`, `relayId`, `publicKey`,
+`nickname`, `lastSeenAt`). No expone nada sobre cápsulas.
+
+#### `POST /v1/peers/announce`
+
+```json
+{
+  "url": "https://relay-nuevo.example",
+  "relayId": "…",
+  "publicKey": "…",
+  "announcedAt": "2026-08-29T12:00:00.000Z",
+  "signature": "…"
+}
+```
+
+La firma Ed25519 cubre exactamente:
+
+```text
+CAPSULE/relay-announce/v1
+<url>
+<relayId>
+<announcedAt>
+```
+
+El receptor acepta el anuncio sólo si `relayId` es el digest de `publicKey`, la
+firma verifica, `announcedAt` está dentro de ±5 minutos y la URL es un origen
+HTTP(S) enrutable. Responde `202` con su propio `self` y sus peers.
+
+Una dirección aprendida de un tercero **no** se guarda por confiar en quien la
+pasó: se prueba con `GET /v1/info` y sólo se guarda si esa dirección responde
+con una identidad consistente. Esto evita que un peer invente relays; no
+convierte a un relay en confiable.
+
+### 12.6 Compatibilidad
+
+- Una cápsula v1 publicada sigue siendo legible por un cliente v2 sin cambios.
+- Un cliente v1 rechaza una cápsula v2: la versión del fragmento no coincide.
+- Un relay v0.1 acepta cápsulas v2 con TTL, porque el ciphertext le es opaco;
+  rechazará `expiresInSeconds: null` por no conocer el campo.

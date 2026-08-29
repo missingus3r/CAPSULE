@@ -13,3 +13,4 @@ output/playwright/*
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
+release

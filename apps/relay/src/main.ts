@@ -28,6 +28,23 @@ process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 try {
   await app.listen({ host: config.host, port: config.port });
+  app.log.info(
+    {
+      relayId: app.capsuleIdentity.relayId,
+      publicUrl: config.publicUrl ?? null,
+      peers: app.capsulePeers.size,
+      persistentCapsules: config.allowPersistentCapsules,
+    },
+    config.publicUrl
+      ? "CAPSULE relay is reachable and announcing itself to the network"
+      : "CAPSULE relay started without CAPSULE_PUBLIC_URL: it can discover peers but cannot be announced to them",
+  );
+  if (config.publicUrl && config.corsOrigins !== "*") {
+    app.log.warn(
+      { corsOrigins: config.corsOrigins },
+      "This relay is public but only accepts browser requests from the listed origins. Web apps hosted elsewhere will be refused; set CAPSULE_CORS_ORIGIN=* to serve any of them (capabilities are bearer tokens, not cookies, so the relay holds no ambient authority to abuse).",
+    );
+  }
 } catch (error) {
   app.log.error({ err: error }, "Unable to start CAPSULE relay");
   process.exitCode = 1;

@@ -8,6 +8,12 @@ describe("CLI options", () => {
     expect(parseTtl("7d")).toBe(604_800);
   });
 
+  it("reads the aliases that ask for a capsule without expiry", () => {
+    expect(parseTtl("never")).toBeNull();
+    expect(parseTtl("Persistent")).toBeNull();
+    expect(parseTtl(" siempre ")).toBeNull();
+  });
+
   it("rejects ambiguous TTL values", () => {
     expect(() => parseTtl("24")).toThrow("Use a TTL");
     expect(() => parseTtl("0h")).toThrow("greater than zero");

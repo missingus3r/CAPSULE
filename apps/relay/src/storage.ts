@@ -19,6 +19,7 @@ import {
   RelayHttpError,
   badRequest,
   conflict,
+  insufficientStorage,
   notFound,
   payloadTooLarge,
   storageCorrupt,
@@ -35,7 +36,8 @@ export interface CreateCapsuleInput {
   encryptedManifest: string;
   chunkCount: number;
   totalCiphertextBytes: number;
-  expiresInSeconds: number;
+  /** `null` requests a capsule the relay keeps until it is deleted. */
+  expiresInSeconds: number | null;
 }
 
 export interface CreateCapsuleOutput {
@@ -43,18 +45,19 @@ export interface CreateCapsuleOutput {
   readToken: string;
   writeToken: string;
   deleteToken: string;
-  expiresAt: string;
+  expiresAt: string | null;
 }
 
 export interface StoredCapsuleRecord {
-  schemaVersion: 1;
+  /** Version 2 added capsules without expiry; version 1 records stay valid. */
+  schemaVersion: 1 | 2;
   capsuleId: string;
   encryptedManifest: string;
   manifestCiphertextBytes: number;
   chunkCount: number;
   totalCiphertextBytes: number;
   createdAt: string;
-  expiresAt: string;
+  expiresAt: string | null;
   tokenHashes: {
     read: string;
     write: string;
@@ -69,7 +72,7 @@ export interface CapsuleStatus {
   uploadedChunks: number;
   totalCiphertextBytes: number;
   uploadedCiphertextBytes: number;
-  expiresAt: string;
+  expiresAt: string | null;
   finalized: boolean;
   receivedChunks: number[];
 }
@@ -125,8 +128,14 @@ function assertStoredRecord(
   if (!value || typeof value !== "object") throw storageCorrupt();
   const candidate = value as Partial<StoredCapsuleRecord>;
   const hashes = candidate.tokenHashes;
+  const expiresAt = candidate.expiresAt;
+  const expiryIsValid =
+    expiresAt === null
+      ? candidate.schemaVersion === 2
+      : typeof expiresAt === "string" && Number.isFinite(Date.parse(expiresAt));
   if (
-    candidate.schemaVersion !== 1 ||
+    (candidate.schemaVersion !== 1 && candidate.schemaVersion !== 2) ||
+    !expiryIsValid ||
     typeof candidate.capsuleId !== "string" ||
     !CAPSULE_ID_PATTERN.test(candidate.capsuleId) ||
     typeof candidate.encryptedManifest !== "string" ||
@@ -139,8 +148,6 @@ function assertStoredRecord(
     (candidate.totalCiphertextBytes ?? -1) < 0 ||
     typeof candidate.createdAt !== "string" ||
     !Number.isFinite(Date.parse(candidate.createdAt)) ||
-    typeof candidate.expiresAt !== "string" ||
-    !Number.isFinite(Date.parse(candidate.expiresAt)) ||
     !hashes ||
     typeof hashes.read !== "string" ||
     !HASH_PATTERN.test(hashes.read) ||
@@ -179,6 +186,8 @@ export class CapsuleStorage {
   readonly rootDirectory: string;
   private readonly capsulesDirectory: string;
   private readonly mutex = new KeyedMutex();
+  /** Ciphertext held by capsules without expiry; bounded by configuration. */
+  private persistentBytes = 0;
 
   constructor(private readonly config: RelayConfig) {
     this.rootDirectory = config.storageDir;
@@ -189,6 +198,34 @@ export class CapsuleStorage {
     await mkdir(this.capsulesDirectory, { recursive: true, mode: 0o700 });
     await this.removeCreationDirectories();
     await this.cleanupExpired();
+    await this.recountPersistentBytes();
+  }
+
+  /** Bytes currently stored by capsules the relay keeps until deletion. */
+  get persistentBytesUsed(): number {
+    return this.persistentBytes;
+  }
+
+  private async recountPersistentBytes(): Promise<void> {
+    let total = 0;
+    let entries;
+    try {
+      entries = await readdir(this.capsulesDirectory, { withFileTypes: true });
+    } catch (error) {
+      if (isNodeError(error, "ENOENT")) return;
+      throw error;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !CAPSULE_ID_PATTERN.test(entry.name))
+        continue;
+      try {
+        const record = await this.readRecord(entry.name);
+        if (record.expiresAt === null) total += record.totalCiphertextBytes;
+      } catch {
+        // A corrupt record is reported when it is read, not during startup.
+      }
+    }
+    this.persistentBytes = total;
   }
 
   async checkHealth(): Promise<void> {
@@ -249,6 +286,20 @@ export class CapsuleStorage {
         "Declared ciphertext cannot fit within the requested chunk count",
       );
     }
+    if (input.expiresInSeconds === null) {
+      if (!this.config.allowPersistentCapsules) {
+        throw badRequest(
+          "persistent_capsules_disabled",
+          "This relay does not store capsules without expiry",
+        );
+      }
+      if (input.totalCiphertextBytes > this.config.maxPersistentBytes) {
+        throw payloadTooLarge(
+          `A capsule without expiry cannot exceed ${this.config.maxPersistentBytes} ciphertext bytes on this relay`,
+        );
+      }
+      return;
+    }
     if (
       !Number.isSafeInteger(input.expiresInSeconds) ||
       input.expiresInSeconds <= 0 ||
@@ -263,6 +314,16 @@ export class CapsuleStorage {
 
   async create(input: CreateCapsuleInput): Promise<CreateCapsuleOutput> {
     this.validateCreateInput(input);
+    const persistent = input.expiresInSeconds === null;
+    if (
+      persistent &&
+      this.persistentBytes + input.totalCiphertextBytes >
+        this.config.maxPersistentBytes
+    ) {
+      throw insufficientStorage(
+        "This relay has no space left for capsules without expiry",
+      );
+    }
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const capsuleId = randomBase64Url(24);
@@ -270,11 +331,13 @@ export class CapsuleStorage {
       const writeToken = randomBase64Url(32);
       const deleteToken = randomBase64Url(32);
       const createdAt = new Date();
-      const expiresAt = new Date(
-        createdAt.getTime() + input.expiresInSeconds * 1000,
-      );
+      const expiresAt = persistent
+        ? null
+        : new Date(
+            createdAt.getTime() + (input.expiresInSeconds ?? 0) * 1000,
+          ).toISOString();
       const record: StoredCapsuleRecord = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         capsuleId,
         encryptedManifest: input.encryptedManifest,
         manifestCiphertextBytes: Buffer.from(
@@ -284,7 +347,7 @@ export class CapsuleStorage {
         chunkCount: input.chunkCount,
         totalCiphertextBytes: input.totalCiphertextBytes,
         createdAt: createdAt.toISOString(),
-        expiresAt: expiresAt.toISOString(),
+        expiresAt,
         tokenHashes: {
           read: hashToken(readToken),
           write: hashToken(writeToken),
@@ -309,6 +372,7 @@ export class CapsuleStorage {
           },
         );
         await rename(temporary, target);
+        if (persistent) this.persistentBytes += record.totalCiphertextBytes;
         return {
           capsuleId,
           readToken,
@@ -374,6 +438,7 @@ export class CapsuleStorage {
   }
 
   assertNotExpired(record: StoredCapsuleRecord): void {
+    if (record.expiresAt === null) return;
     if (Date.parse(record.expiresAt) <= Date.now()) throw notFound();
   }
 
@@ -554,7 +619,10 @@ export class CapsuleStorage {
         throw error;
       }
 
-      if (Date.parse(record.expiresAt) <= Date.now()) {
+      if (
+        record.expiresAt !== null &&
+        Date.parse(record.expiresAt) <= Date.now()
+      ) {
         await rm(this.capsuleDirectory(capsuleId), {
           recursive: true,
           force: true,
@@ -571,6 +639,12 @@ export class CapsuleStorage {
         recursive: true,
         force: true,
       });
+      if (record.expiresAt === null) {
+        this.persistentBytes = Math.max(
+          0,
+          this.persistentBytes - record.totalCiphertextBytes,
+        );
+      }
     });
   }
 
@@ -591,7 +665,11 @@ export class CapsuleStorage {
       try {
         await this.mutex.run(entry.name, async () => {
           const record = await this.readRecord(entry.name);
-          if (Date.parse(record.expiresAt) <= Date.now()) {
+          // A capsule without expiry is only removed by its owner capability.
+          if (
+            record.expiresAt !== null &&
+            Date.parse(record.expiresAt) <= Date.now()
+          ) {
             await rm(this.capsuleDirectory(entry.name), {
               recursive: true,
               force: true,

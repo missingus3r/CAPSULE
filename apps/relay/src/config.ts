@@ -15,6 +15,28 @@ export interface RelayConfig {
   rateLimitMax: number;
   rateLimitWindowMs: number;
   createRateLimitMax: number;
+  /** Public origin other relays and clients can reach; enables announcing. */
+  publicUrl: string | undefined;
+  /** Optional human-readable label shown in the relay directory. */
+  nickname: string | undefined;
+  /** Relays used to bootstrap into the network. */
+  peers: string[];
+  maxPeers: number;
+  peerSyncIntervalMs: number;
+  /** Allows peers on loopback/private addresses; needed for local networks. */
+  allowPrivatePeers: boolean;
+  /** Accepts capsules without expiry when the operator opts in. */
+  allowPersistentCapsules: boolean;
+  /** Ceiling for the ciphertext this relay stores without expiry. */
+  maxPersistentBytes: number;
+  /** Ceiling for one sender's share of the storage without expiry. */
+  maxPersistentBytesPerSender: number;
+  /** Leading zero bits an announcement digest must have to be accepted. */
+  announceWorkBits: number;
+  /** Relays kept per apparent operator, so one domain cannot fill the list. */
+  maxPeersPerOperator: number;
+  /** Keeps raw client addresses out of logs and rate-limit state. */
+  ipBlind: boolean;
 }
 
 const DEFAULTS = {
@@ -32,6 +54,11 @@ const DEFAULTS = {
   rateLimitMax: 300,
   rateLimitWindowMs: 60_000,
   createRateLimitMax: 30,
+  maxPeers: 200,
+  peerSyncIntervalMs: 5 * 60_000,
+  maxPersistentBytes: 1024 * 1024 * 1024,
+  announceWorkBits: 18,
+  maxPeersPerOperator: 4,
 } as const;
 
 function integerFromEnvironment(
@@ -54,10 +81,60 @@ function integerFromEnvironment(
   return parsed;
 }
 
+function booleanFromEnvironment(
+  environment: NodeJS.ProcessEnv,
+  name: string,
+  fallback: boolean,
+): boolean {
+  const raw = environment[name]?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return fallback;
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  throw new Error(`${name} must be a boolean value`);
+}
+
+function originFromEnvironment(
+  environment: NodeJS.ProcessEnv,
+  name: string,
+): string | undefined {
+  const raw = environment[name]?.trim();
+  if (!raw) return undefined;
+  const url = new URL(raw);
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username ||
+    url.password
+  ) {
+    throw new Error(`${name} must be an HTTP(S) origin without credentials`);
+  }
+  return url.origin;
+}
+
+function peersFromEnvironment(environment: NodeJS.ProcessEnv): string[] {
+  const raw = environment.CAPSULE_PEERS?.trim();
+  if (!raw) return [];
+  const peers: string[] = [];
+  for (const entry of raw.split(",")) {
+    const value = entry.trim();
+    if (!value) continue;
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error(`Invalid peer relay: ${value}`);
+    }
+    if (!peers.includes(url.origin)) peers.push(url.origin);
+  }
+  return peers;
+}
+
 function corsOriginsFromEnvironment(
   environment: NodeJS.ProcessEnv,
+  isPublic: boolean,
 ): "*" | string[] {
-  const raw = environment.CAPSULE_CORS_ORIGIN?.trim() || DEFAULTS.corsOrigin;
+  // A relay meant to be reachable by anyone has to answer browsers it has
+  // never heard of. Capabilities are bearer tokens sent explicitly, never
+  // cookies, so a permissive CORS policy grants no ambient authority.
+  const fallback = isPublic ? "*" : DEFAULTS.corsOrigin;
+  const raw = environment.CAPSULE_CORS_ORIGIN?.trim() || fallback;
   if (raw === "*") return "*";
 
   const origins = raw
@@ -99,15 +176,28 @@ export function loadRelayConfig(
     DEFAULTS.rateLimitMax,
   );
 
+  const nickname = environment.CAPSULE_RELAY_NAME?.trim().slice(0, 64);
+  const publicUrl = originFromEnvironment(environment, "CAPSULE_PUBLIC_URL");
+  const maxPersistentBytes = integerFromEnvironment(
+    environment,
+    "CAPSULE_MAX_PERSISTENT_BYTES",
+    DEFAULTS.maxPersistentBytes,
+    { minimum: 0 },
+  );
+
   return {
     host: environment.CAPSULE_HOST?.trim() || DEFAULTS.host,
     port: integerFromEnvironment(environment, "CAPSULE_PORT", DEFAULTS.port, {
       maximum: 65_535,
+      minimum: 0,
     }),
     storageDir: resolve(
       environment.CAPSULE_STORAGE_DIR?.trim() || DEFAULTS.storageDir,
     ),
-    corsOrigins: corsOriginsFromEnvironment(environment),
+    corsOrigins: corsOriginsFromEnvironment(
+      environment,
+      publicUrl !== undefined,
+    ),
     maxCapsuleBytes: integerFromEnvironment(
       environment,
       "CAPSULE_MAX_CAPSULE_BYTES",
@@ -149,5 +239,48 @@ export function loadRelayConfig(
       Math.min(DEFAULTS.createRateLimitMax, rateLimitMax),
       { maximum: rateLimitMax },
     ),
+    publicUrl,
+    nickname: nickname || undefined,
+    peers: peersFromEnvironment(environment),
+    maxPeers: integerFromEnvironment(
+      environment,
+      "CAPSULE_MAX_PEERS",
+      DEFAULTS.maxPeers,
+    ),
+    peerSyncIntervalMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_PEER_SYNC_INTERVAL_MS",
+      DEFAULTS.peerSyncIntervalMs,
+      { minimum: 0 },
+    ),
+    allowPrivatePeers: booleanFromEnvironment(
+      environment,
+      "CAPSULE_ALLOW_PRIVATE_PEERS",
+      false,
+    ),
+    allowPersistentCapsules: booleanFromEnvironment(
+      environment,
+      "CAPSULE_ALLOW_PERSISTENT_CAPSULES",
+      false,
+    ),
+    maxPersistentBytes,
+    maxPersistentBytesPerSender: integerFromEnvironment(
+      environment,
+      "CAPSULE_MAX_PERSISTENT_BYTES_PER_SENDER",
+      Math.max(1, Math.floor(maxPersistentBytes / 8)),
+      { minimum: 0, maximum: Math.max(1, maxPersistentBytes) },
+    ),
+    announceWorkBits: integerFromEnvironment(
+      environment,
+      "CAPSULE_ANNOUNCE_POW_BITS",
+      DEFAULTS.announceWorkBits,
+      { minimum: 0, maximum: 28 },
+    ),
+    maxPeersPerOperator: integerFromEnvironment(
+      environment,
+      "CAPSULE_MAX_PEERS_PER_OPERATOR",
+      DEFAULTS.maxPeersPerOperator,
+    ),
+    ipBlind: booleanFromEnvironment(environment, "CAPSULE_IP_BLIND", true),
   };
 }

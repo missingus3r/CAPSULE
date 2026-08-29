@@ -38,6 +38,18 @@ function config(): RelayConfig {
     rateLimitMax: 10_000,
     rateLimitWindowMs: 60_000,
     createRateLimitMax: 1000,
+    publicUrl: undefined,
+    nickname: undefined,
+    peers: [],
+    maxPeers: 50,
+    peerSyncIntervalMs: 0,
+    allowPrivatePeers: true,
+    allowPersistentCapsules: true,
+    maxPersistentBytes: 64 * 1024 * 1024,
+    maxPersistentBytesPerSender: 1024 * 1024 * 1024,
+    announceWorkBits: 0,
+    maxPeersPerOperator: 8,
+    ipBlind: true,
   };
 }
 
@@ -119,9 +131,12 @@ describe("CAPSULE end-to-end", () => {
       expect(sha256(reconstructed)).toBe(sha256(original));
 
       await deleteCapsule(uploaded.ownerCapability);
-      await expect(
-        deleteCapsule(uploaded.ownerCapability),
-      ).resolves.toBeUndefined();
+      // Deleting twice is not an error: the second call simply confirms that
+      // no relay still holds the capsule.
+      await expect(deleteCapsule(uploaded.ownerCapability)).resolves.toEqual({
+        deleted: [relayUrl],
+        failed: [],
+      });
       await expect(
         new CapsuleRelayClient(relayUrl).status(
           uploaded.capability.capsuleId,

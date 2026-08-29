@@ -270,3 +270,77 @@ No se debe describir CAPSULE como “anónimo”, “imposible de rastrear”,
 “autodestructivo” o “sin confianza” hasta que una versión futura defina un
 adversario concreto, implemente los controles necesarios y supere revisión
 externa. Añadir P2P o varios relays por sí solo tampoco crea anonimato.
+
+## 12. Cambios introducidos en v0.2
+
+v0.2 agrega tres capacidades que modifican el modelo: anonimización parcial,
+cápsulas sin vencimiento y una red abierta de relays. Ninguna convierte a
+CAPSULE en una red anónima.
+
+### 12.1 Anonimización: qué cubre y qué no
+
+| Mecanismo                         | Qué deja de ver un observador                         | Qué sigue viendo                                              |
+| --------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
+| Limpieza de metadatos del archivo | EXIF/GPS/serie de cámara, XMP, chunks de texto en PNG | El contenido del archivo para quien lo recibe; marcas de agua |
+| Nombre y mime neutros             | El nombre real dentro del manifiesto cifrado          | Nada nuevo: el manifiesto ya iba cifrado                      |
+| Relleno por clases de tamaño      | El tamaño exacto de la cápsula                        | La clase de tamaño y la cantidad de chunks                    |
+| Jitter entre chunks               | El patrón exacto de subida                            | El inicio, el fin y el volumen total                          |
+| SOCKS5/Tor en la CLI              | La IP del cliente, para el relay                      | La existencia de la conexión, para el proxy y el ISP local    |
+| Relay sin IP (`CAPSULE_IP_BLIND`) | La IP en logs y en el estado de rate limiting         | La IP en el socket mientras dura la conexión, y en el proxy   |
+
+Límites que deben decirse en voz alta:
+
+- La limpieza de metadatos sólo entiende JPEG, PNG y WebP. Para PDF, Office,
+  HEIC o video el archivo se envía **sin cambios** y el SDK lo reporta como no
+  soportado. No debe presentarse como “limpio”.
+- El relleno protege el tamaño, no el momento ni la frecuencia. Un observador
+  que ve “una cápsula de clase 8 MiB a las 03:14” sigue teniendo un evento.
+- `CAPSULE_IP_BLIND` reduce retención, no observación. El sistema operativo, el
+  balanceador y el proveedor de red siguen viendo la conexión.
+- Tor en la CLI protege frente al relay, no frente a un adversario que observe
+  ambos extremos.
+- La aplicación web no enruta por Tor. Decir lo contrario sería falso: el
+  navegador usa la red del usuario.
+
+### 12.2 Cápsulas sin vencimiento
+
+El TTL era el principal control de retención. Al desactivarlo, cambian dos
+cosas:
+
+- **Exposición sostenida.** Un enlace filtrado ya no deja de funcionar solo.
+  Quien tenga el enlace lee hasta que alguien use la `deleteToken`.
+- **Pérdida irreversible de control.** Si se pierde la capability de retiro, no
+  hay forma de borrar la cápsula: no hay cuentas ni soporte que pueda hacerlo.
+
+Controles vigentes:
+
+- Está desactivado por defecto. El operador debe habilitarlo con
+  `CAPSULE_ALLOW_PERSISTENT_CAPSULES=true`.
+- `CAPSULE_MAX_PERSISTENT_BYTES` acota cuánto puede ocupar el almacenamiento sin
+  vencimiento; el relay responde `507 insufficient_storage` al llegar al tope.
+- La limpieza periódica nunca toca una cápsula sin vencimiento.
+- La interfaz lo dice explícitamente antes de crear la cápsula, y el relay lo
+  publica en `/v1/config` para que el cliente no lo descubra al fallar.
+
+Un relay que promete “para siempre” está prometiendo algo que no controla:
+puede apagarse, perder el disco o ser incautado. La documentación y la UI dicen
+“hasta que la borres”, no “permanente”.
+
+### 12.3 Red abierta de relays
+
+Que cualquiera pueda levantar un relay elimina un punto único de censura y
+agrega superficie:
+
+| Riesgo nuevo                                    | Control aplicado                                                                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Un peer inventa relays que no existen           | Toda dirección aprendida se prueba contra `GET /v1/info` y sólo se guarda si la identidad coincide      |
+| Un atacante suplanta la identidad de un relay   | `relayId` es el digest de la clave pública; el anuncio va firmado con Ed25519 y con ventana ±5 min      |
+| Envenenamiento del directorio (Sybil)           | Límite `CAPSULE_MAX_PEERS`, expulsión tras fallos repetidos, y ninguna decisión automática de confianza |
+| SSRF desde el propio relay al probar peers      | Se rechazan loopback, enlaces locales, rangos privados y CGNAT salvo `CAPSULE_ALLOW_PRIVATE_PEERS`      |
+| Réplica que amplía la superficie de observación | El espejo es explícito y opcional; cada copia adicional es un operador más que ve tamaño y horario      |
+| Un relay retiene una copia tras el borrado      | El borrado es best-effort y se reporta relay por relay; nunca se afirma que la copia desapareció        |
+
+Lo que la red **no** resuelve: correlación entre relays, diversidad
+jurisdiccional real, ni la reputación de un operador. Un directorio grande no es
+evidencia de independencia. Elegir un espejo sigue siendo confiar en un tercero
+con el tamaño y el horario de la transferencia.

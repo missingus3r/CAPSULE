@@ -10,6 +10,10 @@ import {
   encryptChunk,
   encryptMetadata,
   encodeOwnerCapability,
+  encodeShareCapability,
+  paddedLengthFor,
+  shareLocations,
+  sizeClassFor,
   type CapsuleMetadata,
 } from "../src/index.js";
 
@@ -93,5 +97,109 @@ describe("CAPSULE protocol", () => {
 
     expect(encoded).toMatch(/^capsule-owner:/u);
     expect(decodeOwnerCapability(encoded).deleteToken).toBe(deleteToken);
+  });
+
+  it("accepts capsules without expiry from version 2 and rejects them in v1", async () => {
+    const secrets = createCapsuleSecrets(2);
+    const persistent: CapsuleMetadata = {
+      version: 2,
+      filename: "archivo.bin",
+      mimeType: "application/octet-stream",
+      byteLength: 10,
+      chunkSize: 1024,
+      chunkCount: 1,
+      createdAt: "2026-08-29T00:00:00.000Z",
+      expiresAt: null,
+    };
+
+    const encrypted = await encryptMetadata(persistent, secrets);
+    await expect(decryptMetadata(encrypted, secrets)).resolves.toEqual(
+      persistent,
+    );
+    await expect(
+      encryptMetadata(
+        { ...persistent, version: 1 },
+        { ...secrets, version: 1 },
+      ),
+    ).rejects.toThrow("Invalid capsule metadata");
+  });
+
+  it("keeps version 1 capsules readable after later version bumps", async () => {
+    const secrets = createCapsuleSecrets(1);
+    const legacy: CapsuleMetadata = {
+      version: 1,
+      filename: "viejo.txt",
+      mimeType: "text/plain",
+      byteLength: 5,
+      chunkSize: 1024,
+      chunkCount: 1,
+      createdAt: "2026-08-29T00:00:00.000Z",
+      expiresAt: "2026-08-30T00:00:00.000Z",
+    };
+
+    const encrypted = await encryptMetadata(legacy, secrets);
+    await expect(decryptMetadata(encrypted, secrets)).resolves.toEqual(legacy);
+    // A later reader must not silently accept version 1 additional data.
+    await expect(
+      decryptMetadata(encrypted, { ...secrets, version: 2 }),
+    ).rejects.toThrow("authentication failed");
+    await expect(
+      decryptMetadata(encrypted, { ...secrets, version: 3 }),
+    ).rejects.toThrow("authentication failed");
+  });
+
+  it("pads capsules to whole chunks inside a coarse size class", () => {
+    expect(sizeClassFor(1)).toBe(64 * 1024);
+    expect(sizeClassFor(1_000_000)).toBe(1_048_576);
+    expect(paddedLengthFor(3, 1024)).toBe(64 * 1024);
+    expect(paddedLengthFor(1_500_000, 1024 * 1024) % (1024 * 1024)).toBe(0);
+    expect(paddedLengthFor(1_500_000, 1024 * 1024)).toBeGreaterThanOrEqual(
+      1_500_000,
+    );
+  });
+
+  it("rejects padded metadata whose chunk count does not match the padding", async () => {
+    const secrets = createCapsuleSecrets();
+    await expect(
+      encryptMetadata(
+        {
+          version: CAPSULE_PROTOCOL_VERSION,
+          filename: "padded.bin",
+          mimeType: "application/octet-stream",
+          byteLength: 10,
+          chunkSize: 1024,
+          chunkCount: 1,
+          createdAt: "2026-08-29T00:00:00.000Z",
+          expiresAt: "2026-08-30T00:00:00.000Z",
+          paddedLength: 2048,
+        },
+        secrets,
+      ),
+    ).rejects.toThrow("Invalid capsule metadata");
+  });
+
+  it("carries mirror relays inside the share capability", () => {
+    const secrets = createCapsuleSecrets();
+    const capability = {
+      version: CAPSULE_PROTOCOL_VERSION,
+      relayUrl: "https://relay-one.example",
+      capsuleId: "a".repeat(32),
+      readToken: "b".repeat(43),
+      key: secrets.key,
+      noncePrefix: secrets.noncePrefix,
+      mirrors: [
+        {
+          relayUrl: "https://relay-two.example",
+          capsuleId: "c".repeat(32),
+          readToken: "d".repeat(43),
+        },
+      ],
+    };
+
+    const decoded = decodeShareCapability(encodeShareCapability(capability));
+    expect(shareLocations(decoded)).toHaveLength(2);
+    expect(shareLocations(decoded)[1]?.relayUrl).toBe(
+      "https://relay-two.example",
+    );
   });
 });

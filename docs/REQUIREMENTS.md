@@ -24,6 +24,17 @@ opciones, respectivamente.
 
 ## 2. Alcance de v0.1
 
+> **Nota de v0.2.** Este documento describe el alcance de v0.1 y se mantiene
+> como referencia histórica. v0.2 mueve cuatro puntos de “fuera de alcance” a
+> “implementado”: replicación entre relays (explícita, elegida por quien envía),
+> ocultamiento del tamaño exacto mediante relleno por clases, ocultamiento de la
+> IP frente al relay en la CLI mediante SOCKS5/Tor, y almacenamiento sin
+> vencimiento cuando el operador lo habilita. Siguen fuera de alcance el mix
+> routing, la resistencia a un observador global, el ocultamiento del horario y
+> del patrón de acceso, y el anonimato de red en la aplicación web. El detalle
+> está en [ROADMAP.md](./ROADMAP.md) §6 y en
+> [THREAT_MODEL.md](./THREAT_MODEL.md) §12.
+
 ### 2.1 Incluido
 
 - Aplicación web para crear y abrir cápsulas.

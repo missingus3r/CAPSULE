@@ -1,6 +1,6 @@
 {
   "name": "@capsule/sdk",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@capsule/protocol": "0.1.0"
+    "@capsule/protocol": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

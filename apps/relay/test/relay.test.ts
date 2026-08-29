@@ -11,7 +11,7 @@ interface CreatedCapsule {
   readToken: string;
   writeToken: string;
   deleteToken: string;
-  expiresAt: string;
+  expiresAt: string | null;
 }
 
 let app: FastifyInstance | undefined;
@@ -43,6 +43,18 @@ function testConfig(overrides: Partial<RelayConfig> = {}): RelayConfig {
     rateLimitMax: 1_000,
     rateLimitWindowMs: 60_000,
     createRateLimitMax: 100,
+    publicUrl: undefined,
+    nickname: undefined,
+    peers: [],
+    maxPeers: 50,
+    peerSyncIntervalMs: 0,
+    allowPrivatePeers: true,
+    allowPersistentCapsules: false,
+    maxPersistentBytes: 1024,
+    maxPersistentBytesPerSender: 1024 * 1024 * 1024,
+    announceWorkBits: 0,
+    maxPeersPerOperator: 8,
+    ipBlind: true,
     ...overrides,
   };
 }

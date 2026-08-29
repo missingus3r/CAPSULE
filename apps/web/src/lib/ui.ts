@@ -6,6 +6,8 @@ export interface DisplayMetadata {
   byteLength: number;
   createdAt?: string;
   expiresAt?: string;
+  /** True when the capsule was stored without an expiry date. */
+  persistent?: boolean;
   note?: string;
 }
 
@@ -104,6 +106,7 @@ export function normalizeMetadata(
     ...(typeof value.expiresAt === "string"
       ? { expiresAt: value.expiresAt }
       : {}),
+    ...(value.expiresAt === null ? { persistent: true } : {}),
     ...(typeof value.note === "string" && value.note.trim()
       ? { note: value.note }
       : {}),

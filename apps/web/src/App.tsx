@@ -1,7 +1,18 @@
-import { downloadCapsule, uploadCapsule } from "@capsule/sdk";
+import {
+  CapsuleRelayClient,
+  discoverRelays,
+  downloadCapsule,
+  selectRelays,
+  uploadCapsule,
+  type AnonymityReport,
+  type MirrorFailure,
+  type RelayInfo,
+  type RelayPublicConfig,
+} from "@capsule/sdk";
 import {
   decodeShareCapability,
   encodeOwnerCapability,
+  wrapWithPassphrase,
 } from "@capsule/protocol";
 import QRCode from "qrcode";
 import {
@@ -12,14 +23,19 @@ import {
   Clock3,
   Copy,
   Download,
+  EyeOff,
   FileCheck2,
+  Infinity as InfinityIcon,
   KeyRound,
+  Layers,
   Link2,
   LockKeyhole,
   PackageOpen,
   RotateCcw,
   Send,
+  Server,
   ShieldCheck,
+  Shuffle,
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
@@ -46,13 +62,18 @@ interface ExpiryOption {
   label: string;
   shortLabel: string;
   detail: string;
-  seconds: number;
+  /** `null` asks the relay to keep the capsule until it is deleted. */
+  seconds: number | null;
 }
 
 interface SharedCapsule {
   shareUrl: string;
   ownerCapability: string;
   metadata: DisplayMetadata;
+  relayUrls: string[];
+  mirrorFailures: MirrorFailure[];
+  anonymity: AnonymityReport;
+  sharding?: { k: number; n: number };
   qrDataUrl?: string;
 }
 
@@ -80,6 +101,12 @@ const EXPIRY_OPTIONS: ExpiryOption[] = [
     detail: "Para dar más tiempo",
     seconds: 7 * 24 * 60 * 60,
   },
+  {
+    label: "Sin vencimiento",
+    shortLabel: "Sin límite",
+    detail: "Queda hasta que la borres",
+    seconds: null,
+  },
 ];
 
 const DEFAULT_RELAY_URL = "http://localhost:8787";
@@ -104,7 +131,54 @@ function Brand() {
   );
 }
 
-function PrivacyAside() {
+function NetworkPanel({
+  relays,
+  relayUrl,
+}: {
+  relays: RelayInfo[];
+  relayUrl: string;
+}) {
+  const known = relays.length > 0 ? relays : null;
+  return (
+    <section className="network-panel" aria-labelledby="network-title">
+      <div className="aside-eyebrow">
+        <Server size={16} />
+        La red
+      </div>
+      <h3 id="network-title">Cualquiera puede levantar un relay</h3>
+      <p>
+        No hay registro ni permiso: se levanta un relay, se lo apunta a otro que
+        ya conozcas y ambos se presentan. Esta app usa{" "}
+        <code>{new URL(relayUrl).host}</code> y descubre el resto desde ahí.
+      </p>
+      {known ? (
+        <ul className="relay-list">
+          {known.map((relay) => (
+            <li key={relay.relayId}>
+              <strong>{relay.nickname ?? new URL(relay.url).host}</strong>
+              <span>
+                {relay.persistentCapsules ? "sin vencimiento" : "sólo temporal"}{" "}
+                · {relay.peerCount} vecinos
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="relay-empty">
+          Todavía no respondió ningún relay de la red.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function PrivacyAside({
+  relays,
+  relayUrl,
+}: {
+  relays: RelayInfo[];
+  relayUrl: string;
+}) {
   return (
     <aside className="privacy-aside" aria-labelledby="privacy-title">
       <div className="aside-eyebrow">
@@ -140,12 +214,15 @@ function PrivacyAside() {
       <details>
         <summary>Lo que todavía puede verse</summary>
         <p>
-          El relay puede observar tu IP, el momento y el tamaño aproximado de la
-          transferencia. El cifrado no protege un dispositivo infectado ni evita
-          que quien recibe guarde una copia. El vencimiento retira la copia del
-          relay, no las ya descargadas.
+          El relay puede observar tu IP, el momento y el tamaño de la
+          transferencia. El modo anónimo borra metadatos del archivo, oculta el
+          nombre y rellena el tamaño hasta una categoría, pero no oculta tu IP:
+          para eso hace falta un proxy o Tor, disponible hoy en la CLI con{" "}
+          <code>--tor</code>. El cifrado no protege un dispositivo infectado ni
+          evita que quien recibe guarde una copia.
         </p>
       </details>
+      <NetworkPanel relays={relays} relayUrl={relayUrl} />
     </aside>
   );
 }
@@ -169,7 +246,15 @@ function MetadataCard({
           {formatMimeType(metadata.mimeType)}
         </span>
       </div>
-      {metadata.expiresAt ? (
+      {metadata.persistent ? (
+        <div className="metadata-expiry">
+          <InfinityIcon size={14} />
+          <span>
+            Sin vencimiento
+            <strong>Se borra sólo con tu clave de retiro</strong>
+          </span>
+        </div>
+      ) : metadata.expiresAt ? (
         <div className="metadata-expiry">
           <Clock3 size={14} />
           <span>
@@ -192,12 +277,27 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("send");
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
-  const [ttlSeconds, setTtlSeconds] = useState(EXPIRY_OPTIONS[1]!.seconds);
+  const [ttlSeconds, setTtlSeconds] = useState<number | null>(
+    EXPIRY_OPTIONS[1]!.seconds,
+  );
+  const [anonymous, setAnonymous] = useState(false);
+  const [mirrorCount, setMirrorCount] = useState(0);
+  const [splitAcrossRelays, setSplitAcrossRelays] = useState(false);
+  const [passphrase, setPassphrase] = useState("");
+  const [recovery, setRecovery] = useState("");
+  const [protecting, setProtecting] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
+  const [relayConfig, setRelayConfig] = useState<RelayPublicConfig | null>(
+    null,
+  );
+  const [network, setNetwork] = useState<RelayInfo[]>([]);
   const [sendStage, setSendStage] = useState<SendStage>("form");
   const [sendProgress, setSendProgress] = useState(0);
   const [sendError, setSendError] = useState("");
   const [shared, setShared] = useState<SharedCapsule | null>(null);
-  const [copied, setCopied] = useState<"share" | "owner" | null>(null);
+  const [copied, setCopied] = useState<"share" | "owner" | "recovery" | null>(
+    null,
+  );
 
   const [receiveInput, setReceiveInput] = useState("");
   const [capability, setCapability] = useState<string | null>(null);
@@ -212,10 +312,51 @@ export default function App() {
     [],
   );
 
+  // The relay tells the app what it accepts, and which other relays it knows.
+  // Nothing here is hardcoded: point VITE_RELAY_URL at any relay and the app
+  // adapts to that relay's limits and to the network reachable from it.
+  useEffect(() => {
+    let cancelled = false;
+    new CapsuleRelayClient(relayUrl)
+      .config()
+      .then((config) => {
+        if (!cancelled) setRelayConfig(config);
+      })
+      .catch(() => {
+        if (!cancelled) setRelayConfig(null);
+      });
+    discoverRelays({ seeds: [relayUrl], maxRelays: 12 })
+      .then((relays) => {
+        if (!cancelled) setNetwork(relays);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [relayUrl]);
+
+  const persistentAllowed = relayConfig?.persistentCapsules ?? false;
+  const mirrorCandidates = useMemo(
+    () => network.filter((relay) => relay.url !== relayUrl),
+    [network, relayUrl],
+  );
+
+  useEffect(() => {
+    if (ttlSeconds === null && relayConfig && !persistentAllowed) {
+      setTtlSeconds(EXPIRY_OPTIONS[1]!.seconds);
+    }
+  }, [persistentAllowed, relayConfig, ttlSeconds]);
+
   const resetSend = () => {
     setFile(null);
     setNote("");
     setTtlSeconds(EXPIRY_OPTIONS[1]!.seconds);
+    setAnonymous(false);
+    setMirrorCount(0);
+    setSplitAcrossRelays(false);
+    setPassphrase("");
+    setRecovery("");
+    setRecoveryError("");
     setSendStage("form");
     setSendProgress(0);
     setSendError("");
@@ -282,6 +423,18 @@ export default function App() {
     setShared(null);
 
     try {
+      const mirrorRelayUrls =
+        mirrorCount > 0
+          ? selectRelays(mirrorCandidates, {
+              count: mirrorCount,
+              ciphertextBytes: file.size + 1024 * 1024,
+              chunkCount: Math.max(1, Math.ceil(file.size / (1024 * 1024))),
+              persistent: ttlSeconds === null,
+              ...(ttlSeconds !== null ? { ttlSeconds } : {}),
+              exclude: [relayUrl],
+            }).map((relay) => relay.url)
+          : [];
+
       const result = await uploadCapsule({
         data: file,
         filename: file.name,
@@ -290,6 +443,18 @@ export default function App() {
         ttlSeconds,
         relayUrl,
         appUrl: getPublicAppUrl(),
+        ...(mirrorRelayUrls.length > 0 ? { mirrorRelayUrls } : {}),
+        ...(splitAcrossRelays && mirrorRelayUrls.length >= 2
+          ? { replication: { mode: "shards" as const } }
+          : {}),
+        anonymity: anonymous
+          ? {
+              padding: true,
+              scrubMetadata: true,
+              hideFilename: true,
+              jitterMs: 600,
+            }
+          : {},
         onProgress: (progress: unknown) =>
           setSendProgress(Math.max(0.02, normalizeProgress(progress))),
       });
@@ -310,6 +475,12 @@ export default function App() {
         shareUrl: result.shareUrl,
         ownerCapability: encodeOwnerCapability(result.ownerCapability),
         metadata: normalizeMetadata(result.metadata, file, file.name),
+        relayUrls: result.relayUrls,
+        mirrorFailures: result.mirrorFailures,
+        anonymity: result.anonymity,
+        ...(result.sharding
+          ? { sharding: { k: result.sharding.k, n: result.sharding.n } }
+          : {}),
         ...(qrDataUrl ? { qrDataUrl } : {}),
       });
       setSendStage("success");
@@ -319,13 +490,43 @@ export default function App() {
     }
   };
 
-  const handleCopy = async (kind: "share" | "owner") => {
+  const handleCopy = async (kind: "share" | "owner" | "recovery") => {
     if (!shared) return;
-    const ok = await copyText(
-      kind === "share" ? shared.shareUrl : shared.ownerCapability,
-    );
+    const value =
+      kind === "share"
+        ? shared.shareUrl
+        : kind === "owner"
+          ? shared.ownerCapability
+          : recovery;
+    if (!value) return;
+    const ok = await copyText(value);
     setCopied(ok ? kind : null);
     if (ok) window.setTimeout(() => setCopied(null), 2200);
+  };
+
+  const handleProtect = async () => {
+    if (!shared || passphrase.length < 8) return;
+    setProtecting(true);
+    setRecoveryError("");
+    try {
+      // Deriving the key deliberately takes a moment: that cost is what a
+      // guessing attacker pays for every attempt.
+      const blob = await wrapWithPassphrase(
+        shared.ownerCapability,
+        passphrase,
+        { label: shared.metadata.filename },
+      );
+      setRecovery(blob);
+      setPassphrase("");
+    } catch (error) {
+      setRecoveryError(
+        error instanceof Error
+          ? error.message
+          : "No pudimos proteger la clave.",
+      );
+    } finally {
+      setProtecting(false);
+    }
   };
 
   const handleReceiveSubmit = () => {
@@ -443,6 +644,58 @@ export default function App() {
 
                   <MetadataCard metadata={shared.metadata} />
 
+                  <ul className="delivery-summary">
+                    <li>
+                      <Server size={14} aria-hidden="true" />
+                      Guardada en {shared.relayUrls.length}{" "}
+                      {shared.relayUrls.length === 1 ? "relay" : "relays"}:{" "}
+                      {shared.relayUrls
+                        .map((url) => new URL(url).host)
+                        .join(", ")}
+                    </li>
+                    {shared.anonymity.padded ? (
+                      <li>
+                        <EyeOff size={14} aria-hidden="true" />
+                        Tamaño rellenado con{" "}
+                        {formatBytes(shared.anonymity.paddingBytes)} para que el
+                        relay vea una categoría y no el tamaño real
+                      </li>
+                    ) : null}
+                    {shared.anonymity.removedMetadata.length > 0 ? (
+                      <li>
+                        <EyeOff size={14} aria-hidden="true" />
+                        Metadatos borrados del archivo:{" "}
+                        {shared.anonymity.removedMetadata.join(", ")}
+                      </li>
+                    ) : null}
+                    {anonymous && !shared.anonymity.metadataScrubbed ? (
+                      <li>
+                        <TriangleAlert size={14} aria-hidden="true" />
+                        Todavía no sabemos limpiar metadatos de este formato: el
+                        archivo se envió tal cual
+                      </li>
+                    ) : null}
+                    {shared.sharding ? (
+                      <li>
+                        <Shuffle size={14} aria-hidden="true" />
+                        Repartida {shared.sharding.k} de {shared.sharding.n}:
+                        ningún relay guarda lo suficiente para reconstruirla
+                      </li>
+                    ) : null}
+                    {shared.anonymity.remainingMetadata.map((entry) => (
+                      <li key={entry}>
+                        <TriangleAlert size={14} aria-hidden="true" />
+                        Quedó sin borrar: {entry}
+                      </li>
+                    ))}
+                    {shared.mirrorFailures.map((failure) => (
+                      <li key={failure.relayUrl}>
+                        <TriangleAlert size={14} aria-hidden="true" />
+                        No pudimos copiar a {new URL(failure.relayUrl).host}
+                      </li>
+                    ))}
+                  </ul>
+
                   <div className="share-layout">
                     <div className="share-link-block">
                       <label htmlFor="share-url">Enlace privado</label>
@@ -518,6 +771,68 @@ export default function App() {
                       No la compartas: CAPSULE no puede recuperarla si la
                       perdés.
                     </small>
+
+                    <div className="recovery-block">
+                      <strong>
+                        <ShieldCheck size={14} aria-hidden="true" />
+                        Guardarla con una contraseña
+                      </strong>
+                      <small>
+                        Cifra la clave de retiro con una contraseña tuya, acá
+                        mismo. El resultado se puede anotar o guardar en
+                        cualquier lado: sin la contraseña no sirve de nada. El
+                        relay no participa ni se entera.
+                      </small>
+                      {recovery ? (
+                        <div className="share-field">
+                          <KeyRound size={18} aria-hidden="true" />
+                          <input
+                            aria-label="Clave de retiro protegida"
+                            readOnly
+                            value={recovery}
+                            onFocus={(event) => event.target.select()}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleCopy("recovery")}
+                            className={copied === "recovery" ? "copied" : ""}
+                          >
+                            {copied === "recovery" ? (
+                              <Check size={17} />
+                            ) : (
+                              <Copy size={17} />
+                            )}
+                            {copied === "recovery" ? "Copiada" : "Copiar"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="recovery-form">
+                          <input
+                            type="password"
+                            autoComplete="new-password"
+                            placeholder="Una contraseña que recuerdes"
+                            value={passphrase}
+                            disabled={protecting}
+                            onChange={(event) => {
+                              setPassphrase(event.target.value);
+                              setRecoveryError("");
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={protecting || passphrase.length < 8}
+                            onClick={() => void handleProtect()}
+                          >
+                            {protecting ? "Protegiendo…" : "Proteger"}
+                          </button>
+                        </div>
+                      )}
+                      {recoveryError ? (
+                        <span className="recovery-error" role="alert">
+                          {recoveryError}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <button
@@ -560,26 +875,47 @@ export default function App() {
                         role="radiogroup"
                         aria-label="Vencimiento de la cápsula"
                       >
-                        {EXPIRY_OPTIONS.map((option) => (
-                          <button
-                            key={option.seconds}
-                            type="button"
-                            role="radio"
-                            aria-checked={ttlSeconds === option.seconds}
-                            className={
-                              ttlSeconds === option.seconds ? "selected" : ""
-                            }
-                            disabled={isSending}
-                            onClick={() => setTtlSeconds(option.seconds)}
-                          >
-                            <span>{option.shortLabel}</span>
-                            <small>{option.detail}</small>
-                            {ttlSeconds === option.seconds ? (
-                              <Check size={15} aria-hidden="true" />
-                            ) : null}
-                          </button>
-                        ))}
+                        {EXPIRY_OPTIONS.map((option) => {
+                          const unavailable =
+                            option.seconds === null && !persistentAllowed;
+                          return (
+                            <button
+                              key={option.seconds ?? "persistent"}
+                              type="button"
+                              role="radio"
+                              aria-checked={ttlSeconds === option.seconds}
+                              className={
+                                ttlSeconds === option.seconds ? "selected" : ""
+                              }
+                              disabled={isSending || unavailable}
+                              title={
+                                unavailable
+                                  ? "Este relay no guarda cápsulas sin vencimiento"
+                                  : option.label
+                              }
+                              onClick={() => setTtlSeconds(option.seconds)}
+                            >
+                              <span>{option.shortLabel}</span>
+                              <small>
+                                {unavailable
+                                  ? "No disponible en este relay"
+                                  : option.detail}
+                              </small>
+                              {ttlSeconds === option.seconds ? (
+                                <Check size={15} aria-hidden="true" />
+                              ) : null}
+                            </button>
+                          );
+                        })}
                       </div>
+                      {ttlSeconds === null ? (
+                        <p className="inline-warning">
+                          <InfinityIcon size={14} aria-hidden="true" />
+                          Sin vencimiento el relay guarda la cápsula hasta que
+                          la borres con tu clave de retiro. Si perdés esa clave,
+                          queda ahí.
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="field-group note-group">
@@ -602,6 +938,104 @@ export default function App() {
                         />
                         <span>{note.length}/280</span>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="field-group">
+                    <div className="field-label">
+                      <span>4</span>
+                      <div>
+                        <label>Elegí cuánto ocultar</label>
+                        <small>Opcional · cada opción tiene un costo</small>
+                      </div>
+                    </div>
+                    <div className="option-stack">
+                      <label className="switch-row">
+                        <input
+                          type="checkbox"
+                          checked={anonymous}
+                          disabled={isSending}
+                          onChange={(event) =>
+                            setAnonymous(event.target.checked)
+                          }
+                        />
+                        <span className="switch-copy">
+                          <strong>
+                            <EyeOff size={15} aria-hidden="true" />
+                            Modo anónimo
+                          </strong>
+                          <small>
+                            Borra metadatos del archivo (EXIF/XMP), reemplaza el
+                            nombre por uno neutro, rellena el tamaño hasta una
+                            categoría y espacia las subidas. Sube algo más de
+                            datos y tarda un poco más.
+                          </small>
+                        </span>
+                      </label>
+
+                      {mirrorCandidates.length > 0 ? (
+                        <div className="switch-row as-static">
+                          <Layers size={15} aria-hidden="true" />
+                          <span className="switch-copy">
+                            <strong>Copias en otros relays</strong>
+                            <small>
+                              Si un relay se cae o te bloquea, la cápsula sigue
+                              disponible en otro. Más copias significa más
+                              servidores que ven el tamaño y el horario.
+                            </small>
+                            <span
+                              className="mirror-options"
+                              role="radiogroup"
+                              aria-label="Cantidad de copias"
+                            >
+                              {[
+                                0,
+                                ...Array.from(
+                                  {
+                                    length: Math.min(
+                                      3,
+                                      mirrorCandidates.length,
+                                    ),
+                                  },
+                                  (_unused, index) => index + 1,
+                                ),
+                              ].map((count) => (
+                                <button
+                                  key={count}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={mirrorCount === count}
+                                  className={
+                                    mirrorCount === count ? "selected" : ""
+                                  }
+                                  disabled={isSending}
+                                  onClick={() => setMirrorCount(count)}
+                                >
+                                  {count === 0 ? "Sólo uno" : `+${count}`}
+                                </button>
+                              ))}
+                            </span>
+                            {mirrorCount >= 2 ? (
+                              <label className="nested-switch">
+                                <input
+                                  type="checkbox"
+                                  checked={splitAcrossRelays}
+                                  disabled={isSending}
+                                  onChange={(event) =>
+                                    setSplitAcrossRelays(event.target.checked)
+                                  }
+                                />
+                                <span>
+                                  <Shuffle size={13} aria-hidden="true" />
+                                  Repartir en vez de copiar: ningún relay guarda
+                                  la cápsula entera y alcanza con dos para
+                                  abrirla.
+                                </span>
+                              </label>
+                            ) : null}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -767,7 +1201,7 @@ export default function App() {
           )}
         </section>
 
-        <PrivacyAside />
+        <PrivacyAside relays={network} relayUrl={relayUrl} />
       </main>
 
       <footer>

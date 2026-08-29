@@ -1,0 +1,158 @@
+# Levantá tu propio relay
+
+**Estado:** guía operativa para CAPSULE 0.2
+**Fecha:** 2026-08-29
+
+No hay registro, lista blanca ni permiso que pedir. Un relay de CAPSULE es
+cualquier host que responde `/v1/info`. Levantás el tuyo, lo apuntás a un relay
+que ya conozcas, y a partir de ahí se presentan entre sí.
+
+## 1. Qué es y qué no es un relay
+
+Un relay guarda ciphertext y lo entrega a quien presente la capability
+correcta. **No** puede leer el contenido, el nombre del archivo ni la nota: todo
+eso viaja cifrado y la llave nunca sale del dispositivo de quien envía.
+
+Lo que sí ve tu relay, y por lo tanto lo que asumís como operador:
+
+- direcciones IP mientras dura cada conexión;
+- horarios y volumen de cada transferencia;
+- la clase de tamaño de cada cápsula (el tamaño exacto sólo si el remitente no
+  usó relleno);
+- cuántas veces se leyó una cápsula.
+
+Operar un relay implica alojar datos que no podés inspeccionar. Leé
+[el modelo de amenazas](./THREAT_MODEL.md), en particular la sección de abuso y
+contenido ilícito, antes de exponerlo a Internet.
+
+## 2. Arranque mínimo
+
+```bash
+git clone <este-repositorio> capsule && cd capsule
+npm install
+npm run build
+CAPSULE_HOST=0.0.0.0 CAPSULE_STORAGE_DIR=/var/lib/capsule \
+  node apps/relay/dist/main.js
+```
+
+Con Docker:
+
+```bash
+cd infra
+CAPSULE_PUBLIC_URL=https://relay.example.org docker compose up -d
+```
+
+En el primer arranque el relay genera su identidad Ed25519 y la guarda en
+`identity.json` dentro del directorio de datos, con permisos `0600`. Ese archivo
+**es** la identidad de tu relay: si lo perdés, la red lo ve como un relay nuevo.
+Hacé backup del directorio de datos o al menos de ese archivo.
+
+## 3. Conectarte a la red
+
+Dos variables alcanzan:
+
+```bash
+# La dirección por la que otros pueden alcanzarte. Sin esto podés descubrir
+# relays, pero nadie puede anunciarte: sos sólo un consumidor del directorio.
+CAPSULE_PUBLIC_URL=https://relay.example.org
+
+# Relays que ya conocés. Basta uno.
+CAPSULE_PEERS=https://relay-de-un-conocido.example
+```
+
+Opcionales:
+
+```bash
+CAPSULE_RELAY_NAME="relay del club de barrio"   # etiqueta visible en el directorio
+CAPSULE_MAX_PEERS=200                            # tope del directorio local
+CAPSULE_PEER_SYNC_INTERVAL_MS=300000             # cada cuánto saluda a sus peers
+CAPSULE_ALLOW_PRIVATE_PEERS=false                # true sólo en redes locales
+```
+
+Cada ronda de gossip el relay:
+
+1. saluda a los peers configurados y a los que ya conoce;
+2. les manda un anuncio firmado con su clave privada;
+3. recibe la lista de relays que ellos conocen;
+4. prueba cada dirección nueva con `GET /v1/info` y la guarda sólo si esa
+   dirección responde con una identidad coherente con lo que anunció.
+
+Una dirección aprendida de un tercero nunca se guarda por confiar en quien la
+pasó. Eso impide que un peer invente relays; no convierte a ningún relay en
+confiable.
+
+Verificá desde otra máquina:
+
+```bash
+curl https://relay.example.org/v1/info
+node apps/cli/dist/index.js relays --seed https://relay.example.org
+```
+
+## 4. Cápsulas sin vencimiento
+
+Están **apagadas** por defecto, porque guardar archivos sin fecha de baja es una
+decisión de costo y de responsabilidad que sólo puede tomar quien paga el disco.
+
+```bash
+CAPSULE_ALLOW_PERSISTENT_CAPSULES=true
+CAPSULE_MAX_PERSISTENT_BYTES=10737418240   # 10 GiB de tope
+```
+
+Al habilitarlo:
+
+- el relay acepta `expiresInSeconds: null` y lo publica en `/v1/config`, así los
+  clientes ofrecen la opción sin tener que probar y fallar;
+- la limpieza periódica nunca toca esas cápsulas;
+- al llegar al tope, el relay responde `507 insufficient_storage` a las nuevas
+  cápsulas sin vencimiento, sin afectar a las que tienen TTL;
+- la única forma de borrarlas es la capability de retiro del remitente, o vos
+  borrando el directorio a mano.
+
+Decilo como es en tu política de servicio: no es “permanente”, es “hasta que la
+borren o hasta que el relay deje de existir”.
+
+## 5. Privacidad operativa
+
+```bash
+CAPSULE_IP_BLIND=true    # valor por defecto
+```
+
+Con esto el relay no escribe direcciones en los logs y el rate limiting usa un
+hash con sal rotativa en vez de la IP. Reduce lo que **retenés**, no lo que
+observás: el sistema operativo y el proxy siguen viendo la conexión.
+
+Además:
+
+- terminá TLS con HTTPS y no pongas la capability en query strings (el protocolo
+  ya usa `Authorization`, mantenelo así);
+- configurá tu proxy inverso para **no** loguear IPs ni el header
+  `Authorization`;
+- no agregues analítica de terceros delante del relay;
+- si publicás un servicio onion, el `.onion` funciona sin cambios: es una URL
+  HTTP más para el protocolo, y la CLI la alcanza con `--tor`.
+
+## 6. Límites y abuso
+
+```bash
+CAPSULE_MAX_CAPSULE_BYTES=104857600
+CAPSULE_MAX_CHUNK_COUNT=10000
+CAPSULE_MAX_TTL_SECONDS=604800
+CAPSULE_RATE_LIMIT_MAX=300
+CAPSULE_CREATE_RATE_LIMIT_MAX=30
+```
+
+No podés moderar por contenido: no lo ves. Lo que sí podés hacer es acotar
+tamaño, tiempo y frecuencia, publicar una política y una vía de contacto, y
+borrar por `capsuleId` cuando recibas un reclamo fundado. Anotá esa decisión en
+tu propia política antes de recibir el primer reclamo, no después.
+
+## 7. Checklist antes de anunciarte
+
+- [ ] HTTPS válido y `CAPSULE_PUBLIC_URL` con el origen real.
+- [ ] `identity.json` respaldado y con permisos `0600`.
+- [ ] Volumen de datos con espacio monitoreado.
+- [ ] `CAPSULE_IP_BLIND=true` y proxy inverso sin logs de IP.
+- [ ] Límites de tamaño y TTL acordes a tu disco.
+- [ ] Decisión explícita sobre cápsulas sin vencimiento.
+- [ ] Política de abuso y contacto publicados.
+- [ ] `curl /v1/info` y `/v1/peers` responden desde fuera de tu red.
