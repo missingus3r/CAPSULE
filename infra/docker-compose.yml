@@ -1,0 +1,37 @@
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${CAPSULE_PORT:-8787}:8787"
+    environment:
+      CAPSULE_HOST: 0.0.0.0
+      CAPSULE_PORT: 8787
+      CAPSULE_STORAGE_DIR: /data
+      CAPSULE_CORS_ORIGIN: "${CAPSULE_CORS_ORIGIN:-http://localhost:5173}"
+      CAPSULE_MAX_CAPSULE_BYTES: "${CAPSULE_MAX_CAPSULE_BYTES:-104857600}"
+      CAPSULE_MAX_CHUNK_BYTES: "${CAPSULE_MAX_CHUNK_BYTES:-1048600}"
+      CAPSULE_MAX_MANIFEST_BYTES: "${CAPSULE_MAX_MANIFEST_BYTES:-262144}"
+      CAPSULE_MAX_CHUNK_COUNT: "${CAPSULE_MAX_CHUNK_COUNT:-10000}"
+      CAPSULE_DEFAULT_TTL_SECONDS: "${CAPSULE_DEFAULT_TTL_SECONDS:-86400}"
+      CAPSULE_MAX_TTL_SECONDS: "${CAPSULE_MAX_TTL_SECONDS:-604800}"
+      CAPSULE_CLEANUP_INTERVAL_MS: "${CAPSULE_CLEANUP_INTERVAL_MS:-60000}"
+      CAPSULE_LOG_LEVEL: "${CAPSULE_LOG_LEVEL:-info}"
+      CAPSULE_RATE_LIMIT_MAX: "${CAPSULE_RATE_LIMIT_MAX:-300}"
+      CAPSULE_RATE_LIMIT_WINDOW_MS: "${CAPSULE_RATE_LIMIT_WINDOW_MS:-60000}"
+      CAPSULE_CREATE_RATE_LIMIT_MAX: "${CAPSULE_CREATE_RATE_LIMIT_MAX:-30}"
+    volumes:
+      - capsule-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  capsule-data:

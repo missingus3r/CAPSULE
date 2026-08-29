@@ -1,0 +1,37 @@
+{
+  "name": "capsule",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private, temporary and resilient encrypted capsule transport.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:libs": "npm run build -w @capsule/protocol && npm run build -w @capsule/sdk",
+    "build": "npm run build:libs && npm run build -w @capsule/relay && npm run build -w @capsule/cli && npm run build -w @capsule/web",
+    "dev": "npm run build:libs && concurrently -k -n relay,web -c cyan,magenta \"npm run dev -w @capsule/relay\" \"npm run dev -w @capsule/web\"",
+    "dev:relay": "npm run build:libs && npm run dev -w @capsule/relay",
+    "dev:web": "npm run build:libs && npm run dev -w @capsule/web",
+    "test": "npm run build:libs && npm run test --workspaces --if-present && npm run test:integration",
+    "test:integration": "npm run build && vitest run tests/integration.test.ts",
+    "typecheck": "npm run build:libs && npm run typecheck --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "concurrently": "^9.2.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.4",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -1,0 +1,475 @@
+# CAPSULE Protocol v1
+
+**Estado:** especificación de interoperabilidad para CAPSULE 0.1  
+**Identificador de versión:** `1`  
+**Fecha:** 2026-08-29
+
+## 1. Objetivo y modelo
+
+CAPSULE v1 transporta un archivo cifrado por chunks a través de un relay no
+confiable. El relay administra disponibilidad temporal y capacidades de acceso,
+pero no recibe la clave de contenido. El enlace compartido contiene todo lo
+necesario para localizar, autorizar y descifrar la cápsula.
+
+El protocolo separa tres capacidades:
+
+- **write:** cargar chunks y finalizar una reserva;
+- **read:** consultar y descargar una cápsula finalizada;
+- **delete:** eliminar anticipadamente una cápsula.
+
+Las capacidades son bearer tokens: poseer una equivale a tener su permiso. No
+representan identidad y no deben confundirse con autenticación de una persona.
+
+CAPSULE v1 proporciona confidencialidad y autenticidad del contenido si los
+endpoints son seguros. No oculta IP, relay, tamaño, cantidad de chunks, TTL ni
+patrones temporales. Véase [THREAT_MODEL.md](./THREAT_MODEL.md).
+
+## 2. Convenciones
+
+- Los enteros se expresan en decimal en JSON.
+- Los timestamps usan RFC 3339/ISO 8601 en UTC, por ejemplo
+  `2026-08-29T03:15:00.000Z`.
+- `base64url(x)` es RFC 4648 URL-safe, sin caracteres `=` de padding.
+- Los strings se codifican como UTF-8.
+- `uint32be(i)` son cuatro bytes unsigned, big-endian.
+- `CSPRNG(n)` devuelve `n` bytes de un generador criptográficamente seguro.
+- Los campos desconocidos en JSON PUEDEN ignorarse. Los campos requeridos con
+  tipo, rango o formato inválido DEBEN provocar rechazo.
+
+## 3. Identificadores y secretos
+
+Para una nueva cápsula se generan valores independientes:
+
+| Valor         | Genera  |     Longitud mínima | Uso                                           |
+| ------------- | ------- | ------------------: | --------------------------------------------- |
+| `capsuleId`   | Relay   | 128 bits aleatorios | Identificador no secreto y no enumerable      |
+| `writeToken`  | Relay   | 256 bits aleatorios | Carga y finalización                          |
+| `readToken`   | Relay   | 256 bits aleatorios | Lectura                                       |
+| `deleteToken` | Relay   | 256 bits aleatorios | Eliminación anticipada                        |
+| `key`         | Cliente |            32 bytes | Clave AES-256-GCM                             |
+| `noncePrefix` | Cliente |             8 bytes | Prefijo aleatorio de los nonces de la cápsula |
+
+Todos se representan externamente con base64url sin padding. El relay DEBE
+guardar un hash resistente a preimagen de cada token y NO el token en claro. El
+`capsuleId` puede almacenarse en claro.
+
+El cliente DEBE generar una nueva pareja `(key, noncePrefix)` para cada cápsula.
+No debe reutilizarla, ni siquiera para subir otra versión del mismo archivo.
+
+## 4. Formato criptográfico
+
+### 4.1 Primitiva
+
+- Algoritmo: AES-GCM.
+- Clave: 256 bits.
+- Nonce/IV: 96 bits.
+- Tag de autenticación: 128 bits.
+- Salida binaria: `ciphertext || tag`, como la devuelve Web Crypto.
+
+No se aplica compresión dentro del protocolo v1. Una aplicación puede comprimir
+el archivo antes de crear la cápsula, en cuyo caso el resultado comprimido es el
+archivo transportado.
+
+### 4.2 Espacio de índices
+
+| Índice criptográfico | Contenido                     |
+| -------------------: | ----------------------------- |
+|                  `0` | Manifiesto/metadatos cifrados |
+|    `1 .. chunkCount` | Chunks del archivo, en orden  |
+|         `0xffffffff` | Reservado; no se usa en v1    |
+
+`chunkCount` puede ser cero para un archivo vacío y no puede superar
+`0xfffffffe`. La API HTTP usa índices de chunk **desde cero** en la ruta:
+`/chunks/0` corresponde al índice criptográfico `1`.
+
+### 4.3 Derivación del nonce
+
+Para un índice criptográfico `i`:
+
+```text
+nonce(i) = noncePrefix[0..7] || uint32be(i)
+```
+
+Ejemplo, para el prefijo hexadecimal `0102030405060708` y el índice `2`:
+
+```text
+01 02 03 04 05 06 07 08 00 00 00 02
+```
+
+La unicidad del nonce es crítica para AES-GCM. Un cliente PUEDE reintentar el
+mismo ciphertext ya calculado, pero NO DEBE cifrar bytes diferentes con la misma
+tripla `(key, noncePrefix, index)`. Si cambian archivo, metadatos o TTL, debe
+crear una cápsula con secretos nuevos.
+
+### 4.4 Additional Authenticated Data
+
+Para cada índice `i`, el AAD es exactamente:
+
+```text
+UTF8("CAPSULE/v1/chunk/" || decimal(i))
+```
+
+No contiene NUL, salto de línea ni espacios. Ejemplos:
+
+```text
+CAPSULE/v1/chunk/0
+CAPSULE/v1/chunk/1
+CAPSULE/v1/chunk/27
+```
+
+El AAD autentica versión, función e índice. Por lo tanto, mover un chunk a otra
+posición o descifrarlo como manifiesto hace fallar el tag.
+
+### 4.5 Operaciones
+
+```text
+encrypt(i, plaintext):
+  return AES-256-GCM-ENC(
+    key,
+    nonce(i),
+    plaintext,
+    aad = UTF8("CAPSULE/v1/chunk/" || decimal(i)),
+    tagLength = 128
+  )
+
+decrypt(i, ciphertextAndTag):
+  return AES-256-GCM-DEC(... mismos parámetros ...)
+  // Cualquier fallo de tag aborta la cápsula completa.
+```
+
+Cada bloque cifrado mide `plaintextLength + 16` bytes.
+
+## 5. Manifiesto cifrado
+
+El manifiesto es un objeto JSON UTF-8 cifrado con el índice criptográfico `0`.
+No se exige un orden canónico de claves.
+
+```json
+{
+  "version": 1,
+  "filename": "foto.jpg",
+  "mimeType": "image/jpeg",
+  "byteLength": 2539041,
+  "chunkSize": 1048576,
+  "chunkCount": 3,
+  "createdAt": "2026-08-29T03:00:00.000Z",
+  "expiresAt": "2026-08-30T03:00:00.000Z",
+  "note": "opcional"
+}
+```
+
+| Campo        | Tipo   | Regla                                                      |
+| ------------ | ------ | ---------------------------------------------------------- |
+| `version`    | entero | Debe ser `1`                                               |
+| `filename`   | string | No vacío; dato no confiable que el receptor debe sanitizar |
+| `mimeType`   | string | No vacío; informativo y no confiable                       |
+| `byteLength` | entero | `>= 0`; bytes del archivo original                         |
+| `chunkSize`  | entero | `> 0`; tamaño objetivo del texto plano por chunk           |
+| `chunkCount` | entero | `ceil(byteLength / chunkSize)`, con `0` para archivo vacío |
+| `createdAt`  | string | Timestamp informativo del cliente                          |
+| `expiresAt`  | string | Vencimiento solicitado/informativo                         |
+| `note`       | string | Opcional                                                   |
+
+El cliente receptor DEBE comprobar que:
+
+1. `version` es compatible;
+2. `chunkCount` concuerda con `byteLength` y `chunkSize`;
+3. la suma de plaintext descifrado es exactamente `byteLength`;
+4. todos los chunks `0 .. chunkCount - 1` de la API están presentes y
+   autentican con los índices criptográficos `1 .. chunkCount`.
+
+El `expiresAt` autoritativo es el fijado por el relay y devuelto por la API. El
+valor cifrado puede diferir algunos segundos por latencia y no amplía el TTL.
+
+## 6. Capability URL
+
+### 6.1 Forma
+
+```text
+https://app.example/#capsule=<base64url(UTF8(JSON capability))>
+```
+
+El objeto decodificado es:
+
+```json
+{
+  "version": 1,
+  "relayUrl": "https://relay.example",
+  "capsuleId": "base64url-id",
+  "readToken": "base64url-read-token",
+  "key": "base64url-32-byte-aes-key",
+  "noncePrefix": "base64url-8-byte-prefix"
+}
+```
+
+El orden de campos no es significativo. `relayUrl` debe ser un origen HTTP(S)
+absoluto; en producción DEBE usar HTTPS. El cliente debe rechazar esquemas
+distintos y DEBERÍA pedir confirmación antes de contactar un origen inesperado.
+
+### 6.2 Propiedades y tratamiento
+
+- El fragmento (`#...`) no forma parte de una solicitud HTTP estándar. La
+  aplicación cliente sí puede leerlo mediante JavaScript.
+- Toda la capability URL es secreta. Copiarla equivale a conceder lectura y
+  descifrado.
+- La aplicación NO DEBE mover el fragmento a query, path, analytics, crash
+  reports ni almacenamiento sincronizado sin consentimiento explícito.
+- Después de parsearlo, la UI DEBERÍA limpiar la barra de direcciones con
+  `history.replaceState`, manteniendo la capacidad sólo durante el flujo.
+- El navegador, historial, portapapeles, extensiones, capturas y canal de
+  mensajería aún pueden filtrar el enlace.
+
+La capacidad de propietario se conserva por separado:
+
+```json
+{
+  "relayUrl": "https://relay.example",
+  "capsuleId": "base64url-id",
+  "deleteToken": "base64url-delete-token"
+}
+```
+
+No se incluye `deleteToken` en el enlace de lectura.
+
+## 7. Relay API v1
+
+### 7.1 Reglas comunes
+
+- Base: `{relayUrl}/v1`.
+- Cuerpos JSON: `Content-Type: application/json; charset=utf-8`.
+- Chunks: `application/octet-stream`.
+- Capacidades: `Authorization: Bearer <token>`.
+- Respuestas que dependan de una capacidad DEBEN incluir
+  `Cache-Control: no-store`.
+- El relay no debe redirigir endpoints autenticados. Los clientes DEBEN rechazar
+  redirects para evitar entregar el bearer token a otro origen.
+- En producción se requiere HTTPS. HTTP se admite sólo para loopback/desarrollo.
+- Para no facilitar enumeración, ID inexistente, expirado o token inválido
+  responden de manera pública equivalente, recomendada `404 not_found`.
+
+Formato de error recomendado:
+
+```json
+{
+  "code": "not_found",
+  "message": "Capsule is unavailable"
+}
+```
+
+`message` no debe contener rutas internas, tokens ni detalles criptográficos.
+
+### 7.2 Crear una reserva
+
+```http
+POST /v1/capsules
+Content-Type: application/json
+```
+
+```json
+{
+  "encryptedManifest": "base64url-ciphertext-and-tag",
+  "chunkCount": 3,
+  "totalCiphertextBytes": 2539089,
+  "expiresInSeconds": 86400
+}
+```
+
+`totalCiphertextBytes` es la suma de los chunks de archivo cifrados y excluye el
+manifiesto. Para un archivo de `P` bytes dividido en `N` chunks:
+
+```text
+totalCiphertextBytes = P + 16 * N
+```
+
+El relay valida límites, reserva espacio, genera ID y tokens y responde `201`:
+
+```json
+{
+  "capsuleId": "...",
+  "readToken": "...",
+  "writeToken": "...",
+  "deleteToken": "...",
+  "expiresAt": "2026-08-30T03:00:03.000Z"
+}
+```
+
+Los cuatro valores sensibles de la respuesta se devuelven una única vez. La
+reserva permanece en estado `uploading` y no puede leerse con `readToken`.
+
+### 7.3 Subir un chunk
+
+```http
+PUT /v1/capsules/{capsuleId}/chunks/{apiIndex}
+Authorization: Bearer {writeToken}
+Content-Type: application/octet-stream
+
+<ciphertext || 16-byte-tag>
+```
+
+- `apiIndex` va de `0` a `chunkCount - 1`.
+- El índice criptográfico es `apiIndex + 1`.
+- Un `PUT` idéntico es idempotente y devuelve `204`.
+- Repetir el índice con bytes diferentes DEBE devolver `409 conflict`.
+- Un chunk tiene al menos 16 bytes y no supera el máximo configurado.
+- La suma almacenada no puede superar `totalCiphertextBytes`.
+
+### 7.4 Consultar estado
+
+```http
+GET /v1/capsules/{capsuleId}/status
+Authorization: Bearer {writeToken|readToken}
+```
+
+El `writeToken` puede consultar durante la carga; `readToken`, después de la
+finalización.
+
+```json
+{
+  "capsuleId": "...",
+  "state": "uploading",
+  "chunkCount": 3,
+  "uploadedChunks": 2,
+  "totalCiphertextBytes": 2539089,
+  "uploadedCiphertextBytes": 2097184,
+  "expiresAt": "2026-08-30T03:00:03.000Z"
+}
+```
+
+`state` es `uploading` o `ready` en v1.
+
+### 7.5 Finalizar
+
+```http
+POST /v1/capsules/{capsuleId}/finalize
+Authorization: Bearer {writeToken}
+```
+
+El relay comprueba que existan exactamente los índices declarados y que la suma
+coincida con `totalCiphertextBytes`. Si falta contenido, responde `409`. Si todo
+coincide, cambia de forma atómica a `ready` y devuelve `200` con `RelayStatus`.
+La finalización repetida por el mismo propietario DEBERÍA ser idempotente.
+
+Después de finalizar no se permiten nuevos `PUT` ni cambios de manifiesto.
+
+### 7.6 Descargar manifiesto
+
+```http
+GET /v1/capsules/{capsuleId}/manifest
+Authorization: Bearer {readToken}
+Accept: application/octet-stream
+```
+
+Devuelve `200`, `Content-Type: application/octet-stream` y el manifiesto cifrado
+binario (`ciphertext || tag`). Sólo está disponible en estado `ready` y antes del
+vencimiento.
+
+### 7.7 Descargar un chunk
+
+```http
+GET /v1/capsules/{capsuleId}/chunks/{apiIndex}
+Authorization: Bearer {readToken}
+Accept: application/octet-stream
+```
+
+Devuelve los mismos bytes cargados. v1 no define rangos parciales dentro de un
+chunk; el cliente reintenta el chunk completo.
+
+### 7.8 Eliminar
+
+```http
+DELETE /v1/capsules/{capsuleId}
+Authorization: Bearer {deleteToken}
+```
+
+Devuelve `204`. La operación es idempotente y no debe distinguir públicamente
+entre ya eliminada, vencida o inexistente. El borrado se refiere al
+almacenamiento primario bajo control del relay, no prueba eliminación de backups
+o copias externas.
+
+### 7.9 Endpoints operativos
+
+Una implementación DEBERÍA ofrecer:
+
+```http
+GET /healthz
+GET /v1/config
+```
+
+`/healthz` informa sólo liveness. `/v1/config` puede anunciar versión, tamaños y
+TTL permitidos, pero nunca rutas internas, uso total, IDs ni capacidades.
+
+### 7.10 Estados HTTP
+
+| Estado | Uso                                                                    |
+| -----: | ---------------------------------------------------------------------- |
+|  `200` | Lectura o transición con cuerpo                                        |
+|  `201` | Reserva creada                                                         |
+|  `204` | Escritura/borrado exitoso sin cuerpo                                   |
+|  `400` | JSON, base64url, índice o parámetros malformados                       |
+|  `404` | No disponible, inexistente, vencida o capacidad inválida               |
+|  `409` | Índice ya ocupado con otros bytes, faltan chunks o estado incompatible |
+|  `413` | Manifiesto, chunk o cápsula excede límite                              |
+|  `415` | Content-Type no admitido                                               |
+|  `422` | Parámetros bien formados pero inconsistentes                           |
+|  `429` | Límite de tasa o cuota                                                 |
+|  `500` | Error interno sin detalles sensibles                                   |
+
+## 8. Secuencia completa
+
+```text
+Remitente                    Relay                        Destinatario
+    |                           |                              |
+    | genera key + prefix       |                              |
+    | cifra manifest (i=0)      |                              |
+    | POST /capsules ---------->|                              |
+    |<-- id + read/write/delete |                              |
+    | PUT chunk/0 (crypto i=1)->|                              |
+    | ...                       |                              |
+    | POST /finalize ---------->|                              |
+    |<-- ready                  |                              |
+    | comparte URL #capability ------------------------------>|
+    |                           |<-- GET manifest + readToken  |
+    |                           |--> encrypted manifest        |
+    |                           |<-- GET chunks + readToken    |
+    |                           |--> encrypted chunks          |
+    |                           |        valida y descifra     |
+```
+
+## 9. Validaciones obligatorias del cliente
+
+Un cliente conforme:
+
+1. rechaza versiones desconocidas y longitudes de secretos incorrectas;
+2. no inicia red para un fragmento inválido;
+3. valida todos los tags GCM;
+4. no usa plaintext parcial después de un fallo;
+5. verifica recuento y tamaño final autenticados;
+6. sanitiza `filename` y trata `mimeType` como no confiable;
+7. no sigue redirects autenticados a otro origen;
+8. borra referencias a claves y plaintext de memoria cuando sea razonablemente
+   posible, sin prometer borrado físico de memoria administrada;
+9. nunca registra la capability URL completa.
+
+## 10. Compatibilidad y evolución
+
+- La versión del fragmento y del manifiesto debe coincidir.
+- Cualquier cambio de nonce, AAD, algoritmo, semántica de índices o campos
+  requeridos exige una nueva versión de protocolo.
+- Agregar campos JSON opcionales no cambia la versión si clientes antiguos pueden
+  ignorarlos con seguridad.
+- v1 no negocia algoritmos: la agilidad criptográfica se introduce mediante una
+  versión nueva, no mediante parámetros controlados por el atacante.
+- No existe downgrade automático. Un cliente v1 rechaza una cápsula de versión
+  desconocida.
+
+## 11. Notas de seguridad para implementadores
+
+- No inventar primitivas ni reemplazar AES-GCM sin revisión criptográfica.
+- No deduplicar ciphertext entre cápsulas ni derivar nonces desde el nombre.
+- No incluir claves o tokens en URLs del relay. `Authorization` también puede ser
+  registrado por proxies mal configurados, por lo que debe redactarse allí.
+- La expiración es control de acceso y política operativa, no “autodestrucción”:
+  un destinatario puede guardar el archivo y un relay malicioso puede retener
+  ciphertext.
+- El cifrado no vuelve seguro al archivo descargado. La aplicación no debe
+  previsualizar ni ejecutar contenido activo sin aislamiento explícito.

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+.playwright-cli/
+coverage/
+*.log
+.env
+.env.local
+data/
+storage/
+output/playwright/*
+!output/playwright/.gitkeep
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
