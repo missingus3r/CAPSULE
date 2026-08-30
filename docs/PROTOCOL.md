@@ -943,3 +943,101 @@ Bloque de respuesta (432 B): identificador del primer salto (16), `α` (32),
 Estos dos endpoints llevan su propio límite de peticiones: el tráfico de mezcla
 y el sondeo de un buzón no se parecen al tráfico de API, y contarlos juntos
 deja a la red sin servicio justo cuando está funcionando.
+
+## 17. Nombres, registros y paquetes de sitio
+
+Esta sección especifica la capa de nombres `.capsule`. No forma parte del
+formato de cápsula: un sitio es una cápsula v3 corriente cuyo contenido resulta
+ser un paquete de sitio. El diseño y sus límites están en
+[SITES.md](./SITES.md).
+
+### 17.1 Nombre
+
+```
+base32( clave pública Ed25519 (32) ‖ suma (2) ‖ versión (1) ) ‖ ".capsule"
+```
+
+- Base32 es el alfabeto RFC 4648 en minúsculas, sin relleno. Los bits sobrantes
+  del último carácter deben ser cero: un nombre tiene una sola escritura.
+- `suma = SHA-256("CAPSULE/site-name/v1" ‖ clave ‖ versión)[0..2]`.
+- `versión = 1`.
+- La etiqueta mide siempre 56 caracteres.
+
+Un nombre se compara en minúsculas, sin el punto final opcional. Un nombre cuya
+suma no coincide se rechaza; no resuelve a nada y no se pide a ningún relay.
+
+### 17.2 Registro
+
+```json
+{
+  "version": 1,
+  "name": "<etiqueta>.capsule",
+  "sequence": 7,
+  "publishedAt": "2026-08-30T16:39:44.940Z",
+  "capability": "capsule=<base64url>",
+  "title": "opcional, ≤ 120 caracteres",
+  "signature": "<base64url, 64 bytes>"
+}
+```
+
+El texto firmado es exactamente, con `\n` entre campos:
+
+```
+CAPSULE/site-record/v1
+<version>
+<name>
+<sequence>
+<publishedAt>
+<capability>
+<title, o cadena vacía>
+```
+
+Ningún campo puede contener `\r` ni `\n`, así que dos registros distintos no
+pueden producir el mismo texto. La firma es Ed25519 con la clave que está dentro
+del nombre; no hay otra fuente de verdad.
+
+Reglas de aceptación, iguales en el relay y en el cliente:
+
+| Regla                                        | Motivo                                           |
+| -------------------------------------------- | ------------------------------------------------ |
+| El nombre debe reparsear a sí mismo          | Un nombre con otra escritura sería otro nombre   |
+| La firma verifica contra la clave del nombre | Es toda la confianza del sistema                 |
+| `sequence` es entero seguro y no retrocede   | Una firma vieja sigue siendo válida para siempre |
+| `publishedAt` no más de 10 min en el futuro  | Reloj adelantado o fecha inventada               |
+| `publishedAt` no más de 90 días en el pasado | Que un registro viejo no circule eternamente     |
+| `capability` ≤ 16 384 caracteres             | Techo del fragmento de una capability            |
+
+### 17.3 Paquete de sitio
+
+| Offset | Bytes | Contenido                                     |
+| ------ | ----- | --------------------------------------------- |
+| 0      | 8     | `"CAPSITE1"`                                  |
+| 8      | 4     | Largo del índice, `uint32` big-endian         |
+| 12     | n     | Índice, JSON UTF-8                            |
+| 12+n   | …     | Archivos concatenados, en el orden del índice |
+
+Índice: `{ "v": 1, "entries": [ { "path", "type", "offset", "length" } ] }`,
+donde `offset` es relativo al primer byte después del índice.
+
+Una ruta se acepta sólo si es relativa, separada por `/`, sin segmentos vacíos
+ni `.` ni `..`, sin `\`, sin caracteres de control, de 1 a 512 caracteres. Un
+paquete tiene como mucho 4096 entradas, ninguna repetida, y debe incluir
+`index.html` en la raíz. Estas reglas se aplican tanto al empaquetar como al
+desempaquetar: el paquete lo escribió quien tenga una clave y no es confiable.
+
+Todo lo demás del contenido son bytes de la cápsula: relleno a clase de tamaño,
+cifrado por chunk, espejos y reparto `k` de `n` funcionan sin cambios. El
+relleno queda después del último archivo y el índice dice dónde termina cada
+uno, así que desempaquetar no necesita saber cuánto relleno hubo.
+
+### 17.4 API HTTP del relay
+
+| Método y ruta           | Respuesta                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `GET /v1/sites/:name`   | `{ version, record }` o `404`                                                     |
+| `PUT /v1/sites/:name`   | `202` si lo guardó, `200` si ya tenía uno igual o más nuevo, `400` si no verifica |
+| `GET /v1/sites?limit=n` | `{ version, records: [...] }`, más recientes primero                              |
+
+El nombre en la ruta y el del registro deben coincidir, o un publicador podría
+dejar un registro válido donde nadie va a buscarlo. `GET /v1/info` incluye
+`sitesEnabled` y `siteCount`.

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CAPSULE</title>
+    <style>
+      :root {
+        --ink: #18352f;
+        --paper: #fffdf8;
+        --ground: #f3efe6;
+        --forest: #183f37;
+        --coral: #ef7959;
+        --muted: #6b7772;
+        --line: rgba(27, 62, 54, 0.15);
+        --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--ground);
+        color: var(--ink);
+        font: 400 14px/1.55 var(--sans);
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 14px;
+        background: var(--forest);
+        color: #f4f8f5;
+        flex: 0 0 auto;
+      }
+      .shield {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--coral);
+        flex: 0 0 auto;
+      }
+      .name {
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1 1 auto;
+        opacity: 0.92;
+      }
+      .badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        padding: 4px 8px;
+        border: 1px solid rgba(244, 248, 245, 0.28);
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      button {
+        font: inherit;
+        font-size: 11px;
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 5px 10px;
+        border-radius: 4px;
+        border: 1px solid rgba(244, 248, 245, 0.3);
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:hover {
+        border-color: var(--coral);
+        color: var(--coral);
+      }
+      main {
+        flex: 1 1 auto;
+        position: relative;
+        display: flex;
+      }
+      iframe {
+        flex: 1 1 auto;
+        border: 0;
+        background: var(--paper);
+      }
+      .panel {
+        margin: auto;
+        max-width: 560px;
+        padding: 32px 28px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .panel h1 {
+        font-size: 19px;
+        font-weight: 600;
+        margin: 0 0 10px;
+      }
+      .panel p {
+        margin: 0 0 14px;
+        color: var(--muted);
+      }
+      .panel code {
+        font-family: var(--mono);
+        font-size: 12px;
+        word-break: break-all;
+        color: var(--ink);
+      }
+      .panel button {
+        color: var(--ink);
+        border-color: var(--line);
+      }
+      .panel .primary {
+        background: var(--coral);
+        border-color: var(--coral);
+        color: #fff;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+      .note {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 16px;
+        line-height: 1.7;
+      }
+      .warn {
+        background: #fff5d8;
+        border-top: 1px solid var(--line);
+        padding: 8px 14px;
+        font-size: 12px;
+        color: var(--ink);
+        flex: 0 0 auto;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header hidden id="bar">
+      <span class="shield" aria-hidden="true"></span>
+      <span class="name" id="siteName"></span>
+      <span class="badge" id="badge"></span>
+      <button id="scripts" type="button">Scripts off</button>
+      <button id="relays" type="button">Relays</button>
+    </header>
+    <main>
+      <div class="panel" id="panel">
+        <h1 id="panelTitle">Resolving…</h1>
+        <p id="panelBody"></p>
+        <div class="row" id="panelActions"></div>
+        <p class="note" id="panelNote"></p>
+      </div>
+      <iframe
+        id="frame"
+        hidden
+        title="CAPSULE site"
+        sandbox="allow-top-navigation-by-user-activation"
+        referrerpolicy="no-referrer"
+      ></iframe>
+    </main>
+    <div class="warn" id="warn" hidden></div>
+    <script type="module" src="viewer.js"></script>
+  </body>
+</html>

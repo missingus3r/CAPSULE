@@ -35,6 +35,12 @@ export interface RelayConfig {
   announceWorkBits: number;
   /** Relays kept per apparent operator, so one domain cannot fill the list. */
   maxPeersPerOperator: number;
+  /** Serves and gossips `.capsule` site records. */
+  sitesEnabled: boolean;
+  /** Site records held before the oldest is dropped. */
+  maxSites: number;
+  /** Records pulled from one peer per gossip round. */
+  siteGossipLimit: number;
   /** Keeps raw client addresses out of logs and rate-limit state. */
   ipBlind: boolean;
   /** Acts as a node in the mix network. */
@@ -85,6 +91,8 @@ const DEFAULTS = {
   maxPersistentBytes: 1024 * 1024 * 1024,
   announceWorkBits: 18,
   maxPeersPerOperator: 4,
+  maxSites: 5_000,
+  siteGossipLimit: 200,
   mixMaxQueued: 2048,
   mixMaxDelayMs: 5 * 60_000,
   mixMeanDelayMs: 5_000,
@@ -293,6 +301,23 @@ export function loadRelayConfig(
       environment,
       "CAPSULE_ALLOW_PRIVATE_PEERS",
       false,
+    ),
+    sitesEnabled: booleanFromEnvironment(
+      environment,
+      "CAPSULE_SITES_ENABLED",
+      true,
+    ),
+    maxSites: integerFromEnvironment(
+      environment,
+      "CAPSULE_MAX_SITES",
+      DEFAULTS.maxSites,
+      { minimum: 0 },
+    ),
+    siteGossipLimit: integerFromEnvironment(
+      environment,
+      "CAPSULE_SITE_GOSSIP_LIMIT",
+      DEFAULTS.siteGossipLimit,
+      { minimum: 0, maximum: 1000 },
     ),
     allowPersistentCapsules: booleanFromEnvironment(
       environment,

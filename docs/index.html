@@ -1,0 +1,2065 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>CAPSULE — private file transfer and websites with no server</title>
+    <meta
+      name="description"
+      content="CAPSULE encrypts a file in your browser, stores only ciphertext on relays anyone can run, and puts the key in a link fragment that never reaches a server. It also publishes websites under a .capsule name that is its own key, readable in any Chromium browser."
+    />
+    <meta
+      name="keywords"
+      content="encrypted file transfer, mix network, anonymity, .capsule, self-certifying names, onion address alternative, Sphinx packet format, Loopix, end-to-end encryption, censorship, Tor alternative, IPFS alternative, private website hosting, erasure coding, relay network"
+    />
+    <meta name="author" content="Bruno Silveira (missingus3r)" />
+    <meta
+      name="robots"
+      content="index, follow, max-snippet:-1, max-image-preview:large"
+    />
+    <link rel="canonical" href="https://missingus3r.github.io/CAPSULE/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CAPSULE" />
+    <meta
+      property="og:title"
+      content="CAPSULE — private file transfer and websites with no server"
+    />
+    <meta
+      property="og:description"
+      content="A file encrypted in your browser, stored as ciphertext on relays anyone can run, opened by a key that never touches a server. And websites whose name is their own key."
+    />
+    <meta property="og:url" content="https://missingus3r.github.io/CAPSULE/" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:creator" content="@missingus3r" />
+    <meta
+      name="twitter:title"
+      content="CAPSULE — private file transfer and websites with no server"
+    />
+    <meta
+      name="twitter:description"
+      content="A file encrypted in your browser, stored as ciphertext on relays anyone can run, opened by a key that never touches a server."
+    />
+
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='18' y='18' width='64' height='64' rx='18' fill='%23ef7959'/%3E%3C/svg%3E"
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "CAPSULE",
+            "applicationCategory": "SecurityApplication",
+            "operatingSystem": "Linux, macOS, Windows",
+            "description": "An encrypted transport for files and static websites. Content is encrypted in the sender's browser, relays store only ciphertext, and the decryption capability travels in a URL fragment that browsers never send to a server. Sites are published under a .capsule name derived from an Ed25519 public key and read through a browser extension.",
+            "url": "https://missingus3r.github.io/CAPSULE/",
+            "downloadUrl": "https://github.com/missingus3r/CAPSULE",
+            "softwareVersion": "1.2.0",
+            "author": {
+              "@type": "Person",
+              "name": "Bruno Silveira",
+              "url": "https://github.com/missingus3r"
+            },
+            "featureList": [
+              "AES-256-GCM chunked encryption in the browser",
+              "Capability URLs whose key lives in the fragment",
+              "Relays that store only ciphertext and can be run by anyone",
+              "k-of-n erasure coding across relays",
+              "Sphinx mix packets with Loopix-style per-hop delays and cover traffic",
+              "Websites under a self-certifying .capsule name",
+              "Browser extension that renders sites with no network access at all",
+              "Metadata scrubbing and size-class padding"
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "name": "CAPSULE",
+            "url": "https://missingus3r.github.io/CAPSULE/",
+            "inLanguage": "en"
+          }
+        ]
+      }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      try {
+        const saved = localStorage.getItem("capsule_mode");
+        if (saved) document.documentElement.setAttribute("data-mode", saved);
+      } catch (e) {}
+    </script>
+    <style>
+      :root {
+        --bg: #0b0d0c;
+        --surface: #111413;
+        --ink: #f2f4f2;
+        --ink-2: #a6aeaa;
+        --ink-3: #6b7772;
+        --line: #1e2321;
+        --line-2: #2a302d;
+        --accent: #ef7959;
+        --accent-soft: rgba(239, 121, 89, 0.14);
+        --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+        --serif: "Instrument Serif", Georgia, serif;
+      }
+      [data-mode="light"] {
+        --bg: #faf8f3;
+        --surface: #fffdf8;
+        --ink: #18352f;
+        --ink-2: #4e625c;
+        --ink-3: #8b9691;
+        --line: #e6e0d4;
+        --line-2: #d5cec0;
+        --accent-soft: rgba(239, 121, 89, 0.16);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-weight: 300;
+        -webkit-font-smoothing: antialiased;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+      a {
+        color: inherit;
+      }
+      ::selection {
+        background: var(--accent);
+        color: #0b0d0c;
+      }
+
+      /* Longhands, not the shorthand: sections and the footer set their own
+     vertical padding on the element selector, which a class would erase. */
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+        padding-left: 28px;
+        padding-right: 28px;
+        text-align: center;
+      }
+
+      nav.top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 28px;
+        border-bottom: 1px solid var(--line);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--bg);
+      }
+      .mark {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+      }
+      .pulse {
+        width: 7px;
+        height: 7px;
+        border-radius: 2px;
+        background: var(--accent);
+        position: relative;
+      }
+      .pulse::after {
+        content: "";
+        position: absolute;
+        inset: -4px;
+        border-radius: 4px;
+        border: 1px solid var(--accent);
+        opacity: 0.4;
+        animation: ring 2.6s ease-out infinite;
+      }
+      @keyframes ring {
+        0% {
+          transform: scale(0.6);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(2);
+          opacity: 0;
+        }
+      }
+      nav.top .toc {
+        display: flex;
+        gap: 14px;
+        font-family: var(--mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--ink-3);
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      nav.top .toc::-webkit-scrollbar {
+        display: none;
+      }
+      nav.top .toc a {
+        text-decoration: none;
+        white-space: nowrap;
+        padding: 4px 0;
+        border-bottom: 1px solid transparent;
+      }
+      nav.top .toc a:hover,
+      nav.top .toc a.on {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+      .modebtn {
+        background: transparent;
+        border: 1px solid var(--line-2);
+        color: var(--ink-3);
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        flex: 0 0 auto;
+      }
+      .modebtn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      header.hero {
+        padding: 120px 0 96px;
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 26px;
+      }
+      h1 {
+        font-size: 64px;
+        font-weight: 300;
+        line-height: 1.04;
+        letter-spacing: -0.03em;
+        margin: 0 auto 26px;
+        max-width: 17ch;
+        text-wrap: balance;
+      }
+      h1 b {
+        font-weight: 500;
+      }
+      .lede {
+        font-size: 18px;
+        color: var(--ink-2);
+        max-width: 54ch;
+        margin: 0 auto;
+        font-weight: 300;
+      }
+      .hero-meta {
+        margin-top: 52px;
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        font-family: var(--mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--ink-3);
+      }
+      .hero-meta div {
+        padding: 6px 22px;
+        border-right: 1px solid var(--line);
+      }
+      .hero-meta div:last-child {
+        border-right: none;
+      }
+      .hero-meta b {
+        display: block;
+        font-family: var(--sans);
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--ink);
+        margin-top: 6px;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      section {
+        padding: 92px 0;
+        border-top: 1px solid var(--line);
+        scroll-margin-top: 60px;
+      }
+      .kicker {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 18px;
+      }
+      h2 {
+        font-size: 38px;
+        font-weight: 300;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 0 auto 20px;
+        max-width: 21ch;
+        text-wrap: balance;
+      }
+      h2 b {
+        font-weight: 500;
+      }
+      p.body {
+        font-size: 17px;
+        color: var(--ink-2);
+        max-width: 58ch;
+        margin: 0 auto;
+        font-weight: 300;
+      }
+      p.body + p.body {
+        margin-top: 14px;
+      }
+      p.body b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      code.inline {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        color: var(--accent);
+      }
+
+      .figure {
+        margin: 52px auto 0;
+        max-width: 840px;
+        background: #f3efe6;
+        border: 1px solid var(--line-2);
+        border-radius: 10px;
+        padding: 6px;
+        overflow-x: auto;
+      }
+      .figure svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        min-width: 660px;
+      }
+      .figcap {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 14px;
+        letter-spacing: 0.04em;
+      }
+
+      .caps {
+        margin-top: 44px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 740px;
+        margin-left: auto;
+        margin-right: auto;
+        text-align: left;
+        border-top: 1px solid var(--line);
+      }
+      .cap {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 16px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .cap:hover {
+        background: var(--surface);
+      }
+      .cap .n {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--ink-3);
+        letter-spacing: 0.14em;
+        width: 26px;
+        flex: 0 0 auto;
+      }
+      .cap:hover .n {
+        color: var(--accent);
+      }
+      .cap .t {
+        font-size: 14.5px;
+        font-weight: 500;
+        flex: 1;
+      }
+      .cap .d {
+        font-size: 12px;
+        color: var(--ink-3);
+        font-family: var(--mono);
+        text-align: right;
+      }
+
+      .stack {
+        margin: 36px auto 0;
+        max-width: 560px;
+        text-align: left;
+      }
+      .stack .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 18px;
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+      }
+      .stack .row b {
+        font-weight: 500;
+        color: var(--ink);
+        flex: 0 0 auto;
+      }
+      .stack .row span {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--ink-3);
+        text-align: right;
+      }
+
+      .compare-wrap {
+        margin: 48px auto 0;
+        max-width: 820px;
+        overflow-x: auto;
+        border-top: 1px solid var(--line);
+      }
+      .compare {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        text-align: center;
+        min-width: 640px;
+      }
+      .compare th,
+      .compare td {
+        padding: 12px 8px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      .compare thead th {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        font-weight: 400;
+      }
+      .compare th.feat,
+      .compare td.feat {
+        text-align: left;
+        color: var(--ink-2);
+        font-family: var(--sans);
+        font-weight: 300;
+        white-space: normal;
+        min-width: 186px;
+      }
+      .compare tbody tr:hover {
+        background: var(--surface);
+      }
+      .compare .yes {
+        color: var(--ink);
+      }
+      .compare .partial {
+        color: var(--ink-3);
+      }
+      .compare .no {
+        color: var(--ink-3);
+        opacity: 0.38;
+      }
+      .compare th.me {
+        color: var(--accent);
+      }
+      .compare td.me {
+        background: var(--accent-soft);
+      }
+      .compare th.me,
+      .compare td.me {
+        border-left: 1px solid var(--accent);
+        border-right: 1px solid var(--accent);
+      }
+      .compare td.me .yes {
+        color: var(--accent);
+      }
+      .compare-note {
+        margin: 18px auto 0;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--ink-3);
+        max-width: 620px;
+        line-height: 1.7;
+      }
+
+      .steps {
+        margin: 44px auto 0;
+        max-width: 760px;
+        text-align: left;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 16px;
+        padding: 18px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .step .sn {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--ink-3);
+        letter-spacing: 0.14em;
+        padding-top: 3px;
+      }
+      .step b {
+        display: block;
+        font-weight: 500;
+        font-size: 15px;
+        margin-bottom: 4px;
+      }
+      .step span {
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+      .step code {
+        font-family: var(--mono);
+        color: var(--accent);
+        font-size: 12.5px;
+      }
+
+      .terminal {
+        margin: 34px auto 0;
+        max-width: 700px;
+        background: #06080a;
+        border: 1px solid var(--line-2);
+        border-radius: 10px;
+        padding: 18px 22px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.75;
+        text-align: left;
+        position: relative;
+        color: #e7eae8;
+        overflow-x: auto;
+      }
+      .terminal .bar {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .terminal .bar i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #2a302d;
+        display: inline-block;
+      }
+      .terminal .prompt,
+      .terminal .flag {
+        color: var(--accent);
+      }
+      .terminal .out {
+        color: #78827d;
+        margin: 8px 0 16px;
+        font-size: 11.5px;
+      }
+      .terminal .out div {
+        margin-top: 2px;
+      }
+      .copy {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        background: transparent;
+        border: 1px solid #2a302d;
+        color: #a6aeaa;
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .copy:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .pull {
+        margin: 0 auto;
+        max-width: 32ch;
+        font-family: var(--serif);
+        font-size: 34px;
+        font-weight: 400;
+        line-height: 1.24;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+      .pull b {
+        color: var(--accent);
+        font-weight: 400;
+      }
+      .pull-attr {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--ink-3);
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        margin-top: 20px;
+      }
+
+      .honest {
+        margin: 44px auto 0;
+        max-width: 740px;
+        text-align: left;
+      }
+      .honest .item {
+        padding: 18px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .honest .item b {
+        display: block;
+        font-weight: 500;
+        font-size: 15px;
+        margin-bottom: 5px;
+      }
+      .honest .item b::before {
+        content: "—";
+        color: var(--accent);
+        margin-right: 10px;
+      }
+      .honest .item span {
+        color: var(--ink-3);
+        font-size: 13.5px;
+      }
+
+      .open-modal {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 34px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        background: transparent;
+        border: 1px solid var(--line-2);
+        padding: 12px 18px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .open-modal:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .open-modal .plus {
+        color: var(--accent);
+        font-size: 14px;
+        line-height: 1;
+      }
+
+      .modal-scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.74);
+        backdrop-filter: blur(4px);
+        z-index: 90;
+        display: none;
+      }
+      .modal-scrim.on {
+        display: block;
+      }
+      .modal {
+        position: fixed;
+        inset: 5vh 0 5vh 0;
+        margin: 0 auto;
+        max-width: 800px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        z-index: 100;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .modal.on {
+        display: flex;
+      }
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 26px;
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+      }
+      .modal-head h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 500;
+      }
+      .modal-head .close {
+        background: transparent;
+        border: 1px solid var(--line-2);
+        color: var(--ink-2);
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .modal-head .close:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .modal-body {
+        overflow-y: auto;
+        padding: 30px 36px 44px;
+        text-align: left;
+      }
+      .modal-body h4 {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 34px 0 12px;
+        font-weight: 500;
+      }
+      .modal-body h4:first-child {
+        margin-top: 0;
+      }
+      .modal-body p {
+        font-size: 14px;
+        color: var(--ink-2);
+        margin: 0 0 14px;
+        line-height: 1.65;
+      }
+      .modal-body p b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .modal-body table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0 0 18px;
+        font-size: 13px;
+      }
+      .modal-body table td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+        color: var(--ink-2);
+      }
+      .modal-body table td:first-child {
+        color: var(--ink);
+        font-weight: 500;
+        width: 22%;
+        white-space: nowrap;
+      }
+      .modal-body table td:nth-child(2) {
+        width: 44%;
+      }
+      .modal-body table td.v {
+        font-family: var(--mono);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        width: 14%;
+      }
+      .modal-body td.v-yes {
+        color: var(--accent);
+      }
+      .modal-body td.v-part {
+        color: var(--ink-2);
+      }
+      .modal-body td.v-no {
+        color: var(--ink-3);
+      }
+      .modal-body pre {
+        background: #06080a;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 14px 16px;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: #e7eae8;
+        overflow-x: auto;
+        margin: 0 0 18px;
+        line-height: 1.6;
+      }
+
+      .star-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 34px;
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink);
+        background: var(--accent-soft);
+        border: 1px solid var(--accent);
+        padding: 14px 22px;
+        border-radius: 6px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+      }
+      .star-cta:hover {
+        background: var(--accent);
+        color: #0b0d0c;
+      }
+      footer {
+        padding: 76px 0;
+        border-top: 1px solid var(--line);
+      }
+      footer .tag {
+        font-size: 14px;
+        color: var(--ink-3);
+        max-width: 48ch;
+        margin: 0 auto 24px;
+        font-weight: 300;
+      }
+      footer .links {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+      footer .links a {
+        text-decoration: none;
+        padding: 6px 0;
+        border-bottom: 1px solid transparent;
+      }
+      footer .links a:hover {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+
+      @media (max-width: 760px) {
+        h1 {
+          font-size: 42px;
+        }
+        h2 {
+          font-size: 28px;
+        }
+        .pull {
+          font-size: 26px;
+        }
+        .caps {
+          grid-template-columns: 1fr;
+        }
+        nav.top .toc {
+          display: none;
+        }
+        .modal {
+          inset: 0;
+          border-radius: 0;
+        }
+        .modal-body {
+          padding: 24px 20px 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="top">
+      <a class="mark" href="#top"><span class="pulse"></span> CAPSULE</a>
+      <div class="toc">
+        <a href="#what">01 What</a>
+        <a href="#why">02 Why</a>
+        <a href="#capsules">03 Capsules</a>
+        <a href="#sites">04 Sites</a>
+        <a href="#mix">05 Mix</a>
+        <a href="#compare">06 Compared</a>
+        <a href="#limits">07 Limits</a>
+        <a href="#run">08 Run it</a>
+        <a href="#stack">09 Stack</a>
+      </div>
+      <button class="modebtn" id="mode" type="button">Light</button>
+    </nav>
+
+    <header class="hero wrap" id="top">
+      <div class="eyebrow">Version 1.2 · Unaudited · Node 22</div>
+      <h1>
+        A file the relay <b>cannot read</b>. A site nobody <b>can rewrite</b>.
+      </h1>
+      <p class="lede">
+        CAPSULE encrypts in your browser, stores only ciphertext on relays
+        anyone can run, and puts the key in the part of the link that never
+        reaches a server. The same machinery publishes websites under a name
+        that <em>is</em> its own key.
+      </p>
+      <div class="hero-meta">
+        <div>Cipher<b>AES-256-GCM</b></div>
+        <div>Names<b>Ed25519, self-certifying</b></div>
+        <div>Routing<b>Sphinx + Loopix</b></div>
+        <div>Tests<b>163 passing</b></div>
+      </div>
+      <a class="star-cta" href="https://github.com/missingus3r/CAPSULE"
+        >★ Star on GitHub</a
+      >
+    </header>
+
+    <section id="what" class="wrap">
+      <div class="kicker">01 — What it is</div>
+      <h2>Two things, built on <b>one idea</b></h2>
+      <p class="body">
+        The idea is that a server should be able to hold your data without being
+        able to read it, and that the thing which unlocks it should never travel
+        the same road. CAPSULE encrypts a file in the browser, uploads the
+        ciphertext to a relay, and puts the key in the URL
+        <code class="inline">#fragment</code> — the one part of a link that
+        browsers, by specification, never send to a server.
+      </p>
+      <p class="body">
+        Point that same machinery at a folder instead of a file and you get a
+        website. Its address is <code class="inline">&lt;key&gt;.capsule</code>,
+        where the key is an Ed25519 public key written in base32. There is
+        nothing to register, no certificate to renew, and no authority that
+        could be asked to hand the name to someone else.
+      </p>
+
+      <div class="caps">
+        <div class="cap">
+          <span class="n">01</span><span class="t">Encrypt before upload</span
+          ><span class="d">AES-256-GCM</span>
+        </div>
+        <div class="cap">
+          <span class="n">02</span
+          ><span class="t">Key in the link fragment</span
+          ><span class="d">never sent</span>
+        </div>
+        <div class="cap">
+          <span class="n">03</span><span class="t">Relays anyone can run</span
+          ><span class="d">one command</span>
+        </div>
+        <div class="cap">
+          <span class="n">04</span
+          ><span class="t">Split k-of-n across relays</span
+          ><span class="d">Reed–Solomon</span>
+        </div>
+        <div class="cap">
+          <span class="n">05</span><span class="t">Pad to a size class</span
+          ><span class="d">size hidden</span>
+        </div>
+        <div class="cap">
+          <span class="n">06</span><span class="t">Strip file metadata</span
+          ><span class="d">EXIF, XMP, ZIP</span>
+        </div>
+        <div class="cap">
+          <span class="n">07</span><span class="t">Route through a mix</span
+          ><span class="d">--mix</span>
+        </div>
+        <div class="cap">
+          <span class="n">08</span><span class="t">Publish a .capsule site</span
+          ><span class="d">site publish</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="why" class="wrap">
+      <div class="kicker">02 — Why</div>
+      <h2>Encryption stopped being the <b>hard part</b></h2>
+      <p class="body">
+        Every mainstream file service encrypts in transit and at rest. What none
+        of them do is give up the ability to read the file, and that ability is
+        what gets subpoenaed, breached, scanned and monetised. The interesting
+        question is not "is it encrypted" but <b>who holds the key</b>.
+      </p>
+      <p class="body">
+        The same is true of publishing. A domain is rented, a certificate is
+        issued, and a host serves the bytes — three parties, each of whom can be
+        leaned on to make a page disappear or say something else. A
+        <code class="inline">.capsule</code> name has none of them, because the
+        name and the signing key are the same object.
+      </p>
+
+      <div class="pull" style="margin-top: 56px">
+        A relay that <b>could</b> read your file eventually <b>will</b> be asked
+        to.
+      </div>
+      <div class="pull-attr">the design constraint</div>
+    </section>
+
+    <section id="capsules" class="wrap">
+      <div class="kicker">03 — Capsules</div>
+      <h2>The key goes <b>around</b> the relay</h2>
+      <p class="body">
+        A capsule is a file split into chunks, each encrypted with AES-256-GCM
+        under a key generated in the browser. The nonce is a random prefix plus
+        the chunk index, and the associated data binds every chunk to the
+        protocol version — so a downgrade fails to authenticate rather than
+        silently succeeding.
+      </p>
+
+      <div class="figure">
+        <!-- diagram:capsule-flow:start -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 340" role="img" aria-labelledby="capsule-flow-title capsule-flow-desc">
+<title id="capsule-flow-title">How a capsule travels</title>
+<desc id="capsule-flow-desc">A file is encrypted in the sender's browser. The ciphertext goes to a relay and on to the receiver. The key travels separately, inside the fragment of the share link, which browsers never send to a server. The relay therefore stores bytes it cannot read.</desc>
+<defs>
+<marker id="tip-capsule-flow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+<path d="M 0 1 L 7 4 L 0 7 z" fill="#b9b1a0" />
+</marker>
+<marker id="tip-accent-capsule-flow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+<path d="M 0 1 L 7 4 L 0 7 z" fill="#ef7959" />
+</marker>
+</defs>
+<rect width="920" height="340" fill="#f3efe6" />
+<text x="32" y="40" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#ef7959" letter-spacing="0.24em">CAPSULE</text>
+<text x="32" y="72" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-size="28" font-weight="400" fill="#18352f">The key goes around the relay, not through it</text>
+<path d="M 176 224 L 218 224" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><path d="M 350 224 L 392 224" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><rect x="343" y="217" width="56" height="14" fill="#f3efe6" /><text x="371" y="227" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">ciphertext</text><path d="M 524 224 L 566 224" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><rect x="517" y="217" width="56" height="14" fill="#f3efe6" /><text x="545" y="227" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">ciphertext</text><path d="M 698 224 L 740 224" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><path d="M 284 196 L 284 164 A 8 8 0 0 1 292 156 L 392 156" fill="none" stroke="#ef7959" stroke-width="1.25" marker-end="url(#tip-accent-capsule-flow)" /><rect x="272.1" y="161" width="23.799999999999997" height="14" fill="#f3efe6" /><text x="284" y="171" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">key</text><path d="M 524 156 L 624 156 A 8 8 0 0 1 632 164 L 632 196" fill="none" stroke="#ef7959" stroke-width="1.25" marker-end="url(#tip-accent-capsule-flow)" /><rect x="620.1" y="161" width="23.799999999999997" height="14" fill="#f3efe6" /><text x="632" y="171" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">key</text><rect x="44" y="196" width="132" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="110" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">SENDER</text><text x="110" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Your file</text><rect x="218" y="196" width="132" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="284" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">IN YOUR BROWSER</text><text x="284" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Encrypted</text><text x="284" y="246" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">AES-256-GCM</text><rect x="392" y="196" width="132" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="458" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">RELAY</text><text x="458" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Stores bytes</text><text x="458" y="246" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">cannot read</text><rect x="566" y="196" width="132" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="632" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">IN THEIR BROWSER</text><text x="632" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Decrypted</text><rect x="740" y="196" width="132" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="806" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">RECEIVER</text><text x="806" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">The file</text><rect x="392" y="128" width="132" height="56" rx="8" fill="#fffdf8" stroke="#ef7959" stroke-width="1.5" /><text x="458" y="148" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#ef7959" letter-spacing="0.18em">THE LINK YOU SEND</text><text x="458" y="164" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">#fragment</text><text x="458" y="178" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">never sent to a server</text>
+<line x1="32" y1="294" x2="888" y2="294" stroke="#d5cec0" stroke-width="1" /><text x="32" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Solid — ciphertext, over the network</text><text x="317" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Coral — the key, out of band</text><text x="602" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">The relay never holds both</text>
+</svg>
+<!-- diagram:capsule-flow:end -->
+      </div>
+      <div class="figcap">
+        The relay sees ciphertext and a size class. It never sees the key.
+      </div>
+
+      <button class="open-modal" data-modal="m-capsule">
+        <span class="plus">+</span> What the relay actually stores
+      </button>
+    </section>
+
+    <section id="sites" class="wrap">
+      <div class="kicker">04 — Sites</div>
+      <h2>A name nobody issues, a page nobody <b>can rewrite</b></h2>
+      <p class="body">
+        <code class="inline">capsule site publish ./www</code> packs a folder
+        into one capsule, stores it on relays, and signs a short record saying
+        which capsule is the current version of your name. Relays hand that
+        record out and gossip it to each other. They cannot forge one — they
+        have no key — and they cannot quietly serve an old one, because every
+        record carries a sequence number the browser remembers.
+      </p>
+
+      <div class="figure">
+        <!-- diagram:capsule-site:start -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 400" role="img" aria-labelledby="capsule-site-title capsule-site-desc">
+<title id="capsule-site-title">How a .capsule site is published and read</title>
+<desc id="capsule-site-desc">Publishing packs a folder into one encrypted capsule, stores it on relays, and signs a record saying which capsule is the current version of the name. The name itself is the public key, so the signature can be checked without trusting anyone. A visitor asks several relays, keeps the newest record that verifies, refuses an older one, and renders the page in a sandbox with no network access at all.</desc>
+<defs>
+<marker id="tip-capsule-site" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+<path d="M 0 1 L 7 4 L 0 7 z" fill="#b9b1a0" />
+</marker>
+<marker id="tip-accent-capsule-site" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+<path d="M 0 1 L 7 4 L 0 7 z" fill="#ef7959" />
+</marker>
+</defs>
+<rect width="920" height="400" fill="#f3efe6" />
+<text x="32" y="40" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#ef7959" letter-spacing="0.24em">SITES</text>
+<text x="32" y="72" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-size="28" font-weight="400" fill="#18352f">A name nobody issues, a page nobody can rewrite</text>
+<path d="M 192 162 L 252 162" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="207.8" y="155" width="28.4" height="14" fill="#f3efe6" /><text x="222" y="165" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">pack</text><path d="M 400 162 L 460 162" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="408.9" y="155" width="42.199999999999996" height="14" fill="#f3efe6" /><text x="430" y="165" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">encrypt</text><path d="M 608 162 L 668 162" fill="none" stroke="#ef7959" stroke-width="1.25" marker-end="url(#tip-accent-capsule-site)" /><rect x="623.8" y="155" width="28.4" height="14" fill="#f3efe6" /><text x="638" y="165" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">sign</text><path d="M 742 192 L 742 290 A 8 8 0 0 1 734 298 L 608 298" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="695.6" y="219" width="92.8" height="14" fill="#f3efe6" /><text x="742" y="229" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">relays hand it out</text><path d="M 460 298 L 400 298" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="411.2" y="291" width="37.599999999999994" height="14" fill="#f3efe6" /><text x="430" y="301" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">verify</text><path d="M 252 298 L 192 298" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="200.9" y="291" width="42.199999999999996" height="14" fill="#f3efe6" /><text x="222" y="301" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">decrypt</text><rect x="44" y="132" width="148" height="60" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="118" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">PUBLISHER</text><text x="118" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">A folder of files</text><text x="118" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">index.html and friends</text><rect x="252" y="132" width="148" height="60" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="326" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">BUNDLE</text><text x="326" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">One capsule</text><text x="326" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">padded to a size class</text><rect x="460" y="132" width="148" height="60" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="534" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">RELAYS</text><text x="534" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Ciphertext only</text><text x="534" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">mirrored, or sharded</text><rect x="668" y="132" width="148" height="60" rx="8" fill="#fffdf8" stroke="#ef7959" stroke-width="1.5" /><text x="742" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#ef7959" letter-spacing="0.18em">THE NAME IS THE KEY</text><text x="742" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Signed record</text><text x="742" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">&lt;key&gt;.capsule</text><rect x="460" y="268" width="148" height="60" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="534" y="288" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">VISITOR ASKS</text><text x="534" y="304" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Several relays</text><text x="534" y="318" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">newest signed wins</text><rect x="252" y="268" width="148" height="60" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="326" y="288" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">IN THE BROWSER</text><text x="326" y="304" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Checked, then read</text><text x="326" y="318" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">no rollback accepted</text><rect x="44" y="268" width="148" height="60" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="118" y="288" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">WHAT YOU SEE</text><text x="118" y="304" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Sandboxed page</text><text x="118" y="318" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">cannot reach the web</text>
+<line x1="32" y1="354" x2="888" y2="354" stroke="#d5cec0" stroke-width="1" /><text x="32" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Top — publishing, once per update</text><text x="317" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Bottom — visiting, every time</text><text x="602" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Coral — the only thing that has to be trusted: the key</text>
+</svg>
+<!-- diagram:capsule-site:end -->
+      </div>
+      <div class="figcap">
+        Publishing happens once per update. Verifying happens on every visit.
+      </div>
+
+      <p class="body" style="margin-top: 44px">
+        The extension does something ordinary browsers do not: it rebuilds every
+        page before showing it. Stylesheets, images and fonts from the bundle
+        become
+        <code class="inline">data:</code> URLs; anything pointing at the open
+        web is removed; a link that leaves CAPSULE becomes a click you have to
+        confirm. The result lands in a sandboxed frame with
+        <code class="inline">connect-src 'none'</code> and no scripts.
+      </p>
+      <p class="body">
+        <b>A .capsule site cannot make a single network request.</b> Not a font,
+        not a pixel, not a beacon. That is a property of the format, not a
+        setting you can forget to turn on.
+      </p>
+
+      <button class="open-modal" data-modal="m-sites">
+        <span class="plus">+</span> How a name becomes a page
+      </button>
+    </section>
+
+    <section id="mix" class="wrap">
+      <div class="kicker">05 — The mix network</div>
+      <h2>Every hop knows one step, and <b>no hop knows two</b></h2>
+      <p class="body">
+        Encryption hides what you sent. It does not hide that you sent it, to
+        whom, or when. With <code class="inline">--mix</code>, a request is
+        wrapped in a Sphinx packet — one layer per hop, every packet exactly
+        65,920 bytes — and each relay peels one layer, waits a random time, and
+        forwards. The reply comes back along a second path the destination
+        cannot see, into a mailbox you poll.
+      </p>
+
+      <div class="figure">
+        <!-- diagram:mix-network:start -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 360" role="img" aria-labelledby="mix-network-title mix-network-desc">
+<title id="mix-network-title">How a request travels through the mix network</title>
+<desc id="mix-network-desc">A request is wrapped in a layer for each hop. The first hop sees the client's address, the middle hops see only their neighbours, and the storage relay sees a request with no client attached. The reply comes back along a second path the relay cannot see, into a mailbox the client polls.</desc>
+<defs>
+<marker id="tip-mix-network" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+<path d="M 0 1 L 7 4 L 0 7 z" fill="#b9b1a0" />
+</marker>
+<marker id="tip-accent-mix-network" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+<path d="M 0 1 L 7 4 L 0 7 z" fill="#ef7959" />
+</marker>
+</defs>
+<rect width="920" height="360" fill="#f3efe6" />
+<text x="32" y="40" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#ef7959" letter-spacing="0.24em">MIX NETWORK</text>
+<text x="32" y="72" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-size="28" font-weight="400" fill="#18352f">Every hop knows one step, and no hop knows two</text>
+<path d="M 172 180 L 216 180" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 344 180 L 388 180" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 516 180 L 560 180" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 688 180 L 732 180" fill="none" stroke="#b9b1a0" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 796 208 L 796 260 A 8 8 0 0 1 788 268 L 516 268" fill="none" stroke="#b9b1a0" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#tip-mix-network)" /><rect x="566" y="261" width="148" height="14" fill="#f3efe6" /><text x="640" y="271" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">reply, by a path it cannot see</text><path d="M 388 268 L 116 268 A 8 8 0 0 1 108 260 L 108 208" fill="none" stroke="#b9b1a0" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#tip-mix-network)" /><rect x="178.8" y="261" width="74.39999999999999" height="14" fill="#f3efe6" /><text x="216" y="271" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#6b7772" letter-spacing="0.06em">you collect it</text><rect x="44" y="152" width="128" height="56" rx="8" fill="#fffdf8" stroke="#ef7959" stroke-width="1.5" /><text x="108" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#ef7959" letter-spacing="0.18em">YOU</text><text x="108" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Your client</text><text x="108" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">one layer per hop</text><rect x="216" y="152" width="128" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="280" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">HOP 1</text><text x="280" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Sees your address</text><text x="280" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">and nothing else</text><rect x="388" y="152" width="128" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="452" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">HOP 2</text><text x="452" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Sees two hops</text><text x="452" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">neither end</text><rect x="560" y="152" width="128" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="624" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">HOP 3</text><text x="624" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Sees the relay</text><text x="624" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">not you</text><rect x="732" y="152" width="128" height="56" rx="8" fill="#fffdf8" stroke="#ef7959" stroke-width="1.5" /><text x="796" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#ef7959" letter-spacing="0.18em">DESTINATION</text><text x="796" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Storage relay</text><text x="796" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">no client address</text><rect x="388" y="240" width="128" height="56" rx="8" fill="#fffdf8" stroke="#d5cec0" stroke-width="1" /><text x="452" y="260" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#6b7772" letter-spacing="0.18em">MAILBOX</text><text x="452" y="276" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#18352f">Holds the answer</text><text x="452" y="290" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#6b7772">you poll it</text>
+<line x1="32" y1="314" x2="888" y2="314" stroke="#d5cec0" stroke-width="1" /><text x="32" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Coral — the two ends, which never meet</text><text x="317" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Dashed — the reply, along a path the sender chose</text><text x="602" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6b7772" letter-spacing="0.05em">Each hop waits a random time before forwarding</text>
+</svg>
+<!-- diagram:mix-network:end -->
+      </div>
+      <div class="figcap">
+        Verified in tests: the storage relay receives zero direct requests from
+        the client.
+      </div>
+
+      <p class="body" style="margin-top: 44px">
+        None of that matters if there are four nodes and one operator. So the
+        CLI prints how much protection the live network actually offers
+        <em>before every mixed send</em>, in those words, and the design
+        document leads with the same caveat rather than burying it.
+      </p>
+
+      <div class="terminal">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div>
+          <span class="prompt">$</span> capsule send report.pdf
+          <span class="flag">--mix --anonymous</span>
+        </div>
+        <div class="out">
+          <div>Mix network: 4 nodes across 2 operators, 3 hops — small.</div>
+          <div>
+            This hides you from a curious relay, not from someone watching the
+            network.
+          </div>
+          <div>Metadata removed: EXIF, XMP. Padded 2.3 MB → 4.0 MB.</div>
+        </div>
+      </div>
+
+      <button class="open-modal" data-modal="m-mix">
+        <span class="plus">+</span> The packet format, and what it costs
+      </button>
+    </section>
+
+    <section id="compare" class="wrap">
+      <div class="kicker">06 — Compared</div>
+      <h2>Where CAPSULE sits among the <b>alternatives</b></h2>
+      <p class="body">
+        Each of these systems solves a real problem well. The table is about
+        which problems each one leaves on the floor, and it is not flattering
+        everywhere — four rows below are things CAPSULE simply does not do.
+      </p>
+
+      <div class="compare-wrap">
+        <table class="compare">
+          <thead>
+            <tr>
+              <th class="feat">&nbsp;</th>
+              <th class="me">CAPSULE</th>
+              <th>Tor</th>
+              <th>IPFS</th>
+              <th>Nostr</th>
+              <th>Matrix</th>
+              <th>Briar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="feat">Server cannot read the content</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="yes">✓</span></td>
+            </tr>
+            <tr>
+              <td class="feat">No account, no identifier</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Content size hidden from the host</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Resists end-to-end timing correlation</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="partial">~</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Split so no single host has enough</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Content can be withdrawn</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="yes">✓</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Self-certifying site names</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="yes">✓</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Pages cannot phone home</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Readable in an unmodified browser</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="yes">✓</span></td>
+              <td><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Works with no internet at all</td>
+              <td class="me"><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="yes">✓</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Censorship-resistant transport</td>
+              <td class="me"><span class="no">—</span></td>
+              <td><span class="yes">✓</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="partial">~</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="yes">✓</span></td>
+            </tr>
+            <tr>
+              <td class="feat">General-purpose TCP tunnel</td>
+              <td class="me"><span class="no">—</span></td>
+              <td><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+            <tr>
+              <td class="feat">Large anonymity set today</td>
+              <td class="me"><span class="no">—</span></td>
+              <td><span class="yes">✓</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+              <td><span class="no">—</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="compare-note">
+        ✓ by design and tested &nbsp;·&nbsp; ~ partly, or depends on
+        configuration &nbsp;·&nbsp; — not addressed.<br />
+        The last four rows are CAPSULE's, and they are honest losses, not
+        oversights.
+      </p>
+
+      <button class="open-modal" data-modal="m-compare">
+        <span class="plus">+</span> All 21 systems, one limitation each
+      </button>
+    </section>
+
+    <section id="limits" class="wrap">
+      <div class="kicker">07 — Limits</div>
+      <h2>What this <b>does not</b> do</h2>
+      <p class="body">
+        A privacy tool that oversells itself is worse than no tool, because
+        someone will rely on the part that was exaggerated. These are the four
+        that matter.
+      </p>
+
+      <div class="honest">
+        <div class="item">
+          <b>The anonymity set is the smallest on this page</b>
+          <span
+            >Tor has millions of users. CAPSULE has whatever relays someone
+            started today. Every property of the mix network is true and none of
+            them matter much at this size. This is the risk that dominates all
+            the others.</span
+          >
+        </div>
+        <div class="item">
+          <b>No censorship resistance</b>
+          <span
+            >There are no bridges, no pluggable transports, no protocol
+            obfuscation. Blocking the known relays blocks the network. Tor spent
+            a decade on this problem and CAPSULE has not started.</span
+          >
+        </div>
+        <div class="item">
+          <b>No offline or mesh transport</b>
+          <span
+            >Briar, Meshtastic and Reticulum work over Bluetooth, LoRa and radio
+            when the internet is cut. CAPSULE needs IP. In a network blackout,
+            they work and this does not.</span
+          >
+        </div>
+        <div class="item">
+          <b>No external audit</b>
+          <span
+            >The primitives are standard and the composition is not. Everything
+            here is supported by the code, the tests and the threat model in the
+            repository, and by nothing else. Treat it accordingly.</span
+          >
+        </div>
+      </div>
+
+      <p class="body" style="margin-top: 40px">
+        There is a fifth, smaller one worth naming: the browser extension talks
+        to relays directly, so a relay sees an address asking about a name. The
+        CLI can go through the mix network; the extension cannot yet.
+      </p>
+    </section>
+
+    <section id="run" class="wrap">
+      <div class="kicker">08 — Run it</div>
+      <h2>Four commands to <b>join the network</b></h2>
+
+      <div class="steps">
+        <div class="step">
+          <div class="sn">01</div>
+          <div>
+            <b>Install</b
+            ><span
+              >Node 22 or newer. <code>git clone</code>,
+              <code>npm install</code>, <code>npm run build</code>. No database,
+              no accounts, no keys to obtain.</span
+            >
+          </div>
+        </div>
+        <div class="step">
+          <div class="sn">02</div>
+          <div>
+            <b>Send a file</b
+            ><span
+              ><code>capsule send secret.pdf --anonymous</code> prints a link.
+              The person you give it to needs nothing installed.</span
+            >
+          </div>
+        </div>
+        <div class="step">
+          <div class="sn">03</div>
+          <div>
+            <b>Run a relay</b
+            ><span
+              >One process with a public URL. It joins the network by gossip,
+              stores only ciphertext, and keeps no addresses in its logs by
+              default.</span
+            >
+          </div>
+        </div>
+        <div class="step">
+          <div class="sn">04</div>
+          <div>
+            <b>Publish a site</b
+            ><span
+              ><code>capsule site key</code> then
+              <code>capsule site publish ./www</code>. Load the extension from
+              <code>apps/extension/dist</code> and open the address it
+              printed.</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal" id="term">
+        <button class="copy" id="copy" type="button">Copy</button>
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div>
+          <span class="prompt">$</span> git clone
+          https://github.com/missingus3r/CAPSULE &amp;&amp; cd CAPSULE
+        </div>
+        <div>
+          <span class="prompt">$</span> npm install &amp;&amp; npm run build
+        </div>
+        <div>
+          <span class="prompt">$</span> npm run dev:relay
+          <span class="flag"># a relay on :8787</span>
+        </div>
+        <div>
+          <span class="prompt">$</span> node apps/cli/dist/index.js site key
+        </div>
+        <div class="out">
+          <div>
+            Name:
+            6dijvuvwrd5jqp4efjbb4hwcsmtsf6sgi3at4jeto63k7x5fkbwat2yb.capsule
+          </div>
+        </div>
+        <div>
+          <span class="prompt">$</span> node apps/cli/dist/index.js site publish
+          ./www <span class="flag">--key site.capsulekey</span>
+        </div>
+        <div class="out">
+          <div>Published 4 files (1.4 KiB)</div>
+          <div>Name: http://6dijvuvwrd5jq…kbwat2yb.capsule/</div>
+          <div>Resolves: 1 relay(s)</div>
+        </div>
+      </div>
+      <p class="compare-note">
+        To join the public network instead of running alone, point your relay at
+        a peer with
+        <code class="inline">CAPSULE_PEERS</code> and set
+        <code class="inline">CAPSULE_PUBLIC_URL</code>. Gossip does the rest.
+      </p>
+    </section>
+
+    <section id="stack" class="wrap">
+      <div class="kicker">09 — Stack</div>
+      <h2>Boring choices, on <b>purpose</b></h2>
+      <p class="body">
+        Nothing here is novel cryptography. Every primitive is one that has been
+        looked at for years by people better at this than we are; the work is in
+        the composition, and the composition is the part that has not been
+        audited.
+      </p>
+
+      <div class="stack">
+        <div class="row">
+          <b>Content encryption</b><span>AES-256-GCM, chunked, AAD-bound</span>
+        </div>
+        <div class="row">
+          <b>Site names</b><span>Ed25519 → base32, 56 chars</span>
+        </div>
+        <div class="row">
+          <b>Erasure coding</b><span>Reed–Solomon over GF(2⁸)</span>
+        </div>
+        <div class="row">
+          <b>Secret sharing</b><span>Shamir over GF(256)</span>
+        </div>
+        <div class="row">
+          <b>Passphrase recovery</b><span>PBKDF2-SHA-256, 600k</span>
+        </div>
+        <div class="row">
+          <b>Mix packets</b><span>Sphinx + LIONESS wide block</span>
+        </div>
+        <div class="row">
+          <b>Traffic shaping</b><span>Loopix delays and cover loops</span>
+        </div>
+        <div class="row">
+          <b>Runtime</b><span>TypeScript, Node 22, Fastify 5</span>
+        </div>
+        <div class="row">
+          <b>Clients</b><span>CLI, React 19 web, MV3 extension</span>
+        </div>
+        <div class="row">
+          <b>Tests</b><span>163, including fuzz and vectors</span>
+        </div>
+      </div>
+
+      <button class="open-modal" data-modal="m-stack">
+        <span class="plus">+</span> Reading list and specifications
+      </button>
+    </section>
+
+    <footer class="wrap">
+      <p class="tag">
+        CAPSULE is an experiment in giving a server less to hold. It is young,
+        it is small, and it says so in its own documentation before it says
+        anything else.
+      </p>
+      <div class="links">
+        <a href="https://github.com/missingus3r/CAPSULE">GitHub</a>
+        <a
+          href="https://github.com/missingus3r/CAPSULE/blob/main/docs/PROTOCOL.md"
+          >Protocol</a
+        >
+        <a
+          href="https://github.com/missingus3r/CAPSULE/blob/main/docs/THREAT_MODEL.md"
+          >Threat model</a
+        >
+        <a
+          href="https://github.com/missingus3r/CAPSULE/blob/main/docs/MIXNET.md"
+          >Mix network</a
+        >
+        <a href="https://github.com/missingus3r/CAPSULE/blob/main/docs/SITES.md"
+          >Sites</a
+        >
+        <a
+          href="https://github.com/missingus3r/CAPSULE/blob/main/docs/RUN_A_RELAY.md"
+          >Run a relay</a
+        >
+      </div>
+    </footer>
+
+    <div class="modal-scrim" id="scrim"></div>
+
+    <div class="modal" id="m-capsule">
+      <div class="modal-head">
+        <h3>What the relay actually stores</h3>
+        <button class="close" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <h4>The record on disk</h4>
+        <p>
+          A capsule directory holds an encrypted manifest, the ciphertext
+          chunks, and three hashed tokens. Nothing in it names the file, its
+          type, its owner or its size in the clear.
+        </p>
+        <pre>
+capsule-id/
+  manifest.bin      encrypted: filename, mime, note, chunk map
+  chunks/0000.bin   AES-256-GCM, identical length for every chunk
+  chunks/0001.bin
+  meta.json         expiry, chunk count, SHA-256 of each token</pre>
+        <h4>Why the chunks are all the same size</h4>
+        <p>
+          Padding rounds the plaintext up to a size class in quarter-octave
+          steps with a 64 KiB floor, then to a whole number of chunks. A 1.4 KiB
+          site and a 60 KiB site are both stored as 64 KiB. The relay learns a
+          bucket, not a size — and erasure coding needs equal chunks anyway, so
+          the two features pay for each other.
+        </p>
+        <h4>The three tokens</h4>
+        <p>
+          Read, write and delete are separate capabilities, stored as SHA-256
+          digests and compared in constant time. Handing someone a share link
+          gives them read and nothing else; the delete token stays with the
+          sender.
+        </p>
+        <h4>Splitting across relays</h4>
+        <p>
+          <b>k-of-n erasure coding</b> gives each relay one Reed–Solomon shard
+          per chunk. Any <em>k</em> relays can rebuild the capsule and any
+          <em>k−1</em> have nothing — not a partial file, not a shorter file,
+          nothing that decrypts.
+        </p>
+      </div>
+    </div>
+
+    <div class="modal" id="m-sites">
+      <div class="modal-head">
+        <h3>How a name becomes a page</h3>
+        <button class="close" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <h4>The name</h4>
+        <pre>
+&lt;32-byte Ed25519 key ‖ 2-byte checksum ‖ version&gt; → base32 → 56 chars
+6dijvuvwrd5jqp4efjbb4hwcsmtsf6sgi3at4jeto63k7x5fkbwat2yb.capsule</pre>
+        <p>
+          Ugly and unmemorable, and that is the price of nobody having to issue
+          it. The checksum protects against nothing — it exists so a mistyped
+          name fails in the browser instead of resolving somewhere else.
+        </p>
+        <h4>The record</h4>
+        <p>
+          A signed statement: <b>version N of this name is that capability</b>.
+          Relays store and gossip it. They cannot forge one, and a client keeps
+          the highest sequence number it has seen, so a relay cannot quietly
+          serve yesterday's version either.
+        </p>
+        <h4>What the extension does before rendering</h4>
+        <table>
+          <tr>
+            <td>Parse</td>
+            <td>Name → public key. No fallback, no search suggestion.</td>
+            <td class="v v-yes">strict</td>
+          </tr>
+          <tr>
+            <td>Resolve</td>
+            <td>Ask several relays; verify every answer against the key.</td>
+            <td class="v v-yes">signed</td>
+          </tr>
+          <tr>
+            <td>Compare</td>
+            <td>Sequence must not go backwards for this name.</td>
+            <td class="v v-yes">pinned</td>
+          </tr>
+          <tr>
+            <td>Rebuild</td>
+            <td>Assets become data: URLs, outside references are removed.</td>
+            <td class="v v-yes">rewritten</td>
+          </tr>
+          <tr>
+            <td>Sandbox</td>
+            <td>Opaque origin, no scripts, <code>connect-src 'none'</code>.</td>
+            <td class="v v-yes">sealed</td>
+          </tr>
+        </table>
+        <h4>Scripts</h4>
+        <p>
+          Off by default, and the guarantee is absolute while they are: the page
+          cannot issue a network request of any kind. They can be enabled per
+          site, with a visible warning — a script can navigate the frame to an
+          outside address, and no CSP directive covers navigation since
+          <code>navigate-to</code> left the standard.
+        </p>
+        <h4>Permissions</h4>
+        <p>
+          The extension ships with no host permissions. Access to a relay is
+          requested when you add it, for that origin only, and given back when
+          you remove it.
+        </p>
+      </div>
+    </div>
+
+    <div class="modal" id="m-mix">
+      <div class="modal-head">
+        <h3>The packet format, and what it costs</h3>
+        <button class="close" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <h4>One shape for every packet</h4>
+        <table>
+          <tr>
+            <td>Header</td>
+            <td>α (32) ‖ β (320) ‖ γ (32)</td>
+            <td class="v">384 B</td>
+          </tr>
+          <tr>
+            <td>Body</td>
+            <td>LIONESS wide-block permutation</td>
+            <td class="v">65,536 B</td>
+          </tr>
+          <tr>
+            <td>Total</td>
+            <td>Identical for a real packet and a cover loop</td>
+            <td class="v v-yes">65,920 B</td>
+          </tr>
+          <tr>
+            <td>Hops</td>
+            <td>Space is reserved for the maximum regardless</td>
+            <td class="v">5</td>
+          </tr>
+        </table>
+        <h4>What each property buys</h4>
+        <p>
+          <b>No hop knows its position.</b> The header is always the same length
+          and the consumed block is replaced with pseudorandom filler the sender
+          computed. A property of the format, not of the implementation.
+        </p>
+        <p>
+          <b>A packet cannot be followed between links.</b> The ephemeral point
+          is blinded at each hop and the body is decrypted one layer, so the
+          bytes change completely.
+        </p>
+        <p>
+          <b>A packet cannot be marked.</b> LIONESS is a permutation over the
+          whole body: flip one bit and all 64 KiB randomise, and the destination
+          rejects it.
+        </p>
+        <p>
+          <b>No hop reveals why it dropped something.</b> Every response is
+          <code>202</code>. Anything else would be an oracle about the packet's
+          contents.
+        </p>
+        <h4>What it costs</h4>
+        <table>
+          <tr>
+            <td>Latency</td>
+            <td>Exponential delay per hop, tunable, default 2s mean</td>
+            <td class="v">seconds</td>
+          </tr>
+          <tr>
+            <td>Bandwidth</td>
+            <td>Every payload padded to 64 KiB, plus cover loops</td>
+            <td class="v">high</td>
+          </tr>
+          <tr>
+            <td>Guard nodes</td>
+            <td>None — the first hop is re-chosen every request</td>
+            <td class="v v-part">open</td>
+          </tr>
+          <tr>
+            <td>n−1 attack</td>
+            <td>Made expensive by loops, not solved</td>
+            <td class="v v-no">open</td>
+          </tr>
+        </table>
+        <h4>Before it can be called anonymous</h4>
+        <p>
+          Independent operators in different jurisdictions; enough users to hide
+          in; published measurements; an external cryptographic review of this
+          composition; and a reasoned decision about guard nodes. Until those
+          five exist, the correct phrase is "mix network", not "anonymity
+          network", and the interface says it that way.
+        </p>
+      </div>
+    </div>
+
+    <div class="modal" id="m-compare">
+      <div class="modal-head">
+        <h3>21 systems, one limitation each</h3>
+        <button class="close" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <p>
+          The stated limitation of each system, and whether CAPSULE addresses
+          it. Ten yes, five partly, four no, and two that do not apply. The four
+          are listed at the bottom; they are the honest part of this table.
+        </p>
+        <table>
+          <tr>
+            <td>Tor</td>
+            <td>Slow, TCP only, vulnerable to end-to-end correlation</td>
+            <td class="v v-part">partly</td>
+          </tr>
+          <tr>
+            <td>I2P</td>
+            <td>
+              Installation and technical experience; not aimed at the
+              conventional web
+            </td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Nym</td>
+            <td>
+              More protection means far more latency; too slow for daily use
+            </td>
+            <td class="v v-part">partly</td>
+          </tr>
+          <tr>
+            <td>Lokinet</td>
+            <td>
+              Smaller anonymity set than Tor, and a token network to depend on
+            </td>
+            <td class="v v-part">partly</td>
+          </tr>
+          <tr>
+            <td>Hyphanet</td>
+            <td>Content is hard to withdraw; aged performance and UX</td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>GNUnet</td>
+            <td>Research-oriented</td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>SimpleX</td>
+            <td>Depends on relays; no true offline physical network</td>
+            <td class="v v-no">no</td>
+          </tr>
+          <tr>
+            <td>Session</td>
+            <td>Persistent identifier, own network and token, complexity</td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Briar</td>
+            <td>Maintenance mode; battery, background execution, UX</td>
+            <td class="v v-no">no</td>
+          </tr>
+          <tr>
+            <td>Bitchat</td>
+            <td>The protocol does not yet achieve unlinkable presence</td>
+            <td class="v v-no">n/a</td>
+          </tr>
+          <tr>
+            <td>Nostr</td>
+            <td>
+              Pseudonymous not anonymous; spam; key management; inconsistent
+              deletion
+            </td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Matrix</td>
+            <td>
+              Servers replicate accounts, metadata and history; not anonymous
+            </td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Waku</td>
+            <td>
+              Hard balance between privacy, bandwidth, availability and latency
+            </td>
+            <td class="v v-part">partly</td>
+          </tr>
+          <tr>
+            <td>IPFS</td>
+            <td>
+              Not private: PeerIDs, CIDs, providers and queries can be public
+            </td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Hypercore / Pear</td>
+            <td>Peers see IPs; somebody has to stay online</td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Yggdrasil</td>
+            <td>Encryption is not anonymity</td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Reticulum</td>
+            <td>Small ecosystem, complicated onboarding</td>
+            <td class="v v-part">partly</td>
+          </tr>
+          <tr>
+            <td>Meshtastic</td>
+            <td>Needs hardware and has little bandwidth</td>
+            <td class="v v-no">no</td>
+          </tr>
+          <tr>
+            <td>Veilid</td>
+            <td>A framework: an application still has to be built</td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Iroh / libp2p</td>
+            <td>Toolkits, not networks with end users</td>
+            <td class="v v-yes">yes</td>
+          </tr>
+          <tr>
+            <td>Bitcoin / Lightning</td>
+            <td>Traceability and custody complexity</td>
+            <td class="v v-no">n/a</td>
+          </tr>
+        </table>
+        <h4>The four CAPSULE does not cover</h4>
+        <p>
+          <b>No offline transport.</b> Briar, Meshtastic, Bitchat and Reticulum
+          work over Bluetooth, LoRa and radio. CAPSULE needs IP.
+        </p>
+        <p>
+          <b>No censorship resistance.</b> No bridges, no pluggable transports.
+          Blocking the known relays blocks the network.
+        </p>
+        <p>
+          <b>Not a general-purpose transport.</b> Tor, I2P, Lokinet and
+          Yggdrasil carry any TCP or IP connection. CAPSULE carries files and
+          static sites, because the capsule format needs the content known in
+          full up front.
+        </p>
+        <p>
+          <b>The smallest anonymity set in the table.</b> Stated first in the
+          mix network document for exactly this reason.
+        </p>
+      </div>
+    </div>
+
+    <div class="modal" id="m-stack">
+      <div class="modal-head">
+        <h3>Reading list and specifications</h3>
+        <button class="close" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <h4>What CAPSULE is built out of</h4>
+        <table>
+          <tr>
+            <td>Sphinx</td>
+            <td>
+              Danezis &amp; Goldberg,
+              <em>Sphinx: A Compact and Provably Secure Mix Format</em> (2009)
+            </td>
+            <td class="v">packets</td>
+          </tr>
+          <tr>
+            <td>Loopix</td>
+            <td>
+              Piotrowska et al., <em>The Loopix Anonymity System</em> (2017)
+            </td>
+            <td class="v">delays</td>
+          </tr>
+          <tr>
+            <td>LIONESS</td>
+            <td>
+              Anderson &amp; Biham,
+              <em>Two Practical and Provably Secure Block Ciphers</em> (1996)
+            </td>
+            <td class="v">body</td>
+          </tr>
+          <tr>
+            <td>Onion names</td>
+            <td>Tor Rendezvous Specification v3</td>
+            <td class="v">names</td>
+          </tr>
+          <tr>
+            <td>Reed–Solomon</td>
+            <td>Cauchy generator matrix over GF(2⁸)</td>
+            <td class="v">shards</td>
+          </tr>
+          <tr>
+            <td>Shamir</td>
+            <td>Threshold sharing over GF(256)</td>
+            <td class="v">recovery</td>
+          </tr>
+        </table>
+        <h4>Documents in the repository</h4>
+        <p>
+          <b>PROTOCOL.md</b> — the capsule format, byte for byte, with
+          conformance vectors.<br />
+          <b>THREAT_MODEL.md</b> — what is defended, what is not, and what is
+          explicitly out of scope.<br />
+          <b>MIXNET.md</b> — the mix network design, leading with its own
+          limitation.<br />
+          <b>SITES.md</b> — names, records, bundles and how the extension
+          renders them.<br />
+          <b>COMPARISON.md</b> — the 21-system table, in full, with where each
+          claim is tested.<br />
+          <b>RUN_A_RELAY.md</b> — running one, including what an operator can
+          and cannot see.
+        </p>
+        <h4>Conformance</h4>
+        <p>
+          The protocol ships test vectors, so a second implementation can prove
+          it agrees before anyone trusts it with a file. Parser and relay
+          fuzzing run in the suite, and releases carry a CycloneDX SBOM and
+          SHA256SUMS.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const root = document.documentElement;
+        const btn = document.getElementById("mode");
+        const label = () =>
+          root.getAttribute("data-mode") === "light" ? "Dark" : "Light";
+        btn.textContent = label();
+        btn.addEventListener("click", () => {
+          const next =
+            root.getAttribute("data-mode") === "light" ? "dark" : "light";
+          root.setAttribute("data-mode", next);
+          btn.textContent = label();
+          try {
+            localStorage.setItem("capsule_mode", next);
+          } catch (e) {}
+        });
+
+        const scrim = document.getElementById("scrim");
+        const closeAll = () => {
+          document
+            .querySelectorAll(".modal.on")
+            .forEach((m) => m.classList.remove("on"));
+          scrim.classList.remove("on");
+          document.body.style.overflow = "";
+        };
+        document.querySelectorAll(".open-modal").forEach((button) => {
+          button.addEventListener("click", () => {
+            const modal = document.getElementById(button.dataset.modal);
+            if (!modal) return;
+            modal.classList.add("on");
+            scrim.classList.add("on");
+            document.body.style.overflow = "hidden";
+          });
+        });
+        document
+          .querySelectorAll(".modal .close")
+          .forEach((b) => b.addEventListener("click", closeAll));
+        scrim.addEventListener("click", closeAll);
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") closeAll();
+        });
+
+        const copy = document.getElementById("copy");
+        copy.addEventListener("click", async () => {
+          const lines = [...document.querySelectorAll("#term > div")]
+            .filter((d) => d.querySelector(".prompt"))
+            .map((d) => d.textContent.replace(/^\$\s*/, "").trim());
+          try {
+            await navigator.clipboard.writeText(lines.join("\n"));
+            copy.textContent = "Copied";
+            setTimeout(() => {
+              copy.textContent = "Copy";
+            }, 1600);
+          } catch (e) {
+            copy.textContent = "Select it";
+          }
+        });
+
+        const links = [...document.querySelectorAll("nav.top .toc a")];
+        const sections = links
+          .map((a) => document.querySelector(a.getAttribute("href")))
+          .filter(Boolean);
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const index = sections.indexOf(entry.target);
+              links.forEach((a, i) => a.classList.toggle("on", i === index));
+            });
+          },
+          { rootMargin: "-45% 0px -50% 0px" },
+        );
+        sections.forEach((s) => observer.observe(s));
+      })();
+    </script>
+  </body>
+</html>

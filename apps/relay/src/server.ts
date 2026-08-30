@@ -11,12 +11,14 @@ import {
   RelayHttpError,
   badRequest,
   insufficientStorage,
+  notFound,
   payloadTooLarge,
 } from "./errors.js";
 import { loadRelayIdentity, type RelayIdentity } from "./identity.js";
 import { MixNode, type MixPeer } from "./mix.js";
 import { PeerDirectory, type RelayAnnouncement } from "./peers.js";
 import { SenderQuota } from "./quota.js";
+import { SiteDirectory } from "./sites.js";
 import {
   CapsuleStorage,
   parseBearerToken,
@@ -32,7 +34,7 @@ import {
 } from "@capsule/mixnet";
 
 const RELAY_API_VERSION = 1;
-const RELAY_SOFTWARE = "capsule-relay/1.1.0";
+const RELAY_SOFTWARE = "capsule-relay/1.2.0";
 const SUPPORTED_PROTOCOL_VERSIONS = [1, 2, 3];
 const IP_SALT_ROTATION_MS = 60 * 60_000;
 /**
@@ -201,6 +203,8 @@ export async function buildRelayServer(
     log: (message, details) => app.log.info(details ?? {}, message),
   });
   await peers.initialize();
+
+  const sites = new SiteDirectory({ maxSites: config.maxSites });
 
   const isAllowedOrigin = originMatcher(config.corsOrigins);
   await app.register(cors, {
@@ -371,6 +375,8 @@ export async function buildRelayServer(
     maxTtlSeconds: config.maxTtlSeconds,
     peerCount: peers.size,
     acceptsAnnouncements: true,
+    sitesEnabled: config.sitesEnabled,
+    siteCount: sites.size,
   }));
 
   app.get("/v1/peers", async () => ({
@@ -415,6 +421,68 @@ export async function buildRelayServer(
       });
     },
   );
+
+  // --- `.capsule` sites ------------------------------------------------------
+
+  if (config.sitesEnabled) {
+    app.get<{ Querystring: { limit?: string } }>(
+      "/v1/sites",
+      async (request) => ({
+        version: RELAY_API_VERSION,
+        records: sites.list(
+          Math.min(
+            Number.parseInt(request.query.limit ?? "", 10) || 200,
+            config.siteGossipLimit,
+          ),
+        ),
+      }),
+    );
+
+    app.get<{ Params: { name: string } }>(
+      "/v1/sites/:name",
+      async (request) => {
+        const record = sites.get(request.params.name);
+        if (!record) throw notFound();
+        return { version: RELAY_API_VERSION, record };
+      },
+    );
+
+    app.put<{ Params: { name: string } }>(
+      "/v1/sites/:name",
+      {
+        config: {
+          rateLimit: {
+            max: Math.min(config.createRateLimitMax, 60),
+            timeWindow: config.rateLimitWindowMs,
+          },
+        },
+      },
+      async (request, reply) => {
+        const body = request.body as { name?: unknown } | null;
+        if (!body || typeof body !== "object") {
+          throw badRequest("invalid_record", "Expected a site record");
+        }
+        // The name in the path and the name in the record must agree, or a
+        // publisher could store a valid record where nobody will look for it.
+        if (body.name !== request.params.name.trim().toLowerCase()) {
+          throw badRequest(
+            "invalid_record",
+            "The record does not match the name in the path",
+          );
+        }
+        const outcome = await sites.accept(body);
+        if (outcome === "rejected") {
+          throw badRequest(
+            "invalid_record",
+            "The site record could not be verified",
+          );
+        }
+        return reply
+          .status(outcome === "stored" ? 202 : 200)
+          .send({ version: RELAY_API_VERSION, outcome });
+      },
+    );
+  }
 
   const persistentQuota = new SenderQuota(config.maxPersistentBytesPerSender);
 
@@ -564,14 +632,52 @@ export async function buildRelayServer(
       : undefined;
   cleanupTimer?.unref();
 
+  /**
+   * Pulls site records from the relays this one knows about.
+   *
+   * Without this, a `.capsule` name would only resolve at the handful of
+   * relays its publisher happened to announce to, and a visitor would have to
+   * be told which those were — which is a registry with extra steps. Gossip
+   * makes the name resolvable anywhere, and the signature makes it safe to
+   * accept a record from a relay nobody trusts.
+   */
+  const siteFetch =
+    runtime.fetchImpl ??
+    ((input: string, init?: RequestInit) => fetch(input, init));
+  const syncSites = async (): Promise<number> => {
+    if (!config.sitesEnabled || config.siteGossipLimit === 0) return 0;
+    let stored = 0;
+    for (const peer of peers.list()) {
+      try {
+        const response = await siteFetch(
+          `${peer.url}/v1/sites?limit=${config.siteGossipLimit}`,
+          { signal: AbortSignal.timeout(10_000) },
+        );
+        if (!response.ok) continue;
+        const body = (await response.json()) as { records?: unknown[] };
+        if (!Array.isArray(body.records)) continue;
+        for (const record of body.records.slice(0, config.siteGossipLimit)) {
+          if ((await sites.accept(record)) === "stored") stored += 1;
+        }
+      } catch {
+        // A peer that will not answer about sites is not an error worth a log
+        // line every five minutes.
+      }
+    }
+    return stored;
+  };
+
   let peerSyncInFlight: Promise<void> | undefined;
   const runPeerSync = (): void => {
     if (peerSyncInFlight) return;
     peerSyncInFlight = peers
       .sync()
-      .then(({ peers: known, added }) => {
+      .then(async ({ peers: known, added }) => {
         if (added !== 0)
           app.log.info({ known, added }, "Relay directory updated");
+        const records = await syncSites();
+        if (records !== 0)
+          app.log.info({ records, known: sites.size }, "Site records updated");
       })
       .catch((error: unknown) =>
         app.log.error({ err: error }, "Relay directory sync failed"),
@@ -609,6 +715,7 @@ export async function buildRelayServer(
       bootstrapKnown = peers.size;
       void peers
         .sync()
+        .then(() => syncSites())
         .catch((error: unknown) =>
           app.log.warn({ err: error }, "Relay bootstrap attempt failed"),
         )

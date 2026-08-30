@@ -1,6 +1,6 @@
 {
   "name": "capsule",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Private, temporary and resilient encrypted capsule transport.",
   "workspaces": [
@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build:libs": "npm run build -w @capsule/protocol && npm run build -w @capsule/sdk && npm run build -w @capsule/mixnet",
-    "build": "npm run build:libs && npm run build -w @capsule/relay && npm run build -w @capsule/cli && npm run build -w @capsule/web",
+    "build": "npm run build:libs && npm run build -w @capsule/relay && npm run build -w @capsule/cli && npm run build -w @capsule/web && npm run build -w @capsule/extension",
     "dev": "npm run build:libs && concurrently -k -n relay,web -c cyan,magenta \"npm run dev -w @capsule/relay\" \"npm run dev -w @capsule/web\"",
     "dev:relay": "npm run build:libs && npm run dev -w @capsule/relay",
     "dev:web": "npm run build:libs && npm run dev -w @capsule/web",
@@ -22,7 +22,9 @@
     "vectors": "npm run build -w @capsule/protocol && node packages/protocol/scripts/generate-vectors.mjs",
     "release": "npm run build && node scripts/release.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build:extension": "npm run build:libs && npm run build -w @capsule/extension",
+    "diagrams": "node scripts/diagrams.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

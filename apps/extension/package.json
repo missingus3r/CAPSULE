@@ -1,0 +1,23 @@
+{
+  "name": "@capsule/extension",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Opens .capsule sites in any Chromium browser.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@capsule/protocol": "1.2.0",
+    "@capsule/sdk": "1.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.28.2",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.7"
+  }
+}

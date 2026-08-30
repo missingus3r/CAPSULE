@@ -587,3 +587,82 @@ En orden, y ninguno es opcional:
 
 Hasta que esos cinco puntos existan, la palabra correcta es "red de mezcla", no
 "red anónima", y la interfaz lo dice así.
+
+## 15. Sitios `.capsule` (1.2)
+
+El diseño está en [SITES.md](./SITES.md). Acá va sólo lo que cambia en el modelo
+de amenazas.
+
+### 15.1 Lo primero: qué es público
+
+Un sitio `.capsule` **es contenido público**. La capacidad de lectura está
+adentro del registro y el registro se reparte entre relays a propósito. No es
+una filtración: es lo que significa publicar. Un relay, un visitante y
+cualquiera que pase por ahí pueden leer el sitio.
+
+Lo que la capa de nombres protege no es la confidencialidad sino la
+**integridad y la continuidad**: que las páginas sean las que su autor firmó y
+que nadie pueda entregar una versión anterior sin que se note.
+
+### 15.2 Garantías nuevas, y de dónde salen
+
+- **Sólo el titular de la clave puede publicar bajo un nombre.** El nombre _es_
+  la clave pública, así que verificar no requiere confiar en quien entregó el
+  registro. Propiedad del formato.
+- **Un relay no puede modificar un registro.** Cambiar cualquier campo invalida
+  la firma. Verificado en las pruebas.
+- **Un relay no puede revertir un sitio a una versión anterior sin que se note.**
+  El cliente guarda la secuencia más alta que aceptó por nombre y rechaza una
+  menor. Verificado en las pruebas.
+- **Callar tiene poco valor.** El cliente pregunta a varios relays y se queda con
+  la secuencia más alta que verifique; suprimir una actualización requiere que
+  callen todos los relays a los que el visitante pregunta.
+- **El relay no sabe qué guarda.** El sitio va como cápsula cifrada, con relleno
+  a clase de tamaño y nombre de archivo neutro. El registro no dice qué hay
+  adentro más allá de un título opcional que el autor eligió.
+- **El relay no sabe qué página se leyó.** El paquete se baja entero. No hay
+  petición por archivo que revelar.
+- **La página no puede contactar a nadie.** Con los scripts apagados —el modo
+  por omisión— la política del documento y el aislamiento del marco impiden toda
+  petición de red. Verificado en las pruebas.
+
+### 15.3 Riesgos nuevos
+
+**La clave del sitio es un punto único de falla.** Quien la copie puede
+reemplazar las páginas; quien la pierda pierde el nombre. No hay recuperación
+porque no hay a quién pedírsela. Es la misma propiedad que una dirección onion y
+tiene el mismo costo.
+
+**El relay ve quién pregunta.** La extensión consulta relays directamente desde
+el navegador, así que un relay ve una dirección IP preguntando por un nombre —y,
+si es el que guarda la cápsula, bajándola. Es la carencia más importante de esta
+versión. La CLI puede ir por la red de mezcla; la extensión todavía no.
+
+**El registro es un anuncio.** Publicar un sitio le dice a los relays que ese
+nombre existe y cuándo se actualizó. El patrón de actualizaciones de un nombre
+es observable por cualquiera que consulte `GET /v1/sites`.
+
+**Los scripts, si se habilitan, pueden sacar al visitante.** Un script puede
+navegar el marco a una dirección externa, lo que revelaría la IP del visitante a
+esa dirección. La política sigue bloqueando `fetch`, imágenes y fuentes
+externas, pero una navegación no es una petición sujeta a CSP y no hay directiva
+que la cubra desde que `navigate-to` quedó fuera del estándar. Por eso están
+apagados por omisión y la advertencia es visible al encenderlos.
+
+**Un sitio que vence desaparece.** Si la cápsula vence o los relays que la
+guardan se van, el nombre resuelve a un registro que apunta a nada. El registro
+sigue verificando; el contenido no está.
+
+**El reconstructor de páginas es un límite de seguridad escrito a mano.** Está
+probado con los casos que se nos ocurrieron —`<base>`, `meta refresh`, `srcset`,
+`url()` anidado, rutas que suben de directorio— y no está auditado. Un error ahí
+es un escape del aislamiento.
+
+### 15.4 Fuera del modelo
+
+- **Disponibilidad.** Nadie garantiza que un sitio siga arriba.
+- **Censura de un nombre.** Los relays pueden negarse a guardar un registro. Con
+  suficientes relays cooperando, un nombre deja de resolver.
+- **Reputación.** Un nombre no dice nada sobre quién está atrás. Verificar que
+  una página no cambió no es verificar que sea de quien creés.
+- **Anonimato del publicador.** El relay ve quién sube, salvo `--mix` o `--tor`.

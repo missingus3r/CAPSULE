@@ -11,11 +11,13 @@ import {
 } from "./erasure.js";
 
 export * from "./address.js";
+export * from "./bundle.js";
 export * from "./bytes.js";
 export * from "./erasure.js";
 export * from "./gf256.js";
 export * from "./recovery.js";
 export * from "./shamir.js";
+export * from "./site.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();

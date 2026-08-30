@@ -14,3 +14,6 @@ output/playwright/*
 Thumbs.db
 *.tsbuildinfo
 release
+
+# A site key file is the site: whoever copies it can replace the pages.
+*.capsulekey

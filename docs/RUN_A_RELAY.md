@@ -217,7 +217,49 @@ Dos cosas que conviene saber antes de dejarlo prendido:
 Leé [MIXNET.md](./MIXNET.md) antes de anunciar tu nodo como parte de una red
 anónima. Con pocos operadores no lo es, y decirlo de más es peor que no tenerla.
 
-## 9. Checklist antes de anunciarte
+## 9. Tu relay guarda nombres `.capsule`
+
+Un sitio `.capsule` es una cápsula corriente más un **registro firmado** que dice
+qué cápsula es la versión actual de un nombre. Tu relay guarda esos registros y
+se los pasa a otros relays.
+
+```bash
+CAPSULE_SITES_ENABLED=true      # por omisión
+CAPSULE_MAX_SITES=5000          # registros antes de tirar el más viejo
+CAPSULE_SITE_GOSSIP_LIMIT=200   # registros que pedís a un par por ronda
+```
+
+### 10.1 Qué ves y qué no
+
+**Ves** el nombre, el número de versión, la fecha y el título si el autor puso
+uno. Los registros son públicos por diseño: para eso circulan.
+
+**No ves** el contenido. La capacidad está dentro del registro y sirve para bajar
+la cápsula, pero la cápsula está cifrada extremo a extremo y tu relay no tiene la
+clave salvo que además decidas bajarla y descifrarla como haría cualquier
+visitante. Como todo sitio, es público; no hay nada especial en que vos también
+puedas leerlo.
+
+**No podés** falsificar ni alterar un registro: la firma se verifica contra la
+clave que está dentro del nombre y no la tenés. Tampoco podés revertir un sitio
+sin que se note: los navegadores recuerdan la versión más alta que aceptaron.
+
+### 10.2 Lo único que podés hacer es callarte
+
+Podés negarte a guardar registros, o servir uno viejo. Por eso los clientes
+preguntan a varios relays y se quedan con la versión más alta que verifique. Un
+relay que calla es indistinguible de uno caído, y suprimir una actualización
+requiere que callen todos los relays a los que el visitante pregunta.
+
+### 10.3 Si no querés participar
+
+`CAPSULE_SITES_ENABLED=false` apaga los tres endpoints y el chismorreo de
+registros. Tu relay sigue guardando cápsulas y siendo nodo de mezcla. Es una
+decisión razonable: alojar nombres es alojar contenido publicado, con lo que eso
+implica en tu jurisdicción. La sección 6 de este documento sobre abuso y
+contenido ilícito aplica igual.
+
+## 10. Checklist antes de anunciarte
 
 - [ ] HTTPS válido y `CAPSULE_PUBLIC_URL` con el origen real.
 - [ ] `identity.json` respaldado y con permisos `0600`.
@@ -229,3 +271,4 @@ anónima. Con pocos operadores no lo es, y decirlo de más es peor que no tenerl
 - [ ] `CAPSULE_ALLOW_PRIVATE_PEERS=false` (es el freno anti-SSRF).
 - [ ] `curl /v1/info` y `/v1/peers` responden desde fuera de tu red.
 - [ ] Decidido si dejás el nodo de mezcla prendido y con cuánta cobertura.
+- [ ] Decidido si alojás nombres `.capsule` (`CAPSULE_SITES_ENABLED`).

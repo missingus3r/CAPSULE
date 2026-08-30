@@ -41,6 +41,7 @@ import { Command } from "commander";
 import { collectRepeated, humanBytes, parseTtl } from "./options.js";
 import { readPassphrase } from "./passphrase.js";
 import { createProxiedFetch, parseProxyUrl } from "./proxy.js";
+import { registerSiteCommands } from "./site.js";
 
 interface GlobalOptions {
   json?: boolean;
@@ -59,7 +60,7 @@ const program = new Command();
 program
   .name("capsule")
   .description("Send and receive private, temporary CAPSULE payloads")
-  .version("1.1.0")
+  .version("1.2.0")
   .option("--json", "print machine-readable JSON")
   .option(
     "--proxy <url>",
@@ -204,6 +205,15 @@ async function readTicket(path: string): Promise<UploadTicket | undefined> {
     throw error;
   }
 }
+
+registerSiteCommands(program, {
+  json: () => program.opts<GlobalOptions>().json === true,
+  transport,
+  retryPolicy,
+  progressReporter,
+  parseSeed,
+  discoveryScope,
+});
 
 program
   .command("send")

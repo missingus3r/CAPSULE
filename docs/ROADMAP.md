@@ -470,3 +470,69 @@ Sin cambios respecto de v0.1, y por las mismas razones:
 - identidad global, número de teléfono o grafo social centralizado;
 - recuperación custodial habilitada por omisión;
 - etiquetas de marketing como "anónimo", "sin rastros" o "autodestructivo".
+
+## 15. Después de 1.2: lo que falta, en orden de importancia
+
+Sin fechas. El orden es por cuánto cambia lo que CAPSULE puede afirmar
+honestamente, no por cuánto cuesta hacerlo.
+
+### 15.1 Lo que hay que arreglar antes de agregar nada
+
+**Que la extensión pueda ir por la red de mezcla.** Hoy consulta relays
+directamente y un relay ve una dirección preguntando por un nombre. Es la
+diferencia entre «un sitio que no puede rastrearte» y «un sitio que no puede
+rastrearte pero el relay sí». Requiere portar el cliente de mezcla a WebCrypto y
+resolver que un service worker MV3 se duerme; ninguna de las dos es trivial y
+las dos son necesarias.
+
+**Auditoría externa.** De la composición, no de las primitivas. Con alcance,
+método y fecha publicados, y el resultado publicado sea cual sea. Hasta que
+exista, todo lo que dice este repositorio se apoya únicamente en este
+repositorio.
+
+**Una decisión fundada sobre nodos guardián.** Hoy el primer salto se reelige en
+cada petición. Tor eligió al revés después de años de análisis. La decisión de
+CAPSULE está tomada por omisión, no por argumento, y eso hay que corregirlo con
+un análisis que la respalde o la revierta.
+
+**Operadores independientes.** Nada de lo anterior importa sin relays en
+jurisdicciones distintas que no se conozcan entre sí. Es trabajo de comunidad,
+no de código, y es el cuello de botella real.
+
+### 15.2 Sitios: lo que la versión 1.2 dejó pendiente
+
+- **Firefox y Safari.** La extensión es MV3 con `declarativeNetRequest`. Firefox
+  necesita un puerto; Safari, otro.
+- **Sitios grandes.** Hoy el paquete se baja entero para no revelar qué página se
+  leyó. Un esquema que baje de a bloques de tamaño fijo y con relleno podría
+  mantener la propiedad y escalar; hace falta diseñarlo, no improvisarlo.
+- **Nombres legibles, sin registrador.** Un archivo de punteros firmado por
+  alguien en quien el visitante ya confía —como los `.onion` de una organización
+  publicados en su sitio— no reintroduce un registrador central. Es una
+  alternativa a explorar, con cuidado de no convertirla en uno.
+- **Un modo «sólo lectura» real.** Hoy los scripts se apagan por sitio. Falta
+  poder decir «nunca, en ningún sitio», y que sea el estado por omisión de la
+  extensión sin excepción posible.
+
+### 15.3 Lo que ampliaría el alcance
+
+- **Transporte P2P.** Que dos clientes que pueden verse se pasen una cápsula sin
+  relay, con el relay como respaldo.
+- **Transportes de proximidad.** Bluetooth o Wi-Fi Direct para el caso en que no
+  hay internet. Es lo único de la tabla comparativa que CAPSULE no cubre y
+  podría cubrir sin cambiar su naturaleza.
+- **Puentes y transportes conectables.** Resistencia a la censura. Es una línea
+  de trabajo entera, no una función, y conviene mirar lo que ya existe antes de
+  escribir nada.
+- **Mensajería.** El formato de cápsula asume contenido conocido de antemano.
+  Una conversación no lo es. Sería un formato distinto sobre la misma red, no
+  una extensión de este.
+
+### 15.4 Lo que no se va a hacer
+
+- **Token, blockchain o economía de relays.** Resuelve el incentivo creando un
+  problema peor: algo que capturar.
+- **Cuentas.** Un identificador persistente es exactamente lo que este proyecto
+  existe para no tener.
+- **Criptografía propia.** Las primitivas se toman de la literatura. Lo nuevo es
+  la composición, y ya es suficiente superficie sin auditar.

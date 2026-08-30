@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CAPSULE — relays</title>
+    <style>
+      :root {
+        --ink: #18352f;
+        --paper: #fffdf8;
+        --ground: #f3efe6;
+        --forest: #183f37;
+        --coral: #ef7959;
+        --muted: #6b7772;
+        --line: rgba(27, 62, 54, 0.15);
+        --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font: 400 14px/1.6 var(--sans);
+        padding: 26px;
+        min-width: 420px;
+      }
+      main {
+        max-width: 560px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p.lede {
+        margin: 0 0 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      h2 {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 26px 0 10px;
+        font-weight: 500;
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      li:last-child {
+        border-bottom: 0;
+      }
+      li span {
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      li.empty {
+        color: var(--muted);
+        justify-content: center;
+      }
+      form {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      input {
+        flex: 1 1 auto;
+        font: 400 13px var(--mono);
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      button {
+        font: 500 11px var(--mono);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--coral);
+        border-color: var(--coral);
+        color: #fff;
+      }
+      button:hover {
+        border-color: var(--coral);
+      }
+      .status {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        min-height: 18px;
+        margin-top: 10px;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        border-left: 2px solid var(--coral);
+        padding-left: 12px;
+        margin-top: 26px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>CAPSULE</h1>
+      <p class="lede">
+        Relays are ordinary servers that store encrypted capsules and hand out
+        signed site records. They cannot read a site, and they cannot forge one.
+      </p>
+
+      <h2>Relays</h2>
+      <ul id="relays"></ul>
+      <form id="add">
+        <input
+          id="url"
+          type="url"
+          placeholder="https://relay.example.org"
+          required
+        />
+        <button class="primary" type="submit">Add</button>
+      </form>
+      <p class="status" id="status"></p>
+
+      <h2>Names this browser has seen</h2>
+      <ul id="pins"></ul>
+      <form id="forget">
+        <button type="submit">Forget every name and script permission</button>
+      </form>
+
+      <p class="note">
+        The version number next to a name is the newest this browser has seen. A
+        relay offering an older one is refused, which is the only defence
+        against being quietly handed yesterday's version of a site.
+      </p>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

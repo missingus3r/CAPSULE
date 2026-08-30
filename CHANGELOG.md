@@ -4,6 +4,70 @@ Todas las versiones publicadas de CAPSULE, con lo que cambió y —cuando
 corresponde— lo que dejó de ser cierto. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.1.0/).
 
+## [1.2.0] — 2026-08-30
+
+Sitios web con nombre propio. El formato de cápsula, la API del relay y las
+capabilities siguen sin cambiar: un sitio es una cápsula v3 corriente más una
+capa de nombres encima.
+
+**Antes de nada:** un sitio `.capsule` es **público**. Cualquiera que consiga el
+registro puede leerlo, y los registros circulan entre relays a propósito. Lo que
+un sitio garantiza es que nadie puede reemplazar tus páginas ni entregarte una
+versión vieja sin que se note. Lo privado se manda como cápsula, no se publica
+como sitio. Ver [docs/SITES.md](docs/SITES.md).
+
+### Agregado
+
+- **Nombres `.capsule` autocertificados.** El nombre es una clave pública
+  Ed25519 en base32 con suma de verificación y versión: 56 caracteres más
+  `.capsule`. No hay registro, ni registrador, ni certificado que renovar.
+- **Registros de sitio firmados**, con número de secuencia monótono. Un relay
+  no puede falsificar uno porque no tiene la clave, ni revertir a uno viejo
+  porque el navegador recuerda el más alto que aceptó.
+- **Formato de paquete de sitio** (`CAPSITE1`): una carpeta entera dentro de una
+  cápsula. Sin descarga parcial, a propósito: pedir archivo por archivo le
+  contaría al relay qué páginas se leyeron.
+- **Tres endpoints en el relay** —`GET`/`PUT /v1/sites/:name` y `GET /v1/sites`—
+  y chismorreo de registros entre relays, para que un nombre resuelva en
+  cualquier lado y no sólo donde su autor lo anunció. Se apagan con
+  `CAPSULE_SITES_ENABLED=false`.
+- **Comandos `capsule site`**: `key`, `publish`, `resolve`, `get` y `announce`.
+  El relleno a clase de tamaño y el nombre neutro son la opción por omisión al
+  publicar, no algo que haya que recordar activar.
+- **Extensión de navegador (MV3)** que abre `http://<nombre>.capsule/` en
+  cualquier Chromium. Intercepta la navegación antes del DNS, resuelve el
+  nombre, verifica la firma, baja la cápsula y **reconstruye la página**: cada
+  referencia que resuelve dentro del paquete se vuelve un `data:` URL y cada
+  una que apunta afuera se elimina.
+- **Un sitio `.capsule` no puede hacer ninguna petición de red.** El marco va
+  sin `allow-scripts` y con `connect-src 'none'`; ni una fuente, ni un píxel, ni
+  una baliza. Los scripts se habilitan por sitio, con la advertencia de que un
+  script sí puede llevar el marco a una dirección externa.
+- **Permisos de host bajo demanda** en la extensión: no pide ninguno de entrada
+  y pide el de un relay cuando alguien lo agrega, para ese origen y nada más.
+- **Diagramas** generados desde `scripts/diagrams.mjs`, y una página de
+  presentación en un solo archivo (`docs/index.html`) para GitHub Pages.
+- **[docs/COMPARISON.md](docs/COMPARISON.md)**: las 21 redes del mapa, la
+  limitación de cada una y si CAPSULE la cubre. Diez «sí», cinco «parcial»,
+  cuatro «no» y dos que no aplican, con los cuatro «no» explicados.
+
+### Cambiado
+
+- El README arranca por qué es y para qué sirve, con dos diagramas y una guía de
+  instalación de cuatro pasos. El material de referencia sigue abajo.
+- `npm run build` construye también la extensión; `npm run build:extension` la
+  construye sola y `npm run diagrams` regenera los SVG y los reinyecta en la
+  página.
+
+### Sin resolver
+
+- **La extensión habla con los relays directamente.** Un relay ve una dirección
+  preguntando por un nombre. La CLI puede ir por la red de mezcla; la extensión
+  no, porque requiere Node.
+- **Sólo Chromium.** Firefox y Safari necesitan un puerto de la extensión.
+- **El reconstructor de páginas no está auditado.** Es un límite de seguridad
+  escrito a mano y probado con los casos que se nos ocurrieron.
+
 ## [1.1.0] — 2026-08-30
 
 CAPSULE tiene su propia red de mezcla. El formato de cápsula, la API del relay
