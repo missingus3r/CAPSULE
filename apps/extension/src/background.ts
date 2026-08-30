@@ -13,30 +13,21 @@
  * is no server to send it to either way.
  */
 
-const RULE_ID = 1;
-/** 56 base32 characters is exactly a 32-byte key, a checksum and a version. */
-const NAME_PATTERN = "[a-z2-7]{56}\\.capsule";
+import { CAPSULE_RULE_ID, redirectRule } from "./redirect.js";
 
 async function installRedirect(): Promise<void> {
-  const viewer = chrome.runtime.getURL("viewer.html");
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [RULE_ID],
-    addRules: [
-      {
-        id: RULE_ID,
-        priority: 1,
-        action: {
-          type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
-          redirect: { regexSubstitution: `${viewer}#\\0` },
-        },
-        condition: {
-          regexFilter: `^https?://${NAME_PATTERN}(:\\d+)?(/.*)?$`,
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-        },
-      },
-    ],
+    removeRuleIds: [CAPSULE_RULE_ID],
+    addRules: [redirectRule(chrome.runtime.getURL("viewer.html"))],
   });
 }
+
+// Also at the top level, not only in the two lifecycle events. A dynamic rule
+// survives restarts, so those two are enough in the steady state — but between
+// installing the extension and the first navigation there is a window where no
+// rule exists, and a `.capsule` address in that window falls through to DNS and
+// fails. Re-asserting the rule whenever this worker runs closes it.
+void installRedirect();
 
 chrome.runtime.onInstalled.addListener(() => {
   void installRedirect();

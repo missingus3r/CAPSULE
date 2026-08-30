@@ -266,7 +266,7 @@ scripts/      Diagram generator and release tooling
 
 ```bash
 npm run build       # every workspace, including the extension
-npm test            # 163 tests, including fuzzing and conformance vectors
+npm test            # 166 tests, including fuzzing and conformance vectors
 npm run typecheck
 npm run format:check
 npm run diagrams    # regenerate the SVGs and re-inline them into the showcase
