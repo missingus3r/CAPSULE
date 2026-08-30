@@ -414,6 +414,74 @@ export async function fetchSiteBundle(
   return unpackSite(await fetchSiteBytes(capability, options));
 }
 
+export interface ListSitesOptions {
+  fetchImpl?: FetchLike;
+  signal?: AbortSignal;
+  /** Records to ask each relay for. A relay caps this at its own limit. */
+  limit?: number;
+  now?: number;
+}
+
+/**
+ * Every `.capsule` name a set of relays will admit to holding.
+ *
+ * This is what makes an index possible at all, and it is worth being plain
+ * about what it means: **a relay lists the names it holds, so a published site
+ * is discoverable whether or not its author wanted to be found.** That is a
+ * property of the gossip design, not of this function — the endpoint exists so
+ * relays can pass records to each other — and it is why asking to be listed is
+ * a separate decision that lives inside the bundle. Discovering a name here
+ * says nothing about permission to catalogue it.
+ *
+ * Records are verified before they are returned, so a relay can withhold a
+ * name but cannot invent one. Relays that fail are skipped: a directory built
+ * from whoever answered is the only kind there is.
+ */
+export async function listRelaySites(
+  relayUrls: readonly string[],
+  options: ListSitesOptions = {},
+): Promise<CapsuleSiteRecord[]> {
+  const request = options.fetchImpl ?? ((input, init) => fetch(input, init));
+  const limit = options.limit ?? 200;
+  const newest = new Map<string, CapsuleSiteRecord>();
+
+  await Promise.all(
+    [...new Set(relayUrls)].map(async (relayUrl) => {
+      try {
+        const response = await request(
+          `${trimSlash(relayUrl)}/v1/sites?limit=${encodeURIComponent(String(limit))}`,
+          { ...(options.signal ? { signal: options.signal } : {}) },
+        );
+        if (!response.ok) return;
+        const body = (await response.json()) as {
+          records?: CapsuleSiteRecord[];
+        };
+        for (const record of body?.records ?? []) {
+          if (
+            !(await verifySiteRecord(record, {
+              ...(options.now !== undefined ? { now: options.now } : {}),
+            }))
+          ) {
+            continue;
+          }
+          // Two relays can hold different versions of the same name. The
+          // highest that verifies wins, the same rule resolution uses.
+          const held = newest.get(record.name);
+          if (!held || record.sequence > held.sequence) {
+            newest.set(record.name, record);
+          }
+        }
+      } catch {
+        // A relay that cannot answer is not evidence about anything.
+      }
+    }),
+  );
+
+  return [...newest.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
+}
+
 function trimSlash(url: string): string {
   return url.replace(/\/+$/u, "");
 }

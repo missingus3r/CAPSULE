@@ -210,6 +210,23 @@ downloads its key file before it is used for anything — the key _is_ the name 
 and the browser keeps a signing handle that cannot be read back out, so the next
 version is one click.
 
+The tab also publishes a **Hello world** in one click, for an hour, so the whole
+path can be seen working before anybody prepares a folder.
+
+### A directory of sites
+
+```bash
+capsule index --seed https://relay.example.org --key search.capsulekey --ttl 7d
+```
+
+It reads every name the relays admit to holding, keeps the ones carrying a
+`capsule.json` that asks to be listed, and publishes the result as a `.capsule`
+site of its own. Being listed is a decision the author makes: **a site that says
+nothing is treated as one that said no**, whether or not a relay will admit to
+holding it. The page is a snapshot rather than a live search, because a
+`.capsule` page cannot query anything — that is the same rule that stops it
+tracking you. Point the web app at yours with `VITE_CAPSULE_INDEX`.
+
 A relay refuses a TTL longer than its own ceiling — seven days out of the box,
 raised with `CAPSULE_MAX_TTL_SECONDS`. The record survives a restart of the
 relay; a site published to a relay running an older version than this does not.

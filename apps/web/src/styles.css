@@ -273,7 +273,7 @@ footer {
 
 .mode-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   padding-inline: 42px;
   border-bottom: 1px solid var(--line);
 }
@@ -2056,5 +2056,49 @@ footer > span {
 @media (max-width: 620px) {
   .publish-pickers {
     grid-template-columns: 1fr;
+  }
+}
+
+/* A link out of the app, sitting in the tab row without pretending to be a tab. */
+.mode-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.mode-link:hover {
+  color: var(--forest);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(197, 222, 207, 0.16)
+  );
+}
+
+.mode-link-note {
+  color: var(--muted-light);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.example-button {
+  margin-top: 0.7rem;
+}
+
+@media (max-width: 620px) {
+  .mode-link-note {
+    display: none;
   }
 }

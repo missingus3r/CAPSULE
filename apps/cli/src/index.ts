@@ -48,6 +48,7 @@ import { readPassphrase } from "./passphrase.js";
 import { createProxiedFetch, parseProxyUrl } from "./proxy.js";
 import { registerOfflineCommands } from "./offline.js";
 import { registerSiteCommands } from "./site.js";
+import { registerIndexerCommands } from "./indexer.js";
 
 interface GlobalOptions {
   json?: boolean;
@@ -253,6 +254,13 @@ async function readTicket(path: string): Promise<UploadTicket | undefined> {
 
 registerOfflineCommands(program, {
   json: () => program.opts<GlobalOptions>().json === true,
+});
+
+registerIndexerCommands(program, {
+  json: () => program.opts<GlobalOptions>().json === true,
+  transport,
+  parseSeed,
+  discoveryScope,
 });
 
 registerSiteCommands(program, {

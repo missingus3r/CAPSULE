@@ -50,6 +50,24 @@ what stopped being true. The format follows
 - `examples/site/`, a small `.capsule` site to publish against a local relay.
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
+- **`capsule index`, a directory of sites that asked to be listed.** It reads
+  every name the reachable relays admit to holding, downloads each bundle,
+  keeps the ones whose `capsule.json` opts in, and publishes the result as a
+  `.capsule` site of its own. Three things it does deliberately: **a site that
+  says nothing is treated as one that said no**, since a relay listing a name
+  is not its author asking to be catalogued; the page is a snapshot rather
+  than a live search, because a `.capsule` page cannot query anything; and
+  every site is fetched to find out whether it wanted to be there, because a
+  bundle has no partial download. With scripts off the page is a full list,
+  and allowing them reveals a filter over the rows already rendered — the
+  rebuilder strips every `<script>`, so a page whose data lived in one would
+  show nothing. Titles and descriptions come from other people's sites and are
+  escaped; `apps/cli/test/indexer.test.ts` covers that boundary.
+- **A link to an index in the web app**, beside send, receive and publish,
+  saying that opening it needs the extension. Configured with
+  `VITE_CAPSULE_INDEX` and hidden when unset.
+- **A one-click Hello world in the publish tab.** It goes up for an hour and
+  does not ask to be indexed, so trying the feature out leaves nothing behind.
 - **A site can be published from the web app.** The **Publish** tab takes a
   folder or a `.zip`, packs and encrypts it in the page, and announces the
   signed record — the same `publishSite` the CLI calls, given its files from a

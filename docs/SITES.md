@@ -204,6 +204,44 @@ cannot verify, and a client that cannot verify a record refuses the site
 entirely. Inside the bundle it is covered by the same signature chain as the
 pages, and no version of anything had to change.
 
+## 5c. The index
+
+`capsule index` builds a directory of the sites that asked to be listed, and
+publishes it as a `.capsule` site of its own:
+
+```bash
+capsule index --seed https://relay.example.org --key search.capsulekey --ttl 7d
+```
+
+Three constraints shape it, and each is a thing somebody will otherwise take
+for a bug:
+
+**Being listed is opt in, and silence means no.** A relay will tell anyone the
+names it holds — `GET /v1/sites` exists so relays can gossip records — so
+discovering a name says nothing about permission to catalogue it. The
+permission is `capsule.json` inside the bundle, and a site carrying none is
+skipped.
+
+**The result is static, because it has to be.** The index is itself a
+`.capsule` site, and a `.capsule` page cannot make a single network request.
+There is no query API and no live search: the whole directory is baked into the
+page, as fresh as the last run. The page says so on itself rather than letting
+a visitor assume otherwise. With scripts off it is a complete list; allowing
+scripts for that one site reveals a box that filters the rows already on the
+page, because the rebuilder removes every `<script>` when they are off and a
+page whose data lived in one would show nothing at all.
+
+**Every site is downloaded to find out whether it wanted to be there.** A
+bundle has no partial download by design (§4), so there is no cheap way to read
+one file out of one. Sites that did not opt in are fetched, checked and thrown
+away. That cost is the price of the reading-pattern protection, and it falls on
+whoever runs the index rather than on any visitor.
+
+Run it again to refresh; it publishes a new sequence under the same name. A
+deployment of the web app points at an index with `VITE_CAPSULE_INDEX`, which is
+empty by default — a link to an address that resolves to nothing is worse than
+no link.
+
 ## 6. The extension
 
 `http://<name>.capsule/` does not resolve in DNS and never will. The extension

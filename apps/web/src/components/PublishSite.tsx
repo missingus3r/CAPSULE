@@ -7,11 +7,13 @@ import {
   KeyRound,
   RotateCcw,
   Search,
+  Sparkles,
   TriangleAlert,
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
+import { EXAMPLE_TTL_SECONDS, exampleSite } from "../lib/example-site";
 import {
   gatherFromFolder,
   gatherFromZip,
@@ -62,6 +64,8 @@ export function PublishSite({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [listed, setListed] = useState(false);
+  /** The example publishes for an hour whatever the panel above is set to. */
+  const [isExample, setIsExample] = useState(false);
   const [stage, setStage] = useState<Stage>("form");
   const [progress, setProgress] = useState(0);
   const [problem, setProblem] = useState<string | undefined>();
@@ -79,6 +83,7 @@ export function PublishSite({
 
   const take = async (run: () => Promise<GatheredSite>) => {
     setProblem(undefined);
+    setIsExample(false);
     try {
       setGathered(await run());
     } catch (error) {
@@ -129,7 +134,7 @@ export function PublishSite({
         identity,
         files,
         relayUrl,
-        ttlSeconds,
+        ttlSeconds: isExample ? EXAMPLE_TTL_SECONDS : ttlSeconds,
         sequence,
         ...(title.trim() ? { title: title.trim() } : {}),
         ...(transport ? { transport } : {}),
@@ -169,6 +174,7 @@ export function PublishSite({
     setTitle("");
     setDescription("");
     setListed(false);
+    setIsExample(false);
   };
 
   if (stage === "working") {
@@ -287,6 +293,21 @@ export function PublishSite({
           }}
         />
 
+        <button
+          type="button"
+          className="ghost example-button"
+          onClick={() => {
+            setProblem(undefined);
+            setGathered(exampleSite());
+            setIsExample(true);
+            setListed(false);
+            setTitle("Hello from CAPSULE");
+          }}
+        >
+          <Sparkles size={15} aria-hidden="true" />
+          {t("publish.example")}
+        </button>
+
         {gathered ? (
           <p className="publish-summary">
             <Globe size={14} aria-hidden="true" />
@@ -404,6 +425,13 @@ export function PublishSite({
         <p className="inline-warning" role="alert">
           <TriangleAlert size={14} aria-hidden="true" />
           {problem}
+        </p>
+      ) : null}
+
+      {isExample ? (
+        <p className="inline-warning">
+          <Sparkles size={14} aria-hidden="true" />
+          {t("publish.exampleNote")}
         </p>
       ) : null}
 

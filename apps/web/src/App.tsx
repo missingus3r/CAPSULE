@@ -40,6 +40,7 @@ import {
   PackageOpen,
   Puzzle,
   RotateCcw,
+  Search,
   Send,
   Server,
   Shuffle,
@@ -126,6 +127,14 @@ const MIX_MEAN_DELAY_MS = 2_000;
  */
 const EXTENSION_INSTALL_URL =
   "https://github.com/missingus3r/CAPSULE#read-one-in-any-chromium-browser";
+
+/**
+ * The `.capsule` name of a directory of sites, when whoever deployed this app
+ * runs one. Empty by default and hidden when empty: an index is somebody's
+ * decision to operate, and a link to an address that resolves to nothing is
+ * worse than no link.
+ */
+const CAPSULE_INDEX_NAME = import.meta.env.VITE_CAPSULE_INDEX?.trim() ?? "";
 
 function getPublicAppUrl(): string {
   const configured = import.meta.env.VITE_PUBLIC_APP_URL?.trim();
@@ -774,6 +783,21 @@ export default function App() {
               <Globe size={17} />
               {t("mode.publish")}
             </button>
+            {CAPSULE_INDEX_NAME ? (
+              // Not a tab: it leaves this app for an address only the
+              // extension can open, and the title says so before the click.
+              <a
+                className="mode-link"
+                href={`http://${CAPSULE_INDEX_NAME}/`}
+                title={t("mode.searchNeedsExtension")}
+              >
+                <Search size={17} aria-hidden="true" />
+                {t("mode.search")}
+                <span className="mode-link-note">
+                  {t("mode.searchNeedsExtensionShort")}
+                </span>
+              </a>
+            ) : null}
           </div>
 
           {mode === "publish" ? (

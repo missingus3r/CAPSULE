@@ -159,6 +159,14 @@ export const pt: Messages = {
     "O relay vê o seu endereço IP no momento da conexão, embora não o guarde. O modo anônimo remove os metadados do arquivo, esconde o nome e preenche o tamanho até uma categoria, mas não esconde o seu endereço. O roteamento por mixes esconde: o pedido viaja por vários relays e aquele que guarda a cápsula nunca sabe quem pediu. Nenhum dos dois esconde que você usa CAPSULE — para isso a CLI tem {flag}. A cifragem não protege um dispositivo infectado nem impede que quem recebe guarde uma cópia.",
 
   "mode.publish": "Publicar",
+  "mode.search": "Buscar",
+  "mode.searchNeedsExtension":
+    "Abre um endereço .capsule, que precisa da extensão CAPSULE instalada.",
+  "mode.searchNeedsExtensionShort": "precisa da extensão",
+  "publish.example": "Publicar um Olá mundo em vez disso",
+  "publish.exampleNote":
+    "O exemplo é publicado por uma hora e não pede para ser indexado, então testar isto não deixa nada para trás.",
+
   "publish.title": "Publicar um site",
   "publish.sub":
     "Uma pasta vira um endereço que ninguém emitiu e que ninguém pode tirar de você.",
