@@ -40,6 +40,59 @@ export interface RelayPublicConfig {
   persistentCapsules: boolean;
 }
 
+/**
+ * What a transfer needs from a relay, whatever carries the bytes.
+ *
+ * `CapsuleRelayClient` is the direct implementation: an HTTPS request to the
+ * relay, which learns the client's address. The mix network implements the
+ * same interface over a path of relays, so an upload does not need to know or
+ * care which one it is using.
+ */
+export interface RelayTransport {
+  readonly relayUrl: string;
+  config(signal?: AbortSignal): Promise<RelayPublicConfig>;
+  create(
+    request: RelayCreateRequest,
+    signal?: AbortSignal,
+  ): Promise<RelayCreateResponse>;
+  uploadChunk(
+    capsuleId: string,
+    index: number,
+    ciphertext: Uint8Array,
+    writeToken: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  finalize(
+    capsuleId: string,
+    writeToken: string,
+    signal?: AbortSignal,
+  ): Promise<RelayStatus>;
+  status(
+    capsuleId: string,
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<RelayStatus>;
+  manifest(
+    capsuleId: string,
+    readToken: string,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array>;
+  chunk(
+    capsuleId: string,
+    index: number,
+    readToken: string,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array>;
+  delete(
+    capsuleId: string,
+    deleteToken: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
+}
+
+/** Builds the transport used to reach one relay. */
+export type RelayTransportFactory = (relayUrl: string) => RelayTransport;
+
 export class CapsuleRelayError extends Error {
   readonly status: number;
   readonly code: string;
@@ -195,7 +248,7 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-export class CapsuleRelayClient {
+export class CapsuleRelayClient implements RelayTransport {
   readonly relayUrl: string;
   private readonly request: FetchLike;
   private readonly retry: RetryPolicy;

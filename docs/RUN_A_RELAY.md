@@ -185,7 +185,39 @@ tenés el ciphertext completo de nada. No requiere configuración: es una
 decisión de quien envía, y tu relay ve fragmentos opacos igual que veía
 cápsulas opacas.
 
-## 8. Checklist antes de anunciarte
+## 8. Tu relay es un nodo de mezcla
+
+Por omisión, además de guardar cápsulas, tu relay reenvía paquetes de la red de
+mezcla. Es lo que permite que el relay que guarda una cápsula no vea la
+dirección de quien la sube.
+
+```bash
+CAPSULE_MIX_ENABLED=true              # por omisión
+CAPSULE_MIX_COVER_INTERVAL_MS=30000   # cada cuánto emitís un bucle de relleno
+CAPSULE_MIX_MAX_DELAY_MS=300000       # tope al retardo que puede pedirte un remitente
+CAPSULE_MIX_MAX_QUEUED=2048           # paquetes que podés estar reteniendo
+CAPSULE_MIX_RATE_LIMIT_MAX=12000      # el tráfico de mezcla no es tráfico de API
+```
+
+Lo que tu nodo ve: la dirección del nodo anterior y la del siguiente. Nada más.
+No ve el contenido, ni la longitud del camino, ni su posición en él, ni puede
+relacionar el paquete que entró con el que salió.
+
+Dos cosas que conviene saber antes de dejarlo prendido:
+
+- **Cuesta ancho de banda.** Cada paquete mide 65 920 bytes y atraviesa varios
+  nodos. El tráfico de cobertura suma aunque nadie esté enviando nada: esa es
+  su función. Si te resulta caro, subí `CAPSULE_MIX_COVER_INTERVAL_MS` antes de
+  apagarlo del todo, porque un enlace sin cobertura le dice a quien mira
+  exactamente cuándo hay tráfico real.
+- **Podés ser el proveedor de alguien.** Si un cliente te elige para su buzón,
+  vas a ver una dirección consultándolo periódicamente. Sabés que esa persona
+  usa la red; no sabés qué pidió ni a quién.
+
+Leé [MIXNET.md](./MIXNET.md) antes de anunciar tu nodo como parte de una red
+anónima. Con pocos operadores no lo es, y decirlo de más es peor que no tenerla.
+
+## 9. Checklist antes de anunciarte
 
 - [ ] HTTPS válido y `CAPSULE_PUBLIC_URL` con el origen real.
 - [ ] `identity.json` respaldado y con permisos `0600`.
@@ -196,3 +228,4 @@ cápsulas opacas.
 - [ ] Política de abuso y contacto publicados.
 - [ ] `CAPSULE_ALLOW_PRIVATE_PEERS=false` (es el freno anti-SSRF).
 - [ ] `curl /v1/info` y `/v1/peers` responden desde fuera de tu red.
+- [ ] Decidido si dejás el nodo de mezcla prendido y con cuánta cobertura.

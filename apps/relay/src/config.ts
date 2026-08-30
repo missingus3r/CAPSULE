@@ -37,6 +37,32 @@ export interface RelayConfig {
   maxPeersPerOperator: number;
   /** Keeps raw client addresses out of logs and rate-limit state. */
   ipBlind: boolean;
+  /** Acts as a node in the mix network. */
+  mixEnabled: boolean;
+  /** Packets this node may be holding at once before it refuses more. */
+  mixMaxQueued: number;
+  /** Ceiling for the delay a sender may ask a node to wait. */
+  mixMaxDelayMs: number;
+  /** Mean of the exponential delay this node picks for its own cover traffic. */
+  mixMeanDelayMs: number;
+  /** How long a packet identifier is remembered so it cannot be replayed. */
+  mixReplayWindowMs: number;
+  mixMailboxDepth: number;
+  mixMailboxTtlMs: number;
+  mixSendTimeoutMs: number;
+  /** How often this node sends a packet to itself. Zero turns cover off. */
+  mixCoverIntervalMs: number;
+  /** Hops in a path this node builds for its own loops. */
+  mixPathLength: number;
+  /**
+   * Requests per window allowed on the mix endpoints.
+   *
+   * Mix traffic is nothing like API traffic: relays forward for each other
+   * continuously and clients poll a mailbox while they wait. Counting it
+   * against the ordinary limit starves the network at exactly the moment it is
+   * working. What bounds the mix is `mixMaxQueued`, not this.
+   */
+  mixRateLimitMax: number;
 }
 
 const DEFAULTS = {
@@ -59,6 +85,16 @@ const DEFAULTS = {
   maxPersistentBytes: 1024 * 1024 * 1024,
   announceWorkBits: 18,
   maxPeersPerOperator: 4,
+  mixMaxQueued: 2048,
+  mixMaxDelayMs: 5 * 60_000,
+  mixMeanDelayMs: 5_000,
+  mixReplayWindowMs: 60 * 60_000,
+  mixMailboxDepth: 256,
+  mixMailboxTtlMs: 60 * 60_000,
+  mixSendTimeoutMs: 15_000,
+  mixCoverIntervalMs: 30_000,
+  mixPathLength: 3,
+  mixRateLimitMax: 12_000,
 } as const;
 
 function integerFromEnvironment(
@@ -282,5 +318,64 @@ export function loadRelayConfig(
       DEFAULTS.maxPeersPerOperator,
     ),
     ipBlind: booleanFromEnvironment(environment, "CAPSULE_IP_BLIND", true),
+    mixEnabled: booleanFromEnvironment(
+      environment,
+      "CAPSULE_MIX_ENABLED",
+      true,
+    ),
+    mixMaxQueued: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_MAX_QUEUED",
+      DEFAULTS.mixMaxQueued,
+    ),
+    mixMaxDelayMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_MAX_DELAY_MS",
+      DEFAULTS.mixMaxDelayMs,
+      { minimum: 0 },
+    ),
+    mixMeanDelayMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_MEAN_DELAY_MS",
+      DEFAULTS.mixMeanDelayMs,
+      { minimum: 0 },
+    ),
+    mixReplayWindowMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_REPLAY_WINDOW_MS",
+      DEFAULTS.mixReplayWindowMs,
+    ),
+    mixMailboxDepth: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_MAILBOX_DEPTH",
+      DEFAULTS.mixMailboxDepth,
+    ),
+    mixMailboxTtlMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_MAILBOX_TTL_MS",
+      DEFAULTS.mixMailboxTtlMs,
+    ),
+    mixSendTimeoutMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_SEND_TIMEOUT_MS",
+      DEFAULTS.mixSendTimeoutMs,
+    ),
+    mixCoverIntervalMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_COVER_INTERVAL_MS",
+      DEFAULTS.mixCoverIntervalMs,
+      { minimum: 0 },
+    ),
+    mixPathLength: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_PATH_LENGTH",
+      DEFAULTS.mixPathLength,
+      { minimum: 1, maximum: 5 },
+    ),
+    mixRateLimitMax: integerFromEnvironment(
+      environment,
+      "CAPSULE_MIX_RATE_LIMIT_MAX",
+      DEFAULTS.mixRateLimitMax,
+    ),
   };
 }

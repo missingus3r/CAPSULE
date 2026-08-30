@@ -39,6 +39,8 @@ import {
   type RelayCreateRequest,
   type RelayCreateResponse,
   type RelayPublicConfig,
+  type RelayTransport,
+  type RelayTransportFactory,
   type RetryPolicy,
 } from "./client.js";
 import type { FetchLike } from "./network.js";
@@ -117,6 +119,12 @@ export interface UploadCapsuleOptions {
   anonymity?: CapsuleAnonymityOptions;
   fetchImpl?: FetchLike;
   retry?: Partial<RetryPolicy>;
+  /**
+   * Replaces the direct connection to a relay. The mix network supplies one of
+   * these so an upload travels through other relays instead of straight to the
+   * one that stores it.
+   */
+  transport?: RelayTransportFactory;
   signal?: AbortSignal;
   onProgress?: (progress: TransferProgress) => void;
   /**
@@ -178,6 +186,7 @@ export interface DownloadCapsuleOptions {
   capability: CapsuleShareCapability;
   fetchImpl?: FetchLike;
   retry?: Partial<RetryPolicy>;
+  transport?: RelayTransportFactory;
   signal?: AbortSignal;
   onProgress?: (progress: TransferProgress) => void;
 }
@@ -195,6 +204,22 @@ function report(
   progress: TransferProgress,
 ): void {
   callback?.(progress);
+}
+
+/** Builds the transport for a relay: direct unless the caller supplied one. */
+function transportFor(
+  relayUrl: string,
+  options: {
+    transport?: RelayTransportFactory;
+    fetchImpl?: FetchLike;
+    retry?: Partial<RetryPolicy>;
+  },
+): RelayTransport {
+  if (options.transport) return options.transport(relayUrl);
+  return new CapsuleRelayClient(relayUrl, {
+    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    ...(options.retry ? { retry: options.retry } : {}),
+  });
 }
 
 function reasonOf(error: unknown): string {
@@ -215,7 +240,7 @@ async function jitter(maximumMs: number | undefined): Promise<void> {
 }
 
 interface UploadTarget {
-  client: CapsuleRelayClient;
+  client: RelayTransport;
   config: RelayPublicConfig;
   created?: RelayCreateResponse;
   /** Chunk indices the relay already holds, when resuming. */
@@ -339,7 +364,7 @@ export async function uploadCapsule(
     totalChunks: 0,
   });
 
-  const primary = new CapsuleRelayClient(primaryUrl, clientOptions);
+  const primary = transportFor(primaryUrl, options);
   const primaryConfig = await primary.config(options.signal);
   if (persistent && !primaryConfig.persistentCapsules) {
     throw new Error(
@@ -356,7 +381,7 @@ export async function uploadCapsule(
   const targets: UploadTarget[] = [{ client: primary, config: primaryConfig }];
   for (const mirrorUrl of requestedMirrors) {
     try {
-      const client = new CapsuleRelayClient(mirrorUrl, clientOptions);
+      const client = transportFor(mirrorUrl, options);
       const config = await client.config(options.signal);
       if (persistent && !config.persistentCapsules) {
         throw new Error("Relay does not accept capsules without expiry");
@@ -625,7 +650,7 @@ export async function resumeUpload(
 
   const targets: UploadTarget[] = [];
   for (const stored of ticket.targets) {
-    const client = new CapsuleRelayClient(stored.relayUrl, clientOptions);
+    const client = transportFor(stored.relayUrl, options);
     const config = await client.config(options.signal);
     const status = await client.status(
       stored.capsuleId,
@@ -865,7 +890,7 @@ async function transferChunks(
 }
 
 interface ReadSource {
-  client: CapsuleRelayClient;
+  client: RelayTransport;
   location: CapsuleLocation;
   index: number;
 }
@@ -887,7 +912,9 @@ async function openSources(
   const locations = shareLocations(capability);
   for (const [index, location] of locations.entries()) {
     try {
-      const client = new CapsuleRelayClient(location.relayUrl, clientOptions);
+      const client = options.transport
+        ? options.transport(location.relayUrl)
+        : new CapsuleRelayClient(location.relayUrl, clientOptions);
       const status = await client.status(
         location.capsuleId,
         location.readToken,
@@ -1255,10 +1282,7 @@ export async function deleteCapsule(
 
   for (const location of ownerLocations(capability)) {
     try {
-      const relay = new CapsuleRelayClient(location.relayUrl, {
-        ...(normalized.fetchImpl ? { fetchImpl: normalized.fetchImpl } : {}),
-        ...(normalized.retry ? { retry: normalized.retry } : {}),
-      });
+      const relay = transportFor(location.relayUrl, normalized);
       await relay.delete(
         location.capsuleId,
         location.deleteToken,

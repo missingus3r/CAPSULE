@@ -1,6 +1,6 @@
 {
   "name": "@capsule/cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -14,8 +14,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@capsule/protocol": "1.0.0",
-    "@capsule/sdk": "1.0.0",
+    "@capsule/mixnet": "1.1.0",
+    "@capsule/protocol": "1.1.0",
+    "@capsule/sdk": "1.1.0",
     "commander": "^14.0.0"
   },
   "devDependencies": {

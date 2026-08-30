@@ -1,13 +1,14 @@
 # CAPSULE — Modelo de amenazas
 
-**Estado:** vigente para CAPSULE 1.0  
+**Estado:** vigente para CAPSULE 1.1  
 **Fecha:** 2026-08-29  
 **Alcance:** protocolo v1, v2 y v3; aplicación web, CLI, SDK y relay de referencia
 
 Las secciones 1 a 11 describen el modelo de v0.1 y siguen siendo la base. La
 sección 12 cubre lo que cambió en v0.2 (anonimización parcial, cápsulas sin
-vencimiento, red abierta) y la 13 lo de v1.0 (reparto `k de n`, recuperación,
-y los hallazgos de la revisión de seguridad con sus correcciones).
+vencimiento, red abierta), la 13 lo de v1.0 (reparto `k de n`, recuperación,
+y los hallazgos de la revisión de seguridad con sus correcciones) y la 14 la
+red de mezcla de 1.1.
 
 ## 1. Resumen ejecutivo
 
@@ -482,3 +483,107 @@ Se listan porque siguen ahí, no porque sean aceptables para siempre.
 - **Diversidad de operadores.** El tope por operador aparente y la prueba de
   trabajo encarecen el Sybil, no lo impiden. Un directorio grande no es
   evidencia de independencia jurisdiccional ni operativa.
+
+## 14. La red de mezcla (1.1)
+
+CAPSULE tiene su propia red de mezcla. Esta sección dice qué cambia en el
+modelo de amenazas; el diseño está en [MIXNET.md](./MIXNET.md).
+
+### 14.1 Lo que cambia
+
+Hasta 1.0, el relay que guardaba una cápsula veía la dirección de quien la
+subía y de quien la bajaba. En la CLI se podía tapar con Tor. Ahora el tráfico
+puede ir por una red de nodos que son los propios relays.
+
+| Observador             | Sin la red                      | Con la red                                     |
+| ---------------------- | ------------------------------- | ---------------------------------------------- |
+| Relay que almacena     | IP del cliente, horario, tamaño | Sólo la operación y el nodo anterior           |
+| Primer nodo del camino | —                               | IP del cliente, y nada más                     |
+| Nodos intermedios      | —                               | Dos direcciones de nodos; ni origen ni destino |
+| Proveedor del buzón    | —                               | Que una dirección consulta un buzón            |
+| Proveedor de Internet  | Que hablás con un relay         | Que hablás con un relay                        |
+| Observador global      | Todo lo anterior                | Análisis estadístico, mucho más caro           |
+
+Lo que **no** cambia: quien tenga el enlace sigue pudiendo leer la cápsula, el
+contenido sigue estando cifrado extremo a extremo con la llave del fragmento, y
+el proveedor de Internet sigue viendo que hay una conexión.
+
+### 14.2 Garantías nuevas, y de dónde salen
+
+- **Ningún nodo intermedio sabe dónde está en el camino.** La cabecera mide
+  siempre lo mismo y el bloque consumido se reemplaza por relleno
+  pseudoaleatorio que el remitente calculó. Es una propiedad del formato.
+- **Un paquete no se puede seguir de un enlace al siguiente.** El punto efímero
+  se transforma en cada salto y el cuerpo se descifra una capa, así que los
+  bytes cambian por completo. Verificado en las pruebas.
+- **Un nodo no puede marcar un paquete.** El cuerpo es una permutación de
+  bloque ancho: un bit cambiado aleatoriza los 64 KiB y el destino lo rechaza.
+  Verificado en las pruebas.
+- **Un paquete repetido se descarta.** Cada salto guarda una etiqueta derivada
+  del secreto compartido durante una ventana. Sin esto, reenviar un paquete y
+  mirar qué sale dos veces enlaza las dos puntas.
+- **Un nodo no revela por qué descartó.** Toda respuesta es `202`.
+- **No hay nodo de salida.** El destino es el relay que guarda la cápsula, así
+  que ninguna parte ve la petición en claro sin ser además su destinatario.
+
+### 14.3 Riesgos nuevos
+
+**El proveedor del buzón sabe que existís.** Ve una dirección consultando un
+buzón. No ve qué pediste ni a quién. Es inherente a un cliente que no puede
+recibir conexiones. Mitigación: elegir el proveedor a conciencia, o poner Tor
+por debajo con `--tor --mix`.
+
+**El primer nodo ve tu dirección.** Como el guardián en Tor, y por la misma
+razón. A diferencia de Tor, acá **no hay nodos guardián**: el primer salto se
+elige de nuevo en cada petición, lo que reparte la exposición entre más nodos
+pero también aumenta la probabilidad de tocar uno hostil alguna vez. Es un
+compromiso conocido y está sin resolver; Tor eligió al revés después de años de
+análisis, y esa decisión merece revisarse acá.
+
+**Retener paquetes es un arma.** Un nodo puede demorar u omitir el reenvío. El
+cliente lo ve como un tiempo de espera agotado, no como un ataque, y reintenta
+por otro camino. Un nodo que lo hace selectivamente puede sesgar qué caminos
+funcionan.
+
+**El tráfico de cobertura cuesta.** Un bucle es un paquete de 65 920 bytes por
+cada salto que atraviesa. Un operador que lo apague ahorra tráfico y deja su
+enlace legible; un operador que lo suba paga ancho de banda por todos.
+
+**Un ataque n−1 sigue abierto.** Un adversario que controle los nodos vecinos y
+pueda suprimir el tráfico ajeno aísla un paquete y lo sigue. Los bucles y la
+elección aleatoria de camino lo encarecen; no lo resuelven, y es un problema
+abierto en la literatura, no una omisión de esta implementación.
+
+**El conjunto de anonimato es el que sea.** Repetido acá porque es el riesgo
+que domina a todos los demás. Con pocos nodos y un solo operador, todo lo
+anterior es maquinaria alrededor de una sola parte que ve las dos puntas. La
+CLI lo dice antes de cada envío y el documento de diseño lo dice primero.
+
+### 14.4 Fuera del modelo
+
+- **Observador global pasivo.** Con suficiente tráfico y tiempo, el análisis
+  estadístico de flujos funciona contra cualquier red de este tamaño.
+- **Confirmación con tráfico activo.** Un adversario que pueda inyectar y
+  bloquear a voluntad en varios enlaces.
+- **Compromiso del extremo.** Si el dispositivo está comprometido, nada de esto
+  importa.
+- **Censura.** No hay puentes ni transportes conectables. Bloquear los relays
+  conocidos bloquea la red.
+
+### 14.5 Lo que hace falta antes de llamarla anónima
+
+En orden, y ninguno es opcional:
+
+1. **Operadores independientes**, en jurisdicciones distintas, que no se
+   conozcan entre sí. Sin esto lo demás es decoración.
+2. **Usuarios suficientes** para que un mensaje se esconda entre otros. Un
+   conjunto de anonimato chico es un conjunto de sospechosos chico.
+3. **Mediciones publicadas**: latencia real, volumen de cobertura, tamaño
+   efectivo del conjunto, resistencia medida a correlación.
+4. **Revisión criptográfica externa** de esta composición, no sólo de las
+   construcciones que la componen.
+5. **Una decisión fundada sobre nodos guardián**, con el análisis que la
+   respalde.
+
+Hasta que esos cinco puntos existan, la palabra correcta es "red de mezcla", no
+"red anónima", y la interfaz lo dice así.

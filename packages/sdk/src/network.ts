@@ -30,6 +30,8 @@ export interface RelayInfo {
   url: string;
   relayId: string;
   publicKey: string;
+  /** Curve25519 key this relay uses as a mix node, when it runs one. */
+  mixPublicKey?: string;
   nickname?: string;
   software?: string;
   protocolVersions: number[];
@@ -157,6 +159,10 @@ export function parseRelayInfo(value: unknown, url: string): RelayInfo {
     url: normalizeOrigin(address),
     relayId: info.relayId,
     publicKey: info.publicKey,
+    ...(typeof info.mixPublicKey === "string" &&
+    /^[A-Za-z0-9_-]{43}$/u.test(info.mixPublicKey)
+      ? { mixPublicKey: info.mixPublicKey }
+      : {}),
     ...(typeof info.nickname === "string" && info.nickname.trim()
       ? { nickname: info.nickname.trim().slice(0, 64) }
       : {}),

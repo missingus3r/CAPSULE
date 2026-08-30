@@ -14,6 +14,7 @@ import {
   payloadTooLarge,
 } from "./errors.js";
 import { loadRelayIdentity, type RelayIdentity } from "./identity.js";
+import { MixNode, type MixPeer } from "./mix.js";
 import { PeerDirectory, type RelayAnnouncement } from "./peers.js";
 import { SenderQuota } from "./quota.js";
 import {
@@ -22,9 +23,16 @@ import {
   parseChunkIndex,
   type CreateCapsuleInput,
 } from "./storage.js";
+import {
+  MixOp,
+  PACKET_BYTES,
+  nodeIdFor,
+  type MixRequest,
+  type MixResponse,
+} from "@capsule/mixnet";
 
 const RELAY_API_VERSION = 1;
-const RELAY_SOFTWARE = "capsule-relay/1.0.0";
+const RELAY_SOFTWARE = "capsule-relay/1.1.0";
 const SUPPORTED_PROTOCOL_VERSIONS = [1, 2, 3];
 const IP_SALT_ROTATION_MS = 60 * 60_000;
 /**
@@ -34,7 +42,7 @@ const IP_SALT_ROTATION_MS = 60 * 60_000;
  * the next full interval, which is the difference between joining the network
  * in seconds and joining it in minutes.
  */
-const BOOTSTRAP_DELAYS_MS = [0, 2_000, 8_000, 30_000, 120_000];
+const BOOTSTRAP_DELAYS_MS = [0, 1_000, 3_000, 8_000, 20_000, 60_000, 120_000];
 
 interface CapsuleParameters {
   id: string;
@@ -356,6 +364,8 @@ export async function buildRelayServer(
     ...(config.publicUrl ? { url: config.publicUrl } : {}),
     ...(config.nickname ? { nickname: config.nickname } : {}),
     persistentCapsules: config.allowPersistentCapsules,
+    ...(config.mixEnabled ? { mixPublicKey: identity.mixPublicKey } : {}),
+    mixEnabled: config.mixEnabled,
     limits: limits(),
     defaultTtlSeconds: config.defaultTtlSeconds,
     maxTtlSeconds: config.maxTtlSeconds,
@@ -580,14 +590,23 @@ export async function buildRelayServer(
 
   const bootstrapTimers = new Set<NodeJS.Timeout>();
   let bootstrapAttempt = 0;
+  let bootstrapKnown = -1;
+  /**
+   * Keeps gossiping until the directory stops growing, not until it is merely
+   * non-empty. Knowing one peer is enough to be *in* the network and not
+   * enough to be *useful* in it: a mix that has not heard of the node a packet
+   * names has no choice but to drop it, so a partial view is a silent failure
+   * for everything routed through this relay.
+   */
   const bootstrap = (): void => {
     if (!shouldGossip) return;
-    if (peers.size > 0 || bootstrapAttempt >= BOOTSTRAP_DELAYS_MS.length)
-      return;
+    if (bootstrapAttempt >= BOOTSTRAP_DELAYS_MS.length) return;
+    if (peers.size > 0 && peers.size === bootstrapKnown) return;
     const wait = BOOTSTRAP_DELAYS_MS[bootstrapAttempt] ?? 0;
     bootstrapAttempt += 1;
     const timer = setTimeout(() => {
       bootstrapTimers.delete(timer);
+      bootstrapKnown = peers.size;
       void peers
         .sync()
         .catch((error: unknown) =>
@@ -600,6 +619,172 @@ export async function buildRelayServer(
   };
   bootstrap();
 
+  // --- The mix network -------------------------------------------------------
+
+  const mixPublicKeyBytes = new Uint8Array(
+    Buffer.from(identity.mixPublicKey, "base64url"),
+  );
+  const selfMixNodeId = nodeIdFor(mixPublicKeyBytes);
+  // The public URL is often only known once the server is listening, so it is
+  // read when a packet needs routing rather than captured here.
+  const selfMixNode = (): MixPeer | undefined =>
+    config.publicUrl
+      ? {
+          nodeId: selfMixNodeId,
+          url: config.publicUrl,
+          publicKey: mixPublicKeyBytes,
+        }
+      : undefined;
+
+  /**
+   * Runs a capsule operation that arrived through the mix. The relay is the
+   * destination, not a proxy: it does exactly what it would do for a direct
+   * request, having learned nothing about who asked.
+   */
+  const executeMixRequest = async (
+    request: MixRequest,
+  ): Promise<MixResponse> => {
+    const asJson = (value: unknown): Uint8Array =>
+      new Uint8Array(Buffer.from(JSON.stringify(value), "utf8"));
+    try {
+      switch (request.op) {
+        case MixOp.Create: {
+          const body: unknown = JSON.parse(
+            Buffer.from(request.data ?? new Uint8Array()).toString("utf8"),
+          );
+          const created = await storage.create(
+            createInputFromBody(body, config.defaultTtlSeconds),
+          );
+          return { ok: true, data: asJson(created) };
+        }
+        case MixOp.PutChunk: {
+          await storage.putChunk(
+            request.capsuleId ?? "",
+            request.index ?? 0,
+            Buffer.from(request.data ?? new Uint8Array()),
+            request.token,
+          );
+          return { ok: true, data: asJson({ stored: true }) };
+        }
+        case MixOp.Finalize: {
+          const status = await storage.finalize(
+            request.capsuleId ?? "",
+            request.token,
+          );
+          return { ok: true, data: asJson(status) };
+        }
+        case MixOp.Status: {
+          const record = await storage.readRecord(request.capsuleId ?? "");
+          storage.authorizeStatus(record, request.token);
+          storage.assertNotExpired(record);
+          return { ok: true, data: asJson(await storage.status(record)) };
+        }
+        case MixOp.Manifest: {
+          const record = await storage.readRecord(request.capsuleId ?? "");
+          storage.authorize(record, request.token, "read");
+          storage.assertNotExpired(record);
+          return {
+            ok: true,
+            data: new Uint8Array(await storage.manifest(record)),
+          };
+        }
+        case MixOp.GetChunk: {
+          const record = await storage.readRecord(request.capsuleId ?? "");
+          storage.authorize(record, request.token, "read");
+          storage.assertNotExpired(record);
+          return {
+            ok: true,
+            data: new Uint8Array(
+              await storage.chunk(record, request.index ?? 0),
+            ),
+          };
+        }
+        case MixOp.Delete: {
+          await storage.delete(request.capsuleId ?? "", request.token);
+          return { ok: true, data: asJson({ deleted: true }) };
+        }
+        default:
+          return {
+            ok: false,
+            data: asJson({ error: "unsupported operation" }),
+          };
+      }
+    } catch (error) {
+      // The same shape a direct caller would get, so the mix path is not a
+      // different oracle from the plain one.
+      const failure =
+        error instanceof RelayHttpError
+          ? { error: error.code, message: error.message }
+          : { error: "internal_error", message: "Internal relay error" };
+      return { ok: false, data: asJson(failure) };
+    }
+  };
+
+  const mix = new MixNode({
+    config,
+    identity,
+    resolve: (nodeId) => {
+      const wanted = Buffer.from(nodeId).toString("hex");
+      if (Buffer.from(selfMixNodeId).toString("hex") === wanted) {
+        return selfMixNode();
+      }
+      return peers
+        .mixNodes()
+        .find((node) => Buffer.from(node.nodeId).toString("hex") === wanted);
+    },
+    peers: () => peers.mixNodes(),
+    execute: executeMixRequest,
+    ...(runtime.fetchImpl ? { fetchImpl: runtime.fetchImpl } : {}),
+    log: (message, details) => app.log.info(details ?? {}, message),
+  });
+
+  if (config.mixEnabled) {
+    app.addContentTypeParser(
+      "application/capsule-mix",
+      { parseAs: "buffer", bodyLimit: PACKET_BYTES + 64 },
+      (_request, body, done) => done(null, body),
+    );
+
+    const mixRateLimit = {
+      config: {
+        rateLimit: {
+          max: config.mixRateLimitMax,
+          timeWindow: config.rateLimitWindowMs,
+        },
+      },
+    };
+
+    app.post("/v1/mix", mixRateLimit, async (request, reply) => {
+      if (!Buffer.isBuffer(request.body)) {
+        throw badRequest(
+          "invalid_mix_packet",
+          "A mix packet must use application/capsule-mix",
+        );
+      }
+      // Every answer is the same, whatever happened: a mix that reports why it
+      // dropped a packet is an oracle for the packet's contents.
+      mix.accept(new Uint8Array(request.body));
+      return reply.status(202).send();
+    });
+
+    app.get<{ Params: { token: string } }>(
+      "/v1/mix/mailbox/:token",
+      mixRateLimit,
+      async (request, reply) => {
+        const bodies = mix.collect(request.params.token);
+        return reply.type("application/json").send({
+          version: RELAY_API_VERSION,
+          messages: bodies.map((body) =>
+            Buffer.from(body).toString("base64url"),
+          ),
+        });
+      },
+    );
+
+    mix.start();
+    app.decorate("capsuleMix", mix);
+  }
+
   app.decorate("capsulePeers", peers);
   app.decorate("capsuleIdentity", identity);
   app.decorate("capsuleStorage", storage);
@@ -610,6 +795,8 @@ export async function buildRelayServer(
     if (saltTimer) clearInterval(saltTimer);
     for (const timer of bootstrapTimers) clearTimeout(timer);
     bootstrapTimers.clear();
+    peers.close();
+    mix.stop();
     await cleanupInFlight;
     await peerSyncInFlight;
   });
@@ -622,5 +809,6 @@ declare module "fastify" {
     capsulePeers: PeerDirectory;
     capsuleIdentity: RelayIdentity;
     capsuleStorage: CapsuleStorage;
+    capsuleMix: MixNode;
   }
 }

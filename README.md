@@ -2,7 +2,7 @@
 
 CAPSULE is a transport for private, temporary encrypted payloads. A sender encrypts a file locally, uploads only ciphertext to a relay, and shares a URL whose fragment contains the decryption capability. URL fragments are not sent to web servers.
 
-The current release is **v1.0**: the capsule format, the relay API and the capability encoding are frozen and published with [official test vectors](packages/protocol/vectors/capsule-test-vectors.json). Versions 1 and 2 of the format stay readable.
+The current release is **v1.1**. The capsule format, the relay API and the capability encoding were frozen in 1.0 and published with [official test vectors](packages/protocol/vectors/capsule-test-vectors.json); 1.1 adds CAPSULE's own mix network on top, without changing any of them.
 
 1. Select a file and optional private note.
 2. Strip the file's embedded metadata, then encrypt metadata and chunks locally with AES-256-GCM.
@@ -19,7 +19,9 @@ The current release is **v1.0**: the capsule format, the relay API and the capab
 
 **Hides the size.** Capsules are padded to a coarse size class, so the relay sees a bucket rather than a file size, and every chunk is identical in length.
 
-**Hides the client address, in the CLI.** `--tor` or `--proxy socks5h://…` routes every relay request through a SOCKS5 proxy, resolving hostnames at the proxy so `.onion` relays work unchanged. Relays themselves run IP-blind by default: no addresses in logs, rate limiting keyed by a rotating salted hash.
+**Hides the client address.** `--mix` routes every request through CAPSULE's own mix network: relays forward for each other, each hop holds a packet for a random time, every packet is the same size, and the relay that stores the capsule never learns who asked. Separately, `--tor` or `--proxy socks5h://…` routes through a SOCKS5 proxy so `.onion` relays work unchanged — the two combine, and they solve different problems. Relays themselves run IP-blind by default: no addresses in logs, rate limiting keyed by a rotating salted hash.
+
+**And says how much that is worth.** A mix network protects you in proportion to how many people and operators are in it. The CLI prints the real number before every send, and calls a four-node network what it is. Read [docs/MIXNET.md](docs/MIXNET.md) before relying on it.
 
 **Survives a relay.** Mirror a capsule across relays for availability, or split it `k`-of-`n` with Reed-Solomon erasure coding: each relay holds a shard that is useless on its own, any `k` of them can serve the capsule, and it costs `n/k` of the capsule instead of `n`.
 
@@ -33,7 +35,9 @@ The current release is **v1.0**: the capsule format, the relay API and the capab
 
 CAPSULE protects file contents and encrypted metadata from the relay when used over a trustworthy HTTPS deployment, and it removes the metadata a file carries about its author. Anonymisation is **partial, and named precisely**: it hides file metadata, the filename, the exact size and — in the CLI, through Tor or another SOCKS5 proxy — the client address.
 
-It does **not** hide the timing or the volume of a transfer, nor the fact that one happened. The web app does not route through Tor; only the CLI can. Anyone who receives the share URL can read the capsule until it expires or is deleted, and a capsule created without expiry stays readable until someone uses the owner capability.
+With `--mix`, the relay storing a capsule does not learn the client's address, and per-hop delays break the timing correlation that low-latency onion routing cannot defend against. That protection is bounded by the size of the network: **a network of a few nodes run by one operator is not anonymity**, and the tool says so rather than implying otherwise.
+
+It does **not** hide from your internet provider that you are using CAPSULE — put Tor underneath for that — nor resist an observer who can watch the whole network. The web app routes neither through Tor nor through the mix network; only the CLI can. Anyone who receives the share URL can read the capsule until it expires or is deleted, and a capsule created without expiry stays readable until someone uses the owner capability.
 
 The v1.0 security review was **internal**. It found and fixed two exploitable issues and three smaller ones, all documented in [the threat model](docs/THREAT_MODEL.md) §13.3 along with the risks that remain. An independent audit has not happened; when it does, it will be published with scope, method and date.
 
@@ -49,6 +53,7 @@ apps/
 packages/
   protocol/  Versioned capsule format, cryptographic primitives and test vectors
   sdk/       Browser/Node relay client, discovery and transfer orchestration
+  mixnet/    Sphinx packets, mix client and path selection (Node only)
 docs/        Requirements, protocol, threat model, relay guide and roadmap
 infra/       Container deployment files
 scripts/     Release tooling (checksums, SBOM)
@@ -117,6 +122,26 @@ node apps/cli/dist/index.js receive "<share-url>" --out .\downloads\
 node apps/cli/dist/index.js delete "<owner-capability>"
 ```
 
+Send through the mix network:
+
+```powershell
+# Three hops each way, packets held a random time at each
+node apps/cli/dist/index.js --mix send .
+eport.pdf --relay https://relay.example
+
+# Slower and harder to correlate
+node apps/cli/dist/index.js --mix --mix-hops 4 --mix-delay 15000 send .
+eport.pdf
+
+# Receive and delete the same way
+node apps/cli/dist/index.js --mix receive "<share-url>"
+node apps/cli/dist/index.js --mix delete "<owner-capability>"
+
+# Both layers: Tor hides CAPSULE from your ISP, the mix hides you from the relays
+node apps/cli/dist/index.js --tor --mix send .
+eport.pdf
+```
+
 Anonymisation, no expiry, mirroring and splitting:
 
 ```powershell
@@ -163,9 +188,9 @@ node apps/cli/dist/index.js combine "capsule-share:…" "capsule-share:…"
 - Expiration and bounded storage by default; no expiry only when an operator opts in.
 - Anyone can run a relay; no registry, no gatekeeper, no privileged node.
 - Versioned, documented protocol using standard cryptography, with published test vectors.
-- Honest security labels: say what is hidden, name what is not, and report when a file could not be cleaned.
+- Honest security labels: say what is hidden, name what is not, report when a file could not be cleaned, and state the size of the anonymity set rather than implying a guarantee.
 
-What comes next — closing the gaps in PDF metadata and DNS pinning, then P2P and proximity transports, and metadata protection only once its adversary, cost and evidence are defined — is in [the roadmap](docs/ROADMAP.md) §14.
+What comes next — closing the gaps in PDF metadata and DNS pinning, browser support for the mix network, then P2P and proximity transports — is in [the roadmap](docs/ROADMAP.md) §14.
 
 ## Project status and license
 

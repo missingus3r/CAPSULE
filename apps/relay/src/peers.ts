@@ -7,6 +7,7 @@ import {
   parseIpv4,
 } from "@capsule/protocol";
 import type { RelayConfig } from "./config.js";
+import { nodeIdFor } from "@capsule/mixnet";
 import {
   announceMessage,
   relayIdFor,
@@ -51,6 +52,8 @@ export interface PeerRecord {
   url: string;
   relayId: string;
   publicKey: string;
+  /** Curve25519 key this relay uses as a mix node, when it runs one. */
+  mixPublicKey?: string;
   nickname?: string;
   firstSeenAt: string;
   lastSeenAt: string;
@@ -61,6 +64,7 @@ export interface PublicPeer {
   url: string;
   relayId: string;
   publicKey: string;
+  mixPublicKey?: string;
   nickname?: string;
   lastSeenAt: string;
 }
@@ -166,6 +170,8 @@ export class PeerDirectory {
     details?: Record<string, unknown>,
   ) => void;
   private syncing = false;
+  /** Aborts probes in flight when the relay is shutting down. */
+  private readonly shutdown = new AbortController();
 
   constructor(
     private readonly config: RelayConfig,
@@ -195,6 +201,7 @@ export class PeerDirectory {
               url: peer.url,
               relayId: peer.relayId,
               publicKey: peer.publicKey,
+              ...(peer.mixPublicKey ? { mixPublicKey: peer.mixPublicKey } : {}),
               ...(peer.nickname ? { nickname: peer.nickname } : {}),
               firstSeenAt: peer.firstSeenAt ?? nowIso(),
               lastSeenAt: peer.lastSeenAt ?? nowIso(),
@@ -212,6 +219,28 @@ export class PeerDirectory {
     return this.peers.size;
   }
 
+  /** Peers that run a mix node, as the mix layer needs to see them. */
+  mixNodes(): Array<{
+    nodeId: Uint8Array;
+    url: string;
+    publicKey: Uint8Array;
+  }> {
+    const nodes: Array<{
+      nodeId: Uint8Array;
+      url: string;
+      publicKey: Uint8Array;
+    }> = [];
+    for (const peer of this.peers.values()) {
+      if (!peer.mixPublicKey) continue;
+      const publicKey = new Uint8Array(
+        Buffer.from(peer.mixPublicKey, "base64url"),
+      );
+      if (publicKey.byteLength !== 32) continue;
+      nodes.push({ nodeId: nodeIdFor(publicKey), url: peer.url, publicKey });
+    }
+    return nodes;
+  }
+
   list(limit = this.config.maxPeers): PublicPeer[] {
     return [...this.peers.values()]
       .sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt))
@@ -220,6 +249,7 @@ export class PeerDirectory {
         url: peer.url,
         relayId: peer.relayId,
         publicKey: peer.publicKey,
+        ...(peer.mixPublicKey ? { mixPublicKey: peer.mixPublicKey } : {}),
         ...(peer.nickname ? { nickname: peer.nickname } : {}),
         lastSeenAt: peer.lastSeenAt,
       }));
@@ -295,6 +325,7 @@ export class PeerDirectory {
     if (existing) {
       existing.url = peer.url;
       existing.publicKey = peer.publicKey;
+      if (peer.mixPublicKey) existing.mixPublicKey = peer.mixPublicKey;
       if (peer.nickname) existing.nickname = peer.nickname;
       existing.lastSeenAt = nowIso();
       existing.failures = 0;
@@ -336,7 +367,25 @@ export class PeerDirectory {
     });
   }
 
+  /**
+   * A probe gives up on its own timeout, and immediately when the relay is
+   * shutting down: waiting out a network timeout is not a reason to keep a
+   * process alive.
+   */
+  private probeSignal(): AbortSignal {
+    return AbortSignal.any([
+      this.shutdown.signal,
+      AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    ]);
+  }
+
+  /** Stops accepting new work and cancels whatever is in flight. */
+  close(): void {
+    this.shutdown.abort();
+  }
+
   private async probe(url: string): Promise<PeerRecord | undefined> {
+    if (this.shutdown.signal.aborted) return undefined;
     if (!isRoutablePeerUrl(url, this.config.allowPrivatePeers)) {
       return undefined;
     }
@@ -345,7 +394,7 @@ export class PeerDirectory {
     }
     try {
       const response = await this.request(`${url}/v1/info`, {
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        signal: this.probeSignal(),
         headers: { Accept: "application/json" },
       });
       if (!response.ok) return undefined;
@@ -362,6 +411,10 @@ export class PeerDirectory {
         url,
         relayId: info.relayId,
         publicKey: info.publicKey,
+        ...(typeof info.mixPublicKey === "string" &&
+        /^[A-Za-z0-9_-]{43}$/u.test(info.mixPublicKey)
+          ? { mixPublicKey: info.mixPublicKey }
+          : {}),
         ...(typeof info.nickname === "string" && info.nickname.trim()
           ? { nickname: info.nickname.trim().slice(0, 64) }
           : {}),
@@ -383,7 +436,7 @@ export class PeerDirectory {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(announcement),
-          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+          signal: this.probeSignal(),
         });
         if (response.ok) {
           const body = (await response.json()) as { peers?: unknown };
@@ -395,7 +448,7 @@ export class PeerDirectory {
         }
       }
       const response = await this.request(`${url}/v1/peers`, {
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        signal: this.probeSignal(),
         headers: { Accept: "application/json" },
       });
       if (!response.ok) return learned;

@@ -9,6 +9,7 @@ import {
 } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { generateMixKeyPair, mixKeyPairFromScalar } from "@capsule/mixnet";
 
 /**
  * Every relay owns an Ed25519 keypair generated the first time it starts.
@@ -23,15 +24,20 @@ const SPKI_ED25519_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 export interface RelayIdentity {
   relayId: string;
   publicKey: string;
+  /** Curve25519 key the relay uses as a mix node, base64url encoded. */
+  mixPublicKey: string;
+  mixPrivateKey: Uint8Array;
   sign(message: string): string;
 }
 
 interface StoredIdentity {
-  schemaVersion: 1;
+  /** Version 2 added the mix keypair. */
+  schemaVersion: 1 | 2;
   createdAt: string;
   relayId: string;
   publicKey: string;
   privateKey: string;
+  mixPrivateKey?: string;
 }
 
 function rawPublicKeyOf(key: KeyObject): Buffer {
@@ -145,31 +151,30 @@ function isStoredIdentity(value: unknown): value is StoredIdentity {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<StoredIdentity>;
   return (
-    candidate.schemaVersion === 1 &&
+    (candidate.schemaVersion === 1 || candidate.schemaVersion === 2) &&
     typeof candidate.relayId === "string" &&
     typeof candidate.publicKey === "string" &&
     typeof candidate.privateKey === "string"
   );
 }
 
-/** Loads the relay identity, generating and persisting one when absent. */
+/**
+ * Loads the relay identity, generating and persisting one when absent.
+ *
+ * A relay holds two keys for two different jobs: an Ed25519 key that signs who
+ * it is, and a Curve25519 key that lets it act as a mix node. An identity
+ * written before the mix layer existed gains one on first load, keeping the
+ * relay's name in the network unchanged.
+ */
 export async function loadRelayIdentity(
   storageDir: string,
 ): Promise<RelayIdentity> {
   const path = join(storageDir, "identity.json");
+  let stored: StoredIdentity | undefined;
+
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"));
-    if (isStoredIdentity(parsed)) {
-      const privateKey = privateKeyFrom(parsed.privateKey);
-      return {
-        relayId: parsed.relayId,
-        publicKey: parsed.publicKey,
-        sign: (message) =>
-          sign(null, Buffer.from(message, "utf8"), privateKey).toString(
-            "base64url",
-          ),
-      };
-    }
+    if (isStoredIdentity(parsed)) stored = parsed;
   } catch (error) {
     if (
       !(error instanceof Error) ||
@@ -182,25 +187,58 @@ export async function loadRelayIdentity(
     }
   }
 
-  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
-  const encodedPublicKey = rawPublicKeyOf(publicKey).toString("base64url");
-  const stored: StoredIdentity = {
-    schemaVersion: 1,
-    createdAt: new Date().toISOString(),
-    relayId: relayIdFor(encodedPublicKey),
-    publicKey: encodedPublicKey,
-    privateKey: privateKey
-      .export({ type: "pkcs8", format: "der" })
-      .toString("base64"),
-  };
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  await writeFile(path, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
+  let signingKey: KeyObject;
+  let rewrite = false;
+
+  if (stored) {
+    signingKey = privateKeyFrom(stored.privateKey);
+  } else {
+    const generated = generateKeyPairSync("ed25519");
+    signingKey = generated.privateKey;
+    const encodedPublicKey = rawPublicKeyOf(generated.publicKey).toString(
+      "base64url",
+    );
+    stored = {
+      schemaVersion: 2,
+      createdAt: new Date().toISOString(),
+      relayId: relayIdFor(encodedPublicKey),
+      publicKey: encodedPublicKey,
+      privateKey: generated.privateKey
+        .export({ type: "pkcs8", format: "der" })
+        .toString("base64"),
+    };
+    rewrite = true;
+  }
+
+  if (!stored.mixPrivateKey) {
+    stored.mixPrivateKey = Buffer.from(
+      generateMixKeyPair().privateKey,
+    ).toString("base64url");
+    stored.schemaVersion = 2;
+    rewrite = true;
+  }
+
+  if (rewrite) {
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    await writeFile(
+      path,
+      `${JSON.stringify(stored)}
+`,
+      { mode: 0o600 },
+    );
+  }
+
+  const mix = mixKeyPairFromScalar(
+    new Uint8Array(Buffer.from(stored.mixPrivateKey, "base64url")),
+  );
 
   return {
     relayId: stored.relayId,
     publicKey: stored.publicKey,
+    mixPublicKey: Buffer.from(mix.publicKey).toString("base64url"),
+    mixPrivateKey: mix.privateKey,
     sign: (message) =>
-      sign(null, Buffer.from(message, "utf8"), privateKey).toString(
+      sign(null, Buffer.from(message, "utf8"), signingKey).toString(
         "base64url",
       ),
   };

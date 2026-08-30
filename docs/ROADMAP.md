@@ -410,26 +410,36 @@ control; los archivos por Wi-Fi.
 vive donde se creó. Puerta de entrada: un diseño donde el segundo dispositivo
 se autoriza sin que ningún servidor pueda descifrar.
 
-### 14.3 Protección de metadata (sólo con evidencia)
+### 14.3 Protección de metadata
 
-Es lo que más se pide y lo que menos se puede prometer. El orden es
-deliberado: primero medir, después construir.
+**Construida en 1.1**, con los puntos 1, 3 y 4 de la lista original resueltos:
+el adversario está definido (el relay que almacena, y hasta cierto punto los
+nodos intermedios), la construcción es publicada (Sphinx y Loopix, usadas como
+están especificadas), y hay retardos y tráfico de cobertura. El diseño está en
+[MIXNET.md](./MIXNET.md) y el modelo en [THREAT_MODEL.md](./THREAT_MODEL.md)
+§14.
 
-1. **Definir el adversario.** ¿El relay? ¿El ISP local? ¿Varios relays
-   coludidos? ¿Un observador global pasivo? Cada respuesta lleva a un diseño
-   distinto, y "todos" no es una respuesta.
-2. **Medir el costo aceptable** de latencia, ancho de banda y batería en redes
-   móviles reales de la región.
-3. **Elegir una construcción publicada** —paquetes tipo Sphinx, mixnet con
-   batching y retardos— en vez de diseñar criptografía nueva.
-4. **Padding temporal y tráfico de cobertura**, que es lo único que ataca lo
-   que hoy queda expuesto: el horario y el volumen.
-5. **Simulaciones y testnet públicos** antes de integrarlo en la aplicación
-   estable.
+Lo que **falta**, en orden de importancia:
+
+1. **Operadores independientes y usuarios.** Es el punto que domina a todos los
+   demás y el único que no se resuelve escribiendo código. Sin varios
+   operadores que no se conozcan entre sí, la red es maquinaria alrededor de
+   una sola parte que ve las dos puntas.
+2. **Mediciones publicadas**: latencia real, costo de la cobertura, tamaño
+   efectivo del conjunto de anonimato y resistencia medida a correlación, en
+   redes móviles reales de la región.
+3. **Una decisión fundada sobre nodos guardián.** Hoy el primer salto se
+   reelige en cada petición. Tor eligió al revés tras años de análisis; acá la
+   decisión está tomada por omisión, no por evidencia.
+4. **Soporte en el navegador**, cuando X25519 en Web Crypto esté disponible en
+   todas partes.
+5. **Revisión criptográfica externa** de esta composición.
+6. **Resistencia a censura**: no hay puentes ni transportes conectables.
 
 Nada de esto se enciende por omisión, y ninguna versión dirá "anónimo" por
 tener más saltos. Un anonymity set chico ofrece poca protección aunque la
-topología se vea impresionante.
+topología se vea impresionante — y por eso la CLI imprime su tamaño real antes
+de cada envío.
 
 ### 14.4 Confianza verificable por terceros
 

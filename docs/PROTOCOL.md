@@ -1,6 +1,6 @@
 # CAPSULE Protocol v1, v2 y v3
 
-**Estado:** especificación estable para CAPSULE 1.0  
+**Estado:** especificación estable para CAPSULE 1.0; §16 añadida en 1.1  
 **Identificador de versión escrito por esta implementación:** `3`  
 **Versiones legibles:** `1`, `2`, `3`  
 **Fecha:** 2026-08-29
@@ -829,3 +829,117 @@ quien tenga una sola parte, verificar conjeturas sin conocer las demás.
   shards como si fueran chunks, así que exigió versión nueva.
 - No hay negociación de algoritmos y no hay downgrade automático. Un lector
   rechaza una versión que no conoce.
+
+## 16. Formato de paquete de la red de mezcla
+
+Esta sección especifica el paquete que viaja entre nodos de mezcla. No forma
+parte del formato de cápsula: una cápsula v3 es idéntica se haya enviado
+directo o por la red. El diseño y sus límites están en
+[MIXNET.md](./MIXNET.md).
+
+### 16.1 Constantes
+
+| Nombre           | Valor  | Nota                                                    |
+| ---------------- | ------ | ------------------------------------------------------- |
+| `MAX_HOPS`       | 5      | Todo paquete reserva espacio para esta cantidad         |
+| `NODE_ID_BYTES`  | 16     | `HKDF(clave pública, "node-id")`                        |
+| Bloque de ruteo  | 64 B   | 32 de ruteo + 32 del MAC del salto siguiente            |
+| `BETA_BYTES`     | 320    | `MAX_HOPS × 64`                                         |
+| `HEADER_BYTES`   | 384    | `α(32) ‖ β(320) ‖ γ(32)`                                |
+| `PAYLOAD_BYTES`  | 65 536 | Idéntico para todo paquete                              |
+| `PACKET_BYTES`   | 65 920 | Cabecera más cuerpo                                     |
+| `MIX_CHUNK_SIZE` | 64 512 | Texto plano de un chunk, para que quepa uno por paquete |
+
+Grupo: Curve25519, mediante X25519 usado como multiplicación escalar de puntos.
+Derivación: `HKDF-SHA-256` con la etiqueta `capsule/mix/v1/<uso>`, donde `<uso>`
+es una de `blind`, `mac`, `stream`, `payload`, `replay-tag`, `node-id`,
+`lioness`, `lioness-stream`.
+
+### 16.2 Bloque de ruteo
+
+64 bytes por salto:
+
+| Offset | Bytes | Contenido                                                     |
+| ------ | ----- | ------------------------------------------------------------- |
+| 0      | 1     | Comando: `1` reenviar, `2` entregar, `3` buzón, `4` descartar |
+| 1      | 4     | Retardo en milisegundos, big-endian                           |
+| 5      | 16    | Identificador del siguiente salto, del destino o del buzón    |
+| 21     | 11    | Reservado                                                     |
+| 32     | 32    | MAC del salto siguiente                                       |
+
+### 16.3 Construcción de la cabecera
+
+Con camino `n_0 … n_{k-1}` y escalar efímero `x`:
+
+1. `α_0 = x·G`.
+2. Para cada salto `i`: el secreto es `Y_i` multiplicado por `x` y luego por
+   cada factor de enmascaramiento anterior `b_0 … b_{i-1}`, donde
+   `b_j = HKDF(s_j, "blind")`. El salto llega al mismo valor calculando
+   `x_i · α_i`.
+3. `α_{i+1} = b_i · α_i`.
+4. Relleno: para `i` de `0` a `k-2`, se hace crecer la cadena un bloque y se
+   la XOR-ea con los últimos bytes del flujo `AES-256-CTR` derivado de
+   `HKDF(s_i, "stream")` sobre `BETA_BYTES + 64` bytes. El resultado mide
+   `(k-1)·64`.
+5. Último salto: bloque de destino, relleno aleatorio hasta
+   `BETA_BYTES − (k-1)·64`, XOR con su flujo, y a continuación el relleno del
+   punto 4.
+6. Hacia atrás, para `i` de `k-2` a `0`:
+   `β_i = (bloque_i ‖ β_{i+1}[0 … BETA_BYTES−64]) ⊕ flujo_i`, y
+   `γ_i = HMAC-SHA-256(HKDF(s_i, "mac"), β_i)`.
+
+### 16.4 Procesamiento en un salto
+
+1. `s = x_i · α`; si `γ ≠ HMAC(HKDF(s,"mac"), β)`, descartar sin responder.
+2. Rechazar si `HKDF(s, "replay-tag")` ya se vio dentro de la ventana.
+3. `(β ‖ 0^64) ⊕ flujo` da el bloque de este salto y la β siguiente.
+4. `α' = HKDF(s,"blind") · α`.
+5. Cuerpo: `LIONESS_descifrar(HKDF(s,"payload"), δ)`.
+6. Esperar el retardo, acotado por el máximo del nodo, y actuar según el
+   comando.
+
+Un nodo responde siempre igual —`202`— haya reenviado, entregado o descartado.
+Un código distinto sería un oráculo sobre el contenido del paquete.
+
+### 16.5 Cuerpo
+
+`LIONESS` (Anderson y Biham) con `AES-256-CTR` como cifrado de flujo y
+`HMAC-SHA-256` como función de hash, cuatro rondas, mitad izquierda de 32
+bytes. Es una permutación sobre el bloque entero: cambiar un bit aleatoriza los
+65 536 bytes. Eso es lo que impide marcar un paquete para reconocerlo después.
+
+Texto plano dentro del cuerpo: `"CAPSULEMIX1"` (11 B), longitud `uint32`
+big-endian, mensaje, y relleno aleatorio hasta `PAYLOAD_BYTES`. Un destino que
+no encuentra esa marca descarta el paquete: fue alterado en el camino.
+
+### 16.6 Mensaje entregado
+
+Petición:
+
+| Offset | Bytes | Contenido                                                                                                    |
+| ------ | ----- | ------------------------------------------------------------------------------------------------------------ |
+| 0      | 1     | Versión (`1`)                                                                                                |
+| 1      | 1     | Operación: `1` crear, `2` subir chunk, `3` finalizar, `4` manifiesto, `5` leer chunk, `6` estado, `7` borrar |
+| 2      | 432   | Bloque de respuesta                                                                                          |
+| 434    | 1+n   | Identificador de cápsula, con largo previo                                                                   |
+| …      | 1+n   | Token, con largo previo                                                                                      |
+| …      | 4     | Índice de chunk, big-endian                                                                                  |
+| …      | 4     | Largo de los datos, big-endian                                                                               |
+| …      | n     | Datos                                                                                                        |
+
+Respuesta: versión (1 B), éxito (1 B), largo `uint32` (4 B), datos.
+
+Bloque de respuesta (432 B): identificador del primer salto (16), `α` (32),
+`β` (320), `γ` (32), clave de sellado (32).
+
+### 16.7 API HTTP del nodo
+
+- `POST /v1/mix` con `Content-Type: application/capsule-mix` y exactamente
+  `PACKET_BYTES` bytes. Responde `202` siempre.
+- `GET /v1/mix/mailbox/<token hexadecimal de 32 caracteres>` devuelve
+  `{ version, messages: [base64url] }` y vacía el buzón.
+- `GET /v1/info` incluye `mixEnabled` y, cuando corresponde, `mixPublicKey`.
+
+Estos dos endpoints llevan su propio límite de peticiones: el tráfico de mezcla
+y el sondeo de un buzón no se parecen al tráfico de API, y contarlos juntos
+deja a la red sin servicio justo cuando está funcionando.

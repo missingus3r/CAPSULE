@@ -37,6 +37,7 @@ const ARTEFACTS = [
   "packages/protocol/dist",
   "packages/protocol/vectors",
   "packages/sdk/dist",
+  "packages/mixnet/dist",
 ];
 
 async function* walk(directory) {

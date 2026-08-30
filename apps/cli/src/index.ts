@@ -31,6 +31,12 @@ import {
   type TransferProgress,
   type UploadTicket,
 } from "@capsule/sdk";
+import {
+  MIX_CHUNK_SIZE,
+  buildMixNetwork,
+  describeStrength,
+  type MixNetwork,
+} from "@capsule/mixnet";
 import { Command } from "commander";
 import { collectRepeated, humanBytes, parseTtl } from "./options.js";
 import { readPassphrase } from "./passphrase.js";
@@ -41,6 +47,10 @@ interface GlobalOptions {
   proxy?: string;
   tor?: boolean;
   retries?: string;
+  mix?: boolean;
+  mixProvider?: string;
+  mixHops?: string;
+  mixDelay?: string;
 }
 
 const TOR_DEFAULT_PROXY = "socks5h://127.0.0.1:9050";
@@ -49,14 +59,76 @@ const program = new Command();
 program
   .name("capsule")
   .description("Send and receive private, temporary CAPSULE payloads")
-  .version("1.0.0")
+  .version("1.1.0")
   .option("--json", "print machine-readable JSON")
   .option(
     "--proxy <url>",
     "route every relay request through a SOCKS5 proxy, e.g. socks5h://127.0.0.1:9050",
   )
   .option("--tor", `shorthand for --proxy ${TOR_DEFAULT_PROXY}`)
-  .option("--retries <count>", "retries per relay request", "3");
+  .option("--retries <count>", "retries per relay request", "3")
+  .option(
+    "--mix",
+    "send through CAPSULE's own mix network instead of contacting the relay directly",
+  )
+  .option("--mix-provider <url>", "relay that holds the reply mailbox")
+  .option("--mix-hops <count>", "hops per direction", "3")
+  .option(
+    "--mix-delay <ms>",
+    "mean time each hop holds a packet; higher hides timing better and takes longer",
+    "2000",
+  );
+
+/**
+ * Builds the mix network from whatever the directory holds, and says out loud
+ * how much protection that actually is. A network of three nodes is not a
+ * secret to keep from the person relying on it.
+ */
+async function openMixNetwork(seeds: RelaySeed[]): Promise<MixNetwork> {
+  const options = program.opts<GlobalOptions>();
+  const fetchImpl = transport();
+  const relays = await discoverRelays({
+    seeds,
+    ...discoveryScope(seeds),
+    ...(fetchImpl ? { fetchImpl } : {}),
+  });
+  const usable = relays.filter((relay) => relay.mixPublicKey);
+  if (usable.length === 0) {
+    throw new Error(
+      "No relay in reach runs a mix node. Start one with CAPSULE_MIX_ENABLED=true, or drop --mix.",
+    );
+  }
+
+  const hops = Number(options.mixHops ?? 3);
+  const meanDelayMs = Number(options.mixDelay ?? 2000);
+  if (!Number.isSafeInteger(hops) || hops < 1 || hops > 5) {
+    throw new Error("--mix-hops must be between 1 and 5");
+  }
+  if (!Number.isFinite(meanDelayMs) || meanDelayMs < 0) {
+    throw new Error("--mix-delay must be a non-negative number");
+  }
+
+  const network = buildMixNetwork({
+    relays: usable,
+    ...(options.mixProvider ? { providerUrl: options.mixProvider } : {}),
+    pathLength: hops,
+    meanDelayMs,
+    timeoutMs: Math.max(120_000, meanDelayMs * hops * 8),
+    ...(fetchImpl ? { fetchImpl } : {}),
+  });
+
+  if (!options.json) {
+    process.stderr.write(`Mix network: ${describeStrength(network.strength)}
+`);
+    if (network.pathLength < hops) {
+      process.stderr.write(
+        `Only ${network.pathLength} hops are available, not the ${hops} requested.
+`,
+      );
+    }
+  }
+  return network;
+}
 
 function transport(): FetchLike | undefined {
   const options = program.opts<GlobalOptions>();
@@ -316,6 +388,14 @@ program
         }
       }
 
+      const mixNetwork = globalOptions.mix
+        ? await openMixNetwork(
+            commandOptions.seed.length > 0
+              ? commandOptions.seed.map(parseSeed)
+              : [commandOptions.relay],
+          )
+        : undefined;
+
       const uploaded = await uploadCapsule({
         data: fileBlob,
         filename: basename(absolutePath),
@@ -328,6 +408,14 @@ program
         ...(mirrorRelayUrls.length > 0 ? { mirrorRelayUrls } : {}),
         ...(dataShards !== undefined
           ? { replication: { mode: "shards" as const, dataShards } }
+          : {}),
+        ...(mixNetwork
+          ? {
+              transport: mixNetwork.transportFor,
+              // A chunk has to fit one packet, and every packet on the network
+              // is the same size whatever it carries.
+              chunkSize: MIX_CHUNK_SIZE,
+            }
           : {}),
         ...(fetchImpl ? { fetchImpl } : {}),
         ...retryPolicy(),
@@ -427,8 +515,12 @@ program
       const capability = decodeShareCapability(extractFragment(shareUrl));
       const globalOptions = program.opts<GlobalOptions>();
       const fetchImpl = transport();
+      const mixNetwork = globalOptions.mix
+        ? await openMixNetwork([capability.relayUrl])
+        : undefined;
       const downloaded = await downloadCapsule({
         capability,
+        ...(mixNetwork ? { transport: mixNetwork.transportFor } : {}),
         ...(fetchImpl ? { fetchImpl } : {}),
         ...retryPolicy(),
         ...progressReporter("Receiving", ["decrypting", "complete"]),
@@ -480,7 +572,11 @@ program
   .action(async (encodedCapability: string) => {
     const capability = decodeOwnerCapability(encodedCapability);
     const fetchImpl = transport();
+    const mixNetwork = program.opts<GlobalOptions>().mix
+      ? await openMixNetwork([capability.relayUrl])
+      : undefined;
     const result = await deleteCapsule(capability, {
+      ...(mixNetwork ? { transport: mixNetwork.transportFor } : {}),
       ...(fetchImpl ? { fetchImpl } : {}),
       ...retryPolicy(),
     });

@@ -4,6 +4,77 @@ Todas las versiones publicadas de CAPSULE, con lo que cambió y —cuando
 corresponde— lo que dejó de ser cierto. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.1.0/).
 
+## [1.1.0] — 2026-08-30
+
+CAPSULE tiene su propia red de mezcla. El formato de cápsula, la API del relay
+y las capabilities no cambian: una cápsula enviada por la red es idéntica a una
+enviada directo.
+
+**Antes de nada:** el anonimato de una red viene del tamaño del conjunto en el
+que te escondés, no de su código. Con pocos nodos y un solo operador esto no es
+una red anónima, y la herramienta lo dice en cada envío en vez de sugerir lo
+contrario. El diseño completo y sus límites están en
+[docs/MIXNET.md](docs/MIXNET.md).
+
+### Agregado
+
+**La red de mezcla**
+
+- Paquetes Sphinx de tamaño único (65 920 bytes), con cabecera enmascarada en
+  cada salto, relleno que impide deducir la posición en el camino, y cuerpo
+  cifrado con LIONESS: cambiar un bit aleatoriza el paquete entero, que es lo
+  que anula el ataque de marcado.
+- Retardos por salto tomados de una distribución exponencial. Esto es lo que
+  Tor no puede hacer —quien espera una página web no espera— y es lo que rompe
+  la correlación temporal de punta a punta.
+- Bloques de respuesta de un solo uso: el relay contesta sin saber a quién.
+- Buzones en un relay proveedor, para clientes que no pueden recibir
+  conexiones.
+- Tráfico de cobertura: cada nodo se envía paquetes a sí mismo por caminos
+  aleatorios, indistinguibles de los reales.
+- Protección contra repetición por etiqueta derivada del secreto compartido.
+- **Sin nodos de salida**: el destino es el propio relay que guarda la cápsula,
+  así que ninguna parte ve la petición en claro sin ser su destinataria.
+- Cada relay es un nodo de mezcla por omisión, con su clave Curve25519 propia
+  publicada en `/v1/info` y propagada por el gossip existente.
+
+**En la CLI**
+
+- `--mix` en `send`, `receive` y `delete`, con `--mix-hops`, `--mix-delay` y
+  `--mix-provider`.
+- Se combina con `--tor`: Tor oculta CAPSULE de tu proveedor de Internet, la
+  mezcla te oculta de los relays.
+- Antes de cada envío imprime cuántos nodos y cuántos operadores aparentes hay,
+  y qué significa ese número.
+
+**En el SDK**
+
+- `RelayTransport`, la interfaz que una transferencia necesita de un relay. El
+  cliente directo y el de la red la implementan igual, así que subir y bajar
+  funcionan sin saber por dónde viajan.
+
+### Corregido
+
+- **Un relay dejaba de propagar el directorio en cuanto conocía un vecino**, y
+  quedaba con vista parcial hasta el siguiente ciclo de gossip. Con la red de
+  mezcla eso deja de ser un detalle: un nodo que no conoce al nodo que nombra
+  un paquete no tiene más opción que descartarlo. Ahora sigue propagando hasta
+  que el directorio deja de crecer.
+- **El tráfico de mezcla y el sondeo de buzones se contaban contra el límite de
+  peticiones de la API**, que los agotaba justo cuando la red funcionaba. Ahora
+  tienen su propio límite, y lo que acota la mezcla es el tamaño de la cola.
+- Un relay que se apaga cancela los sondeos en curso en vez de esperar a que
+  venzan por tiempo.
+
+### Sigue sin resolverse
+
+- La aplicación web no usa la red: necesita X25519 en Web Crypto.
+- No hay nodos guardián; el primer salto se reelige en cada petición, y esa
+  decisión merece el análisis que Tor sí hizo.
+- Un ataque n−1 activo sigue abierto, como en la literatura.
+- No hay resistencia a censura: ni puentes ni transportes conectables.
+- Esta composición no tiene revisión criptográfica externa.
+
 ## [1.0.0] — 2026-08-29
 
 Primera versión estable: el formato de cápsula, la API del relay y las

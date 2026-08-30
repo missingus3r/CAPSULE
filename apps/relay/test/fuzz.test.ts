@@ -47,6 +47,17 @@ function testConfig(overrides: Partial<RelayConfig> = {}): RelayConfig {
     announceWorkBits: 0,
     maxPeersPerOperator: 8,
     ipBlind: true,
+    mixEnabled: true,
+    mixMaxQueued: 256,
+    mixMaxDelayMs: 5_000,
+    mixMeanDelayMs: 0,
+    mixReplayWindowMs: 60_000,
+    mixMailboxDepth: 64,
+    mixMailboxTtlMs: 60_000,
+    mixSendTimeoutMs: 5_000,
+    mixCoverIntervalMs: 0,
+    mixPathLength: 3,
+    mixRateLimitMax: 100_000,
     ...overrides,
   };
 }
