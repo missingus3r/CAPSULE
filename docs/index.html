@@ -369,6 +369,36 @@
         letter-spacing: 0.04em;
       }
 
+      /* Screenshots, as opposed to diagrams: a real window, framed lightly. */
+      .shots {
+        margin: 52px auto 0;
+        max-width: 900px;
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+      .shot {
+        margin: 0;
+      }
+      .shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid var(--line-2);
+        border-radius: 10px;
+        background: #0a0a0a;
+      }
+      .shot figcaption {
+        font-family: var(--mono);
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--ink-3);
+        margin-top: 12px;
+        letter-spacing: 0.03em;
+        text-align: left;
+      }
+
       .plain {
         margin: 44px auto 0;
         max-width: 720px;
@@ -969,6 +999,9 @@
         .caps {
           grid-template-columns: 1fr;
         }
+        .shots {
+          grid-template-columns: 1fr;
+        }
         nav.top .toc {
           display: none;
         }
@@ -1260,6 +1293,40 @@
         not a pixel, not a beacon. That is a property of the format, not a
         setting you can forget to turn on.
       </p>
+
+      <div class="shots">
+        <figure class="shot">
+          <img
+            src="screenshots/extension-site.png"
+            alt="A .capsule site open in Chrome through the CAPSULE extension. A bar above the page reads VERIFIED, version one, SCRIPTS OFF and RELAYS. The page headline says: Nobody sold you this address."
+            width="1917"
+            height="991"
+            loading="lazy"
+            decoding="async"
+          />
+          <figcaption>
+            A site under its own name. The bar belongs to the extension, not to
+            the page: VERIFIED means the signature checked out against the key
+            inside the name, and SCRIPTS OFF is the default the site has no say
+            in.
+          </figcaption>
+        </figure>
+        <figure class="shot">
+          <img
+            src="screenshots/extension-relays.png"
+            alt="The CAPSULE extension settings panel, listing two relay addresses with remove buttons, a field to add another, and the list of .capsule names this browser has seen with their version numbers."
+            width="715"
+            height="671"
+            loading="lazy"
+            decoding="async"
+          />
+          <figcaption>
+            The whole configuration surface: which relays to ask, and the newest
+            version this browser has accepted for each name. A relay offering an
+            older one is refused.
+          </figcaption>
+        </figure>
+      </div>
 
       <button class="open-modal" data-modal="m-sites">
         <span class="plus">+</span> How a name becomes a page

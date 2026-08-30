@@ -217,6 +217,14 @@ Load unpacked** and choose `apps/extension/dist`. Open the settings, add your
 relay, and type the `.capsule` address in the address bar — or `capsule <name>`,
 which works even when the browser wants to search instead.
 
+![A `.capsule` site open in the extension viewer, with the verification bar above it](docs/screenshots/extension-site.png)
+
+The bar across the top belongs to the extension, not to the page.
+`VERIFIED · V1` means the record's signature checked out against the key inside
+the name and this is the newest version this browser has seen. `SCRIPTS OFF` is
+the default, and the site has no say in it. Nothing below that bar can reach the
+network.
+
 The extension does something ordinary browsers do not: it **rebuilds every page**
 before showing it. Stylesheets, images and fonts from the bundle become `data:`
 URLs, anything pointing at the open web is removed, and a link that leaves
@@ -226,6 +234,13 @@ frame with `connect-src 'none'` and no scripts.
 **A `.capsule` site cannot make a single network request.** Not a font, not a
 pixel, not a beacon. That is a property of the format, not a setting you can
 forget. Details and the exceptions: [docs/SITES.md](docs/SITES.md).
+
+![The extension settings: the relays to ask, and the names this browser has seen](docs/screenshots/extension-relays.png)
+
+That is the whole configuration surface: which relays to ask, and the highest
+version number this browser has accepted for each name it has opened. A relay
+offering an older one is refused, which is the only defence against being
+quietly handed yesterday's version of a site.
 
 ### It is not a `.onion` with a different suffix
 

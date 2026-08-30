@@ -157,7 +157,7 @@ with `--tor`; the extension cannot, because the mix layer needs Node.
 key means an HSDir stores a descriptor without being able to tell which service
 it belongs to. In CAPSULE, `GET /v1/sites?limit=n` exists so that relays can
 gossip records, which means anyone can ask a relay for the list of names it
-holds. The *content* of a `.capsule` site is public by definition, so nothing
+holds. The _content_ of a `.capsule` site is public by definition, so nothing
 secret leaks — but **the existence of your site is discoverable**, and in Tor it
 is not. If you need a name nobody can stumble onto, this is not the layer for
 it.
@@ -191,6 +191,6 @@ static IP and no forwarded port. The two answer different questions: Tor asks
 how a connection can be anonymous, and CAPSULE asks how little a host can be
 allowed to know about what it is holding.
 
-Use an onion service when the site has to *do* something. Use a `.capsule` site
-when the site only has to *say* something, and you would rather it could not
+Use an onion service when the site has to _do_ something. Use a `.capsule` site
+when the site only has to _say_ something, and you would rather it could not
 watch who is reading.
