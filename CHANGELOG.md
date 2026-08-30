@@ -1,277 +1,365 @@
 # Changelog
 
-Todas las versiones publicadas de CAPSULE, con lo que cambió y —cuando
-corresponde— lo que dejó de ser cierto. El formato sigue
-[Keep a Changelog](https://keepachangelog.com/es/1.1.0/).
+Every released version of CAPSULE, with what changed and — where it applies —
+what stopped being true. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [1.3.0] — 2026-08-30
+
+Three of the four gaps the comparison table called out, and an honest note
+about the fourth.
+
+**Before anything else:** a bridge stops a censor enumerating and probing. It
+does not stop one who obtains the bridge line, and it does not hide the TLS
+fingerprint. An offline capsule works with no network at all, and is not a mesh.
+The anonymity set is still small and no commit changes that. See
+[docs/CENSORSHIP.md](docs/CENSORSHIP.md), [docs/OFFLINE.md](docs/OFFLINE.md)
+and [docs/COMPARISON.md](docs/COMPARISON.md).
+
+### Added
+
+**Bridges — reaching the network when it is blocked**
+
+- A relay started with `CAPSULE_BRIDGE=true` never announces itself, so it
+  appears in nobody's peer list. Enumerating the public directory does not find
+  it.
+- Every route hides behind a secret path prefix derived from the bridge key. A
+  scan for `/v1/info` finds nothing.
+- Every real request carries a **session-cookie authenticator** over its own
+  method and path, so a cookie captured on one request cannot be replayed onto
+  another, and a recorded request cannot be replayed at all.
+- The cookie's name is derived from the key and chosen from ordinary session
+  cookie names, so two bridges do not look alike and there is no single string
+  to write a DPI rule for.
+- Everything without a valid one — wrong prefix, missing cookie, malformed,
+  expired, replayed, or for another path — gets exactly what an unconfigured web
+  server gives: a page at `/` and a 404 everywhere else. The operator can point
+  `CAPSULE_BRIDGE_DECOY` at a real file.
+- `--bridge <line>` in the CLI works everywhere, because it wraps `fetch`
+  rather than the relay client: transfers, relay discovery, `.capsule`
+  resolution and record announcements all included. It stacks with `--tor`.
+
+**Working with no internet**
+
+- `capsule offline pack` / `open` puts a capsule in one file that travels on a
+  memory stick or across an air gap. **Sealed by default**: the file is
+  ciphertext and the key goes by another route, so a lost stick is a lost stick.
+  `--with-key` puts the key inside and says what that costs.
+- `capsule lan` finds a relay over UDP multicast with no DNS, no seed list and
+  no uplink. A relay announces itself only with `CAPSULE_LAN=true`, which is off
+  by default because a beacon tells the whole network that CAPSULE is running
+  here.
+- A beacon may only name a plain `http(s)` origin — no path, no credentials, no
+  other scheme — because anybody on the network can send one.
+
+**The part of the anonymity set that code can affect**
+
+- **Every encrypted manifest is now padded to a size class.** AES-GCM does not
+  hide length, so the manifest used to measure the filename and the note: a
+  capsule called `x.txt` and one called `Ana Pereira - passport scan.jpg` were
+  visibly different to the relay. It is unconditional on purpose — an anonymity
+  feature some senders enable splits everyone into two distinguishable groups.
+- `capsule network` reports what the live network can offer: relays reachable,
+  apparent operators, mix nodes, mix operators. It also says plainly that the
+  anonymity set itself cannot be measured here, because there are no accounts
+  and no counters, so there is nobody to count.
+
+### Changed
+
+- **The documentation is in English.** Every file in `docs/` and this changelog.
+- **Wire format:** manifests changed length. It is visible on the wire but
+  compatible in both directions — readers ignore unknown fields — and the test
+  vectors were regenerated. Manifest padding is specified in
+  [docs/PROTOCOL.md](docs/PROTOCOL.md) §13.4.
+- The showcase page is monochrome, with a capsule mark in the header.
+- `npm run build:libs` now builds `@capsule/lan` as well.
+
+### Documentation
+
+- [docs/CENSORSHIP.md](docs/CENSORSHIP.md) — what a probe gets, what a bridge
+  does not protect against, and how to run one.
+- [docs/OFFLINE.md](docs/OFFLINE.md) — offline capsules and LAN discovery, and
+  why neither is a mesh.
+- `PROTOCOL.md` §13.4, §18 and §19; `THREAT_MODEL.md` §16; `RUN_A_RELAY.md`
+  §10 and §11; `ROADMAP.md` §16.
+
+### Still unresolved
+
+- **Bridge distribution.** A censor who gets the line has the bridge. Tor has
+  spent fifteen years on this; CAPSULE has no answer at all.
+- **The TLS fingerprint is Node's**, not a browser's.
+- **No pluggable transports.** For protocol obfuscation, put Tor or obfs4
+  underneath with `--proxy`.
+- **No mesh or radio transport.** Where there is no IP and nobody to carry a
+  file, Briar and Meshtastic work and this does not.
+- **The anonymity set is still small**, and that is adoption rather than
+  engineering.
+- **A general-purpose TCP tunnel** is designed but not built; see
+  [docs/ROADMAP.md](docs/ROADMAP.md) §16.1.
 
 ## [1.2.0] — 2026-08-30
 
-Sitios web con nombre propio. El formato de cápsula, la API del relay y las
-capabilities siguen sin cambiar: un sitio es una cápsula v3 corriente más una
-capa de nombres encima.
+Websites with a name of their own. The capsule format, the relay API and the
+capabilities are unchanged: a site is an ordinary v3 capsule plus a naming
+layer on top.
 
-**Antes de nada:** un sitio `.capsule` es **público**. Cualquiera que consiga el
-registro puede leerlo, y los registros circulan entre relays a propósito. Lo que
-un sitio garantiza es que nadie puede reemplazar tus páginas ni entregarte una
-versión vieja sin que se note. Lo privado se manda como cápsula, no se publica
-como sitio. Ver [docs/SITES.md](docs/SITES.md).
+**Before anything else:** a `.capsule` site is **public**. Anyone who obtains
+the record can read it, and records circulate between relays on purpose. What a
+site guarantees is that nobody can replace your pages or hand you an old
+version without it being noticed. Anything private is sent as a capsule, not
+published as a site. See [docs/SITES.md](docs/SITES.md).
 
-### Agregado
+### Added
 
-- **Nombres `.capsule` autocertificados.** El nombre es una clave pública
-  Ed25519 en base32 con suma de verificación y versión: 56 caracteres más
-  `.capsule`. No hay registro, ni registrador, ni certificado que renovar.
-- **Registros de sitio firmados**, con número de secuencia monótono. Un relay
-  no puede falsificar uno porque no tiene la clave, ni revertir a uno viejo
-  porque el navegador recuerda el más alto que aceptó.
-- **Formato de paquete de sitio** (`CAPSITE1`): una carpeta entera dentro de una
-  cápsula. Sin descarga parcial, a propósito: pedir archivo por archivo le
-  contaría al relay qué páginas se leyeron.
-- **Tres endpoints en el relay** —`GET`/`PUT /v1/sites/:name` y `GET /v1/sites`—
-  y chismorreo de registros entre relays, para que un nombre resuelva en
-  cualquier lado y no sólo donde su autor lo anunció. Se apagan con
-  `CAPSULE_SITES_ENABLED=false`.
-- **Comandos `capsule site`**: `key`, `publish`, `resolve`, `get` y `announce`.
-  El relleno a clase de tamaño y el nombre neutro son la opción por omisión al
-  publicar, no algo que haya que recordar activar.
-- **Extensión de navegador (MV3)** que abre `http://<nombre>.capsule/` en
-  cualquier Chromium. Intercepta la navegación antes del DNS, resuelve el
-  nombre, verifica la firma, baja la cápsula y **reconstruye la página**: cada
-  referencia que resuelve dentro del paquete se vuelve un `data:` URL y cada
-  una que apunta afuera se elimina.
-- **Un sitio `.capsule` no puede hacer ninguna petición de red.** El marco va
-  sin `allow-scripts` y con `connect-src 'none'`; ni una fuente, ni un píxel, ni
-  una baliza. Los scripts se habilitan por sitio, con la advertencia de que un
-  script sí puede llevar el marco a una dirección externa.
-- **Permisos de host bajo demanda** en la extensión: no pide ninguno de entrada
-  y pide el de un relay cuando alguien lo agrega, para ese origen y nada más.
-- **Diagramas** generados desde `scripts/diagrams.mjs`, y una página de
-  presentación en un solo archivo (`docs/index.html`) para GitHub Pages.
-- **[docs/COMPARISON.md](docs/COMPARISON.md)**: las 21 redes del mapa, la
-  limitación de cada una y si CAPSULE la cubre. Diez «sí», cinco «parcial»,
-  cuatro «no» y dos que no aplican, con los cuatro «no» explicados.
+- **Self-certifying `.capsule` names.** The name is an Ed25519 public key in
+  base32 with a checksum and a version: 56 characters plus `.capsule`. There is
+  no registry, no registrar and no certificate to renew.
+- **Signed site records**, with a monotonic sequence number. A relay cannot
+  forge one because it has no key, nor roll back to an old one because the
+  browser remembers the highest it accepted.
+- **A site bundle format** (`CAPSITE1`): a whole folder inside one capsule. No
+  partial download, on purpose: asking file by file would tell the relay which
+  pages were read.
+- **Three relay endpoints** — `GET`/`PUT /v1/sites/:name` and `GET /v1/sites` —
+  and record gossip between relays, so a name resolves anywhere rather than only
+  where its author announced it. Turned off with `CAPSULE_SITES_ENABLED=false`.
+- **`capsule site` commands**: `key`, `publish`, `resolve`, `get` and
+  `announce`. Size-class padding and a neutral filename are the default when
+  publishing, not something to remember to switch on.
+- **A browser extension (MV3)** that opens `http://<name>.capsule/` in any
+  Chromium. It intercepts the navigation before DNS, resolves the name, verifies
+  the signature, downloads the capsule and **rebuilds the page**: every
+  reference that resolves inside the bundle becomes a `data:` URL and every one
+  pointing outside is removed.
+- **A `.capsule` site cannot make any network request.** The frame runs with no
+  `allow-scripts` and `connect-src 'none'`; not a font, not a pixel, not a
+  beacon. Scripts are enabled per site, with the warning that a script can take
+  the frame to an external address.
+- **Host permissions on demand** in the extension: it asks for none up front and
+  asks for a relay's when somebody adds it, for that origin and nothing else.
+- **Diagrams** generated from `scripts/diagrams.mjs`, and a single-file showcase
+  page (`docs/index.html`) for GitHub Pages.
+- **[docs/COMPARISON.md](docs/COMPARISON.md)**: the 21 networks on the map,
+  each one's limitation, and whether CAPSULE covers it.
 
-### Cambiado
+### Changed
 
-- El README arranca por qué es y para qué sirve, con dos diagramas y una guía de
-  instalación de cuatro pasos. El material de referencia sigue abajo.
-- `npm run build` construye también la extensión; `npm run build:extension` la
-  construye sola y `npm run diagrams` regenera los SVG y los reinyecta en la
-  página.
+- The README leads with what it is and what it is for, with two diagrams and a
+  four-step installation guide. The reference material stays below.
+- `npm run build` builds the extension too; `npm run build:extension` builds it
+  alone and `npm run diagrams` regenerates the SVGs and re-inlines them into the
+  page.
 
-### Sin resolver
+### Still unresolved
 
-- **La extensión habla con los relays directamente.** Un relay ve una dirección
-  preguntando por un nombre. La CLI puede ir por la red de mezcla; la extensión
-  no, porque requiere Node.
-- **Sólo Chromium.** Firefox y Safari necesitan un puerto de la extensión.
-- **El reconstructor de páginas no está auditado.** Es un límite de seguridad
-  escrito a mano y probado con los casos que se nos ocurrieron.
+- **The extension talks to relays directly.** A relay sees an address asking
+  about a name. The CLI can go through the mix network; the extension cannot,
+  because that requires Node.
+- **Chromium only.** Firefox and Safari need a port of the extension.
+- **The page rebuilder is not audited.** It is a hand-written security boundary
+  tested against the cases we thought of.
 
 ## [1.1.0] — 2026-08-30
 
-CAPSULE tiene su propia red de mezcla. El formato de cápsula, la API del relay
-y las capabilities no cambian: una cápsula enviada por la red es idéntica a una
-enviada directo.
+CAPSULE has its own mix network. The capsule format, the relay API and the
+capabilities do not change: a capsule sent through the network is identical to
+one sent directly.
 
-**Antes de nada:** el anonimato de una red viene del tamaño del conjunto en el
-que te escondés, no de su código. Con pocos nodos y un solo operador esto no es
-una red anónima, y la herramienta lo dice en cada envío en vez de sugerir lo
-contrario. El diseño completo y sus límites están en
+**Before anything else:** a network's anonymity comes from the size of the set
+you hide in, not from its code. With few nodes and one operator this is not an
+anonymity network, and the tool says so on every send rather than suggesting
+otherwise. The full design and its limits are in
 [docs/MIXNET.md](docs/MIXNET.md).
 
-### Agregado
+### Added
 
-**La red de mezcla**
+**The mix network**
 
-- Paquetes Sphinx de tamaño único (65 920 bytes), con cabecera enmascarada en
-  cada salto, relleno que impide deducir la posición en el camino, y cuerpo
-  cifrado con LIONESS: cambiar un bit aleatoriza el paquete entero, que es lo
-  que anula el ataque de marcado.
-- Retardos por salto tomados de una distribución exponencial. Esto es lo que
-  Tor no puede hacer —quien espera una página web no espera— y es lo que rompe
-  la correlación temporal de punta a punta.
-- Bloques de respuesta de un solo uso: el relay contesta sin saber a quién.
-- Buzones en un relay proveedor, para clientes que no pueden recibir
-  conexiones.
-- Tráfico de cobertura: cada nodo se envía paquetes a sí mismo por caminos
-  aleatorios, indistinguibles de los reales.
-- Protección contra repetición por etiqueta derivada del secreto compartido.
-- **Sin nodos de salida**: el destino es el propio relay que guarda la cápsula,
-  así que ninguna parte ve la petición en claro sin ser su destinataria.
-- Cada relay es un nodo de mezcla por omisión, con su clave Curve25519 propia
-  publicada en `/v1/info` y propagada por el gossip existente.
+- Sphinx packets of a single size (65,920 bytes), with the header blinded at
+  every hop, filler that prevents deducing a position in the path, and a body
+  encrypted with LIONESS: changing one bit randomises the whole packet, which
+  is what defeats tagging.
+- Per-hop delays drawn from an exponential distribution. This is what Tor
+  cannot do — somebody waiting for a web page will not wait — and it is what
+  breaks end-to-end timing correlation.
+- Single-use reply blocks: the relay answers without knowing whom.
+- Mailboxes on a provider relay, for clients that cannot receive connections.
+- Cover traffic: every node sends packets to itself along random paths,
+  indistinguishable from real ones.
+- Replay protection by a tag derived from the shared secret.
+- **No exit nodes**: the destination is the relay storing the capsule, so no
+  party sees the request in the clear without being its recipient.
+- Every relay is a mix node by default, with its own Curve25519 key published in
+  `/v1/info` and propagated by the existing gossip.
 
-**En la CLI**
+**In the CLI**
 
-- `--mix` en `send`, `receive` y `delete`, con `--mix-hops`, `--mix-delay` y
-  `--mix-provider`.
-- Se combina con `--tor`: Tor oculta CAPSULE de tu proveedor de Internet, la
-  mezcla te oculta de los relays.
-- Antes de cada envío imprime cuántos nodos y cuántos operadores aparentes hay,
-  y qué significa ese número.
+- `--mix` on `send`, `receive` and `delete`, with `--mix-hops`, `--mix-delay`
+  and `--mix-provider`.
+- It combines with `--tor`: Tor hides CAPSULE from your internet provider, the
+  mix hides you from the relays.
+- Before every send it prints how many nodes and how many apparent operators
+  there are, and what that number means.
 
-**En el SDK**
+**In the SDK**
 
-- `RelayTransport`, la interfaz que una transferencia necesita de un relay. El
-  cliente directo y el de la red la implementan igual, así que subir y bajar
-  funcionan sin saber por dónde viajan.
+- `RelayTransport`, the interface a transfer needs from a relay. The direct
+  client and the network one implement it identically, so uploading and
+  downloading work without knowing which way they travel.
 
-### Corregido
+### Fixed
 
-- **Un relay dejaba de propagar el directorio en cuanto conocía un vecino**, y
-  quedaba con vista parcial hasta el siguiente ciclo de gossip. Con la red de
-  mezcla eso deja de ser un detalle: un nodo que no conoce al nodo que nombra
-  un paquete no tiene más opción que descartarlo. Ahora sigue propagando hasta
-  que el directorio deja de crecer.
-- **El tráfico de mezcla y el sondeo de buzones se contaban contra el límite de
-  peticiones de la API**, que los agotaba justo cuando la red funcionaba. Ahora
-  tienen su propio límite, y lo que acota la mezcla es el tamaño de la cola.
-- Un relay que se apaga cancela los sondeos en curso en vez de esperar a que
-  venzan por tiempo.
+- **A relay stopped propagating the directory as soon as it knew one
+  neighbour**, and kept a partial view until the next gossip cycle. With the mix
+  network that stops being a detail: a node that has not heard of the node a
+  packet names has no choice but to drop it. It now keeps propagating until the
+  directory stops growing.
+- **Mix traffic and mailbox polling counted against the API rate limit**, which
+  exhausted it exactly when the network was working. They now have their own
+  limit, and what bounds the mix is the size of its queue.
+- A relay shutting down cancels in-flight probes instead of waiting for them to
+  time out.
 
-### Sigue sin resolverse
+### Still unresolved
 
-- La aplicación web no usa la red: necesita X25519 en Web Crypto.
-- No hay nodos guardián; el primer salto se reelige en cada petición, y esa
-  decisión merece el análisis que Tor sí hizo.
-- Un ataque n−1 activo sigue abierto, como en la literatura.
-- No hay resistencia a censura: ni puentes ni transportes conectables.
-- Esta composición no tiene revisión criptográfica externa.
+- The web application does not use the network: it needs X25519 in Web Crypto.
+- There are no guard nodes; the first hop is re-chosen on every request, and
+  that decision deserves the analysis Tor actually did.
+- An active n−1 attack remains open, as in the literature.
+- There is no censorship resistance: no bridges and no pluggable transports.
+- This composition has no external cryptographic review.
 
 ## [1.0.0] — 2026-08-29
 
-Primera versión estable: el formato de cápsula, la API del relay y las
-capabilities quedan congelados y publicados con vectores de prueba. Las
-cápsulas v1 y v2 se siguen leyendo sin cambios.
+The first stable release: the capsule format, the relay API and the
+capabilities are frozen and published with test vectors. v1 and v2 capsules are
+still read unchanged.
 
-### Agregado
+### Added
 
-**Anonimización del contenido**
+**Content anonymisation**
 
-- Limpieza de metadatos embebidos antes de cifrar, con soporte para JPEG
-  (APPn y comentarios), PNG (`tEXt`/`zTXt`/`iTXt`/`eXIf`/`tIME`), WebP
-  (`EXIF`/`XMP` y los flags de `VP8X`), GIF (comentarios y extensiones de
-  aplicación, conservando el bucle NETSCAPE2.0), MP4/MOV/HEIC/AVIF (cajas
-  `udta`, `uuid` y `meta` sobrescritas en el lugar) y contenedores ZIP
-  (Office/ODF/EPUB: propiedades del documento vaciadas y marcas de tiempo
-  normalizadas).
-- En PDF se blanquean los paquetes XMP sin mover un solo byte; el diccionario
-  `/Info` se **reporta** como no removible en vez de fingir que se limpió.
-- Nombre de archivo y tipo MIME neutros en el manifiesto.
-- Relleno por clases de tamaño: el relay ve una categoría, no el tamaño real.
-- Jitter opcional entre chunks.
+- Stripping embedded metadata before encrypting, with support for JPEG (APPn
+  and comments), PNG (`tEXt`/`zTXt`/`iTXt`/`eXIf`/`tIME`), WebP (`EXIF`/`XMP`
+  and the `VP8X` flags), GIF (comments and application extensions, keeping the
+  NETSCAPE2.0 loop), MP4/MOV/HEIC/AVIF (`udta`, `uuid` and `meta` boxes
+  overwritten in place) and ZIP containers (Office/ODF/EPUB: document
+  properties emptied and timestamps normalised).
+- In PDF, XMP packets are blanked without moving a single byte; the `/Info`
+  dictionary is **reported** as not removable instead of pretending it was
+  cleaned.
+- A neutral filename and MIME type in the manifest.
+- Size-class padding: the relay sees a category, not the real size.
+- Optional jitter between chunks.
 
-**Anonimización del transporte**
+**Transport anonymisation**
 
-- Cliente SOCKS5 propio en la CLI (`--proxy`, `--tor`), sin dependencias
-  nuevas, con resolución de nombre en el proxy y soporte de `.onion`.
-- El relay opera sin retener direcciones: nada de IPs en logs y rate limiting
-  por hash con sal rotativa (`CAPSULE_IP_BLIND`, activado por omisión).
+- A hand-rolled SOCKS5 client in the CLI (`--proxy`, `--tor`), with no new
+  dependencies, name resolution at the proxy and `.onion` support.
+- The relay operates without retaining addresses: no IPs in logs and rate
+  limiting by a hash with a rotating salt (`CAPSULE_IP_BLIND`, on by default).
 
-**Cápsulas sin vencimiento**
+**Capsules without expiry**
 
-- `expiresAt: null` en el manifiesto y `expiresInSeconds: null` en la API.
-- Desactivado por omisión; el operador lo habilita y fija una cuota global y
-  otra por remitente.
+- `expiresAt: null` in the manifest and `expiresInSeconds: null` in the API.
+- Off by default; the operator enables it and sets a global quota and a
+  per-sender one.
 
-**Red abierta de relays**
+**An open relay network**
 
-- Identidad Ed25519 por relay, generada al arrancar y persistida.
-- `GET /v1/info`, `GET /v1/peers` y `POST /v1/peers/announce` con anuncios
-  firmados y prueba de trabajo configurable.
-- Gossip con reintentos de arranque, verificación de cada dirección aprendida
-  contra `/v1/info`, tope por operador aparente y defensa SSRF.
-- Descubrimiento del lado cliente con semillas fijables (`url#relayId`) y
-  selección que prefiere operadores distintos.
+- An Ed25519 identity per relay, generated at startup and persisted.
+- `GET /v1/info`, `GET /v1/peers` and `POST /v1/peers/announce` with signed
+  announcements and configurable proof of work.
+- Gossip with startup retries, verification of every learned address against
+  `/v1/info`, a cap per apparent operator, and SSRF defence.
+- Client-side discovery with pinnable seeds (`url#relayId`) and selection that
+  prefers distinct operators.
 
-**Réplica y disponibilidad**
+**Replication and availability**
 
-- Espejos completos en varios relays, con failover de lectura y borrado
-  dirigido a todos con reporte honesto.
-- Erasure coding `k de n` opcional: ningún relay guarda lo suficiente para
-  reconstruir la cápsula, y cuesta `n/k` en vez de `n`. Un relay que sirve
-  shards corruptos no rompe la descarga: se prueba otra combinación.
+- Full mirrors on several relays, with read failover and deletion addressed to
+  all of them with an honest report.
+- Optional `k`-of-`n` erasure coding: no relay stores enough to reconstruct the
+  capsule, and it costs `n/k` instead of `n`. A relay serving corrupt shards
+  does not break the download: another combination is tried.
 
-**Recuperación (opt-in)**
+**Recovery (opt-in)**
 
-- Capabilities protegidas con frase de acceso (PBKDF2-SHA-256 + AES-GCM).
-- División Shamir `k de n` de una capability entre personas o dispositivos.
+- Capabilities protected with a passphrase (PBKDF2-SHA-256 + AES-GCM).
+- Shamir `k`-of-`n` splitting of a capability between people or devices.
 
-**Operación**
+**Operation**
 
-- Subidas reanudables mediante un ticket, y reintentos con backoff.
-- Vectores de conformidad publicados en
+- Resumable uploads via a ticket, and retries with backoff.
+- Conformance vectors published in
   `packages/protocol/vectors/capsule-test-vectors.json`.
-- Fuzzing de todos los parsers y de la superficie HTTP del relay.
-- `npm run release`: checksums SHA-256 y SBOM CycloneDX.
+- Fuzzing of every parser and of the relay's HTTP surface.
+- `npm run release`: SHA-256 checksums and a CycloneDX SBOM.
 
-### Cambiado
+### Changed
 
-- Versión de protocolo **3**. El AAD queda ligado a la versión de la cápsula,
-  de modo que un downgrade falla la autenticación en vez de pasar inadvertido.
-- Un relay con `CAPSULE_PUBLIC_URL` acepta CORS de cualquier origen por
-  omisión: sin eso no puede servir aplicaciones web que no hospede él mismo.
-  Las capabilities son bearer tokens explícitos, nunca cookies, así que una
-  política permisiva no otorga autoridad ambiental.
-- La CSP de la aplicación web permite `https:` en `connect-src`, necesario para
-  hablar con relays descubiertos en la red. El servidor de desarrollo agrega
-  loopback; el build de producción no.
+- Protocol version **3**. The AAD is bound to the capsule's version, so a
+  downgrade fails authentication instead of passing unnoticed.
+- A relay with `CAPSULE_PUBLIC_URL` accepts CORS from any origin by default:
+  without that it cannot serve web applications it does not host itself.
+  Capabilities are explicit bearer tokens, never cookies, so a permissive policy
+  grants no ambient authority.
+- The web application's CSP allows `https:` in `connect-src`, necessary to talk
+  to relays discovered in the network. The development server adds loopback; the
+  production build does not.
 
-### Corregido
+### Fixed
 
-- Un relay que arrancaba antes que su semilla quedaba aislado hasta el
-  siguiente intervalo de gossip (5 minutos por omisión). Ahora reintenta el
-  arranque con backoff corto.
+- A relay that started before its seed stayed isolated until the next gossip
+  interval (5 minutes by default). It now retries startup with a short backoff.
 
-### Seguridad
+### Security
 
-Hallazgos de la revisión de seguridad de esta versión, todos corregidos antes
-de publicarla. El detalle y el razonamiento están en
-[el modelo de amenazas](docs/THREAT_MODEL.md) §13.3.
+Findings from this version's security review, all fixed before publishing. The
+detail and the reasoning are in [the threat model](docs/THREAT_MODEL.md) §13.3.
 
-- **Filtro de direcciones del relay esquivable (medio).** La lista negra
-  comparaba cadenas: `127.0.0.1` quedaba bloqueado y `[::ffff:7f00:1]` —la
-  misma dirección en IPv6— pasaba. Cualquiera podía hacer que un relay público
-  consultara servicios internos de su operador y republicara esa dirección a
-  toda la red. Se reemplazó por un analizador que normaliza toda forma
-  equivalente y bloquea los rangos privados, loopback, link-local, CGNAT,
-  multicast, reservados y de documentación; además el relay resuelve los
-  nombres y rechaza los que apuntan ahí.
-- **El descubrimiento del cliente no tenía ese filtro, y la CSP lo permitía
-  (medio).** Un relay hostil podía devolver direcciones de loopback en su lista
-  de peers y el navegador de quien abriera la aplicación las consultaba. El SDK
-  aplica ahora el mismo filtro; seguir direcciones privadas es una opción
-  explícita que la aplicación sólo activa cuando su propio relay ya es local.
-  La CSP de producción volvió a `connect-src 'self' https:`.
-- **La firma del anuncio no cubría el nombre del relay (bajo).** Se sacó el
-  nombre del anuncio: ahora afirma sólo "soy este relay en esta dirección", y
-  todo lo demás se lee de esa dirección.
-- **Un anuncio válido no probaba el control de la dirección anunciada (bajo).**
-  El receptor consulta ahora la dirección antes de creerle.
-- **Reanudar con otro archivo del mismo tamaño podía reutilizar un nonce
-  (bajo).** El ticket lleva un compromiso con el contenido y se rechaza
-  cualquier otro archivo; además un chunk se reenvía a todos los relays en
-  cuanto a alguno le falta, de modo que quien ya lo tenía verifica los bytes.
+- **The relay's address filter could be bypassed (medium).** The blocklist
+  compared strings: `127.0.0.1` was blocked and `[::ffff:7f00:1]` — the same
+  address in IPv6 — passed. Anyone could make a public relay query its
+  operator's internal services and republish that address to the whole network.
+  Replaced with a parser that normalises every equivalent form and blocks
+  private, loopback, link-local, CGNAT, multicast, reserved and documentation
+  ranges; the relay also resolves names and refuses those that point there.
+- **Client-side discovery had no such filter, and the CSP allowed it
+  (medium).** A hostile relay could return loopback addresses in its peer list
+  and the browser of whoever opened the application would query them. The SDK
+  now applies the same filter; following private addresses is an explicit option
+  the application enables only when its own relay is already local. The
+  production CSP went back to `connect-src 'self' https:`.
+- **The announcement signature did not cover the relay's name (low).** The name
+  was removed from the announcement: it now claims only "I am this relay at this
+  address", and everything else is read from that address.
+- **A valid announcement did not prove control of the announced address
+  (low).** The receiver now queries the address before believing it.
+- **Resuming with a different file of the same size could reuse a nonce
+  (low).** The ticket carries a commitment to the content and any other file is
+  refused; in addition a chunk is re-sent to every relay as soon as one is
+  missing it, so a relay that already had it verifies the bytes.
 
-Revisado sin hallazgos: la aritmética GF(256), Reed-Solomon y Shamir, el
-espacio de nonces, el ligado del AAD a la versión, los parámetros de PBKDF2, la
-validación TLS a través del proxy SOCKS5, la autorización y el manejo de rutas
-del relay, los siete parsers binarios y la ausencia de secretos en logs.
+Reviewed with no findings: the GF(256) arithmetic, Reed-Solomon and Shamir, the
+nonce space, the binding of the AAD to the version, the PBKDF2 parameters, TLS
+validation through the SOCKS5 proxy, the relay's authorisation and path
+handling, the seven binary parsers, and the absence of secrets in logs.
 
-### Sigue sin resolverse
+### Still unresolved
 
-Estas no son omisiones: son límites conocidos y documentados en
-[el modelo de amenazas](docs/THREAT_MODEL.md).
+These are not omissions: they are known limits documented in
+[the threat model](docs/THREAT_MODEL.md).
 
-- La aplicación web no enruta por Tor; sólo la CLI puede.
-- El horario y el volumen de una transferencia siguen siendo observables.
-- No hay transporte P2P ni por proximidad.
-- No hay mix routing ni resistencia a un observador global.
-- El diccionario `/Info` de un PDF y los metadatos de TIFF/HEIF exóticos no se
-  limpian.
+- The web application does not route through Tor; only the CLI can.
+- The timing and volume of a transfer remain observable.
+- There is no P2P or proximity transport.
+- There is no mix routing and no resistance to a global observer.
+- A PDF's `/Info` dictionary and the metadata of exotic TIFF/HEIF are not
+  cleaned.
 
 ## [0.1.0] — 2026-08-29
 
-- Primera versión ejecutable: web, CLI, SDK y relay temporal interoperables,
-  con cifrado AES-256-GCM en el cliente, enlaces-capacidad y TTL.
+- The first runnable version: web, CLI, SDK and a temporary relay
+  interoperating, with AES-256-GCM encryption on the client, capability links
+  and a TTL.

@@ -57,13 +57,23 @@ across several relays so no single one has enough to rebuild anything.
 | Split so no single host has enough    |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ❌   |
 | Self-certifying site names            |   ✅    | ✅  |  ~   |  ❌   |   ❌   |  ❌   |
 | Pages cannot phone home               |   ✅    |  ~  |  ❌  |  ❌   |   ❌   |  ❌   |
-| **Works with no internet at all**     |   ❌    | ❌  |  ❌  |  ❌   |   ❌   |  ✅   |
-| **Censorship-resistant transport**    |   ❌    | ✅  |  ~   |   ~   |   ❌   |  ✅   |
-| **General-purpose TCP tunnel**        |   ❌    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
+| **Works with no internet at all**     |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ✅   |
+| **Censorship-resistant transport**    |   ✅    | ✅  |  ~   |   ~   |   ❌   |  ✅   |
+| **General-purpose TCP tunnel**        |   🚧    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
 | **Large anonymity set today**         |   ❌    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
 
-The last four rows are CAPSULE's, and they are honest losses rather than
-oversights. All 21 systems, one limitation each, with a verdict for every row:
+🚧 designed, not built — [ROADMAP.md](docs/ROADMAP.md) §16.1.
+
+The last row is the honest one, and it is not an engineering problem. The
+anonymity set is how many people use the network right now; Tor has one after
+fifteen years of adoption. CAPSULE cannot even measure its own, because there
+are no accounts and no counters — `capsule network` reports the network's
+_capacity_ instead, and says so. What code can do there, 1.3 did: every
+manifest is now padded to a size class so capsules stop being distinguishable
+from each other. The rest is adoption, and the most useful thing you can do
+about it is run a relay.
+
+All 21 systems, one limitation each, with a verdict for every row:
 [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ---
@@ -165,17 +175,23 @@ forget. Details and the exceptions: [docs/SITES.md](docs/SITES.md).
 
 ## What this does not do
 
-A privacy tool that oversells itself is worse than no tool, because someone will
-rely on the part that was exaggerated.
+A privacy tool that oversells itself is worse than no tool, because someone
+will rely on the part that was exaggerated.
 
 - **The anonymity set is the smallest of any system on this page.** Tor has
   millions of users; CAPSULE has whatever relays someone started today. Every
   property of the mix network is true and none of them matter much at this size.
-  This is the risk that dominates all the others.
-- **No censorship resistance.** No bridges, no pluggable transports, no protocol
-  obfuscation. Blocking the known relays blocks the network.
-- **No offline or mesh transport.** CAPSULE needs IP. In a network blackout,
-  Briar and Meshtastic work and this does not.
+  This is the risk that dominates all the others, and it is the one thing here
+  that code cannot fix.
+- **Bridge distribution is unsolved.** A bridge is invisible to a censor who
+  scans and probes — but a censor who gets the bridge line has the bridge. Tor
+  has spent fifteen years on this problem and CAPSULE has no answer at all.
+- **The TLS fingerprint is Node's**, not a browser's, and there are no
+  pluggable transports. For protocol obfuscation, put Tor or obfs4 underneath
+  with `--proxy`.
+- **No mesh or radio transport.** Offline capsules and LAN discovery cover
+  "no internet" and "same building". Where there is no IP and nobody to carry a
+  file, Briar and Meshtastic work and this does not.
 - **No external audit.** The primitives are standard; the composition is not.
   Everything here is supported by the code, the tests and
   [the threat model](docs/THREAT_MODEL.md), and by nothing else.
@@ -184,6 +200,53 @@ rely on the part that was exaggerated.
   cannot yet.
 
 Read the threat model before testing with anything sensitive.
+
+---
+
+## Working when the network is against you
+
+### Reach it when the relays are blocked
+
+A **bridge** is a relay the network does not know about. It never announces
+itself, so enumerating the public directory does not find it, and everyone
+without the bridge line gets what an unconfigured web server gives:
+
+```bash
+# On the bridge, once. It prints one line to hand to people directly.
+CAPSULE_BRIDGE=true CAPSULE_BRIDGE_HOST=bridge.example.org   node apps/relay/dist/main.js
+
+# Everywhere else
+capsule --bridge "capsule-bridge:1:..." send ./report.pdf
+capsule --tor --bridge "capsule-bridge:1:..." receive "<share-url>"
+```
+
+What a probe gets, and what this does not protect against:
+[docs/CENSORSHIP.md](docs/CENSORSHIP.md).
+
+### Work with no internet at all
+
+```bash
+# One file that travels on a memory stick. Sealed: the key goes separately.
+capsule offline pack ./report.pdf --out report.capsuleoff --anonymous
+capsule offline open report.capsuleoff --key "capsule-offline:..." --out ./
+
+# A relay on the local network, with no DNS and no uplink
+CAPSULE_LAN=true node apps/relay/dist/main.js   # on one machine
+capsule lan                                      # on the other
+```
+
+Neither is a mesh, and [docs/OFFLINE.md](docs/OFFLINE.md) says exactly where the
+line is.
+
+### See what the network actually offers
+
+```bash
+capsule network --seed https://relay.example.org
+```
+
+It prints relays reachable, apparent operators and mix nodes — and states
+plainly that the anonymity set itself cannot be measured here, because there
+are no accounts and nothing to count.
 
 ---
 
@@ -251,13 +314,14 @@ uploads. `--anonymous` turns on all four.
 apps/
   web/        Installable React PWA
   relay/      Ciphertext relay, mix node and site directory
-  cli/        Command-line sender, receiver and site publisher
+  cli/        Command-line sender, receiver, site publisher and offline packer
   extension/  MV3 browser extension that opens .capsule sites
 packages/
-  protocol/   Capsule format, .capsule names, primitives and test vectors
-  sdk/        Relay client, discovery, transfers and site publishing
+  protocol/   Capsule format, .capsule names, bridges, offline files, vectors
+  sdk/        Relay client, discovery, transfers, sites and bridge transport
   mixnet/     Sphinx packets, mix client and path selection (Node only)
-docs/         Protocol, threat model, mix network, sites, comparison, showcase
+  lan/        Finding a relay on a local network with no internet (Node only)
+docs/         Protocol, threat model, mixnet, sites, censorship, offline, page
 infra/        Container deployment files
 scripts/      Diagram generator and release tooling
 ```
@@ -266,7 +330,7 @@ scripts/      Diagram generator and release tooling
 
 ```bash
 npm run build       # every workspace, including the extension
-npm test            # 166 tests, including fuzzing and conformance vectors
+npm test            # 183 tests, including fuzzing and conformance vectors
 npm run typecheck
 npm run format:check
 npm run diagrams    # regenerate the SVGs and re-inline them into the showcase
@@ -300,8 +364,9 @@ What comes next is in [the roadmap](docs/ROADMAP.md).
 
 The capsule format, relay API and capability encoding were frozen in 1.0 and
 published with [test vectors](packages/protocol/vectors/capsule-test-vectors.json).
-1.1 added the mix network and 1.2 added `.capsule` sites, neither of which
-changed them.
+1.1 added the mix network, 1.2 added `.capsule` sites, and 1.3 added bridges and
+offline capsules. Manifests gained size-class padding in 1.3, which changes
+their length on the wire but is readable in both directions.
 
 The implementation is tested but **has not been independently audited**. The
 v1.0 security review was internal; it found and fixed two exploitable issues and

@@ -52,7 +52,7 @@ try {
       beacon = startLanBeacon({
         relayId: app.capsuleIdentity.relayId,
         url: `http://${host}:${port}`,
-        software: "capsule-relay/1.2.0",
+        software: "capsule-relay/1.3.0",
         sites: config.sitesEnabled,
         mix: config.mixEnabled,
       });

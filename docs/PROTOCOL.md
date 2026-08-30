@@ -1,128 +1,132 @@
-# CAPSULE Protocol v1, v2 y v3
+# CAPSULE Protocol v1, v2 and v3
 
-**Estado:** especificación estable para CAPSULE 1.0; §16 añadida en 1.1  
-**Identificador de versión escrito por esta implementación:** `3`  
-**Versiones legibles:** `1`, `2`, `3`  
-**Fecha:** 2026-08-29
+**Status:** stable specification for CAPSULE 1.0; §16 added in 1.1, §17 in 1.2,
+§18 and §19 in 1.3
+**Version identifier written by this implementation:** `3`
+**Readable versions:** `1`, `2`, `3`
+**Date:** 2026-08-30
 
-Las secciones 1 a 11 describen la versión 1, que sigue siendo legible sin
-cambios. La sección 12 especifica la versión 2 (relleno por clases de tamaño,
-cápsulas sin vencimiento, relays espejo y los endpoints de red del relay) y la
-sección 13 la versión 3, que agrega erasure coding y fija las reglas de
-direcciones. La sección 14 describe las capabilities protegidas y divididas,
-que no son parte del formato de cápsula pero sí de la interoperabilidad.
+Sections 1 to 11 describe version 1, which remains readable unchanged. Section
+12 specifies version 2 (size-class padding, capsules without expiry, mirror
+relays and the relay's network endpoints) and section 13 version 3, which adds
+erasure coding and fixes the address rules. Section 14 covers protected and
+split capabilities, which are not part of the capsule format but are part of
+interoperability. Sections 16 to 19 cover the mix packet, `.capsule` sites,
+bridges and offline capsules.
 
-**Vectores de prueba oficiales:**
+**Official test vectors:**
 [`packages/protocol/vectors/capsule-test-vectors.json`](../packages/protocol/vectors/capsule-test-vectors.json).
-Una implementación que reproduzca esos bytes es compatible con ésta. Se
-regeneran con `npm run vectors`; si un cambio los mueve, el protocolo cambió.
+An implementation that reproduces those bytes is compatible with this one. They
+are regenerated with `npm run vectors`; if a change moves them, the protocol
+changed.
 
-## 1. Objetivo y modelo
+## 1. Goal and model
 
-CAPSULE v1 transporta un archivo cifrado por chunks a través de un relay no
-confiable. El relay administra disponibilidad temporal y capacidades de acceso,
-pero no recibe la clave de contenido. El enlace compartido contiene todo lo
-necesario para localizar, autorizar y descifrar la cápsula.
+CAPSULE v1 carries a file, encrypted per chunk, through an untrusted relay. The
+relay manages temporary availability and access capabilities, but never
+receives the content key. The shared link contains everything needed to locate,
+authorise and decrypt the capsule.
 
-El protocolo separa tres capacidades:
+The protocol separates three capabilities:
 
-- **write:** cargar chunks y finalizar una reserva;
-- **read:** consultar y descargar una cápsula finalizada;
-- **delete:** eliminar anticipadamente una cápsula.
+- **write:** upload chunks and finalise a reservation;
+- **read:** query and download a finalised capsule;
+- **delete:** remove a capsule early.
 
-Las capacidades son bearer tokens: poseer una equivale a tener su permiso. No
-representan identidad y no deben confundirse con autenticación de una persona.
+Capabilities are bearer tokens: holding one is equivalent to having its
+permission. They represent no identity and must not be confused with
+authenticating a person.
 
-CAPSULE v1 proporciona confidencialidad y autenticidad del contenido si los
-endpoints son seguros. No oculta IP, relay, tamaño, cantidad de chunks, TTL ni
-patrones temporales. Véase [THREAT_MODEL.md](./THREAT_MODEL.md).
+CAPSULE v1 provides confidentiality and authenticity of the content if the
+endpoints are secure. It does not hide the IP, the relay, the size, the chunk
+count, the TTL or timing patterns. See [THREAT_MODEL.md](./THREAT_MODEL.md).
 
-## 2. Convenciones
+## 2. Conventions
 
-- Los enteros se expresan en decimal en JSON.
-- Los timestamps usan RFC 3339/ISO 8601 en UTC, por ejemplo
+- Integers are expressed in decimal in JSON.
+- Timestamps use RFC 3339 / ISO 8601 in UTC, for example
   `2026-08-29T03:15:00.000Z`.
-- `base64url(x)` es RFC 4648 URL-safe, sin caracteres `=` de padding.
-- Los strings se codifican como UTF-8.
-- `uint32be(i)` son cuatro bytes unsigned, big-endian.
-- `CSPRNG(n)` devuelve `n` bytes de un generador criptográficamente seguro.
-- Los campos desconocidos en JSON PUEDEN ignorarse. Los campos requeridos con
-  tipo, rango o formato inválido DEBEN provocar rechazo.
+- `base64url(x)` is RFC 4648 URL-safe, with no `=` padding characters.
+- Strings are encoded as UTF-8.
+- `uint32be(i)` is four unsigned bytes, big-endian.
+- `CSPRNG(n)` returns `n` bytes from a cryptographically secure generator.
+- Unknown JSON fields MAY be ignored. Required fields with an invalid type,
+  range or format MUST cause rejection.
 
-## 3. Identificadores y secretos
+## 3. Identifiers and secrets
 
-Para una nueva cápsula se generan valores independientes:
+Independent values are generated for a new capsule:
 
-| Valor         | Genera  |     Longitud mínima | Uso                                           |
-| ------------- | ------- | ------------------: | --------------------------------------------- |
-| `capsuleId`   | Relay   | 128 bits aleatorios | Identificador no secreto y no enumerable      |
-| `writeToken`  | Relay   | 256 bits aleatorios | Carga y finalización                          |
-| `readToken`   | Relay   | 256 bits aleatorios | Lectura                                       |
-| `deleteToken` | Relay   | 256 bits aleatorios | Eliminación anticipada                        |
-| `key`         | Cliente |            32 bytes | Clave AES-256-GCM                             |
-| `noncePrefix` | Cliente |             8 bytes | Prefijo aleatorio de los nonces de la cápsula |
+| Value         | Generated by |  Minimum length | Use                                   |
+| ------------- | ------------ | --------------: | ------------------------------------- |
+| `capsuleId`   | Relay        | 128 random bits | Non-secret, non-enumerable identifier |
+| `writeToken`  | Relay        | 256 random bits | Upload and finalisation               |
+| `readToken`   | Relay        | 256 random bits | Reading                               |
+| `deleteToken` | Relay        | 256 random bits | Early deletion                        |
+| `key`         | Client       |        32 bytes | AES-256-GCM key                       |
+| `noncePrefix` | Client       |         8 bytes | Random prefix of the capsule's nonces |
 
-Todos se representan externamente con base64url sin padding. El relay DEBE
-guardar un hash resistente a preimagen de cada token y NO el token en claro. El
-`capsuleId` puede almacenarse en claro.
+All are represented externally as base64url without padding. The relay MUST
+store a preimage-resistant hash of each token and NOT the token itself. The
+`capsuleId` may be stored in the clear.
 
-El cliente DEBE generar una nueva pareja `(key, noncePrefix)` para cada cápsula.
-No debe reutilizarla, ni siquiera para subir otra versión del mismo archivo.
+The client MUST generate a new `(key, noncePrefix)` pair for every capsule. It
+must not be reused, not even to upload another version of the same file.
 
-## 4. Formato criptográfico
+## 4. Cryptographic format
 
-### 4.1 Primitiva
+### 4.1 Primitive
 
-- Algoritmo: AES-GCM.
-- Clave: 256 bits.
+- Algorithm: AES-GCM.
+- Key: 256 bits.
 - Nonce/IV: 96 bits.
-- Tag de autenticación: 128 bits.
-- Salida binaria: `ciphertext || tag`, como la devuelve Web Crypto.
+- Authentication tag: 128 bits.
+- Binary output: `ciphertext || tag`, as Web Crypto returns it.
 
-No se aplica compresión dentro del protocolo v1. Una aplicación puede comprimir
-el archivo antes de crear la cápsula, en cuyo caso el resultado comprimido es el
-archivo transportado.
+No compression is applied inside the v1 protocol. An application may compress
+the file before creating the capsule, in which case the compressed result is the
+file being transported.
 
-### 4.2 Espacio de índices
+### 4.2 Index space
 
-| Índice criptográfico | Contenido                     |
-| -------------------: | ----------------------------- |
-|                  `0` | Manifiesto/metadatos cifrados |
-|    `1 .. chunkCount` | Chunks del archivo, en orden  |
-|         `0xffffffff` | Reservado; no se usa en v1    |
+| Cryptographic index | Content                     |
+| ------------------: | --------------------------- |
+|                 `0` | Encrypted manifest/metadata |
+|   `1 .. chunkCount` | File chunks, in order       |
+|        `0xffffffff` | Reserved; unused in v1      |
 
-`chunkCount` puede ser cero para un archivo vacío y no puede superar
-`0xfffffffe`. La API HTTP usa índices de chunk **desde cero** en la ruta:
-`/chunks/0` corresponde al índice criptográfico `1`.
+`chunkCount` may be zero for an empty file and may not exceed `0xfffffffe`. The
+HTTP API uses **zero-based** chunk indices in the path: `/chunks/0` corresponds
+to cryptographic index `1`.
 
-### 4.3 Derivación del nonce
+### 4.3 Nonce derivation
 
-Para un índice criptográfico `i`:
+For a cryptographic index `i`:
 
 ```text
 nonce(i) = noncePrefix[0..7] || uint32be(i)
 ```
 
-Ejemplo, para el prefijo hexadecimal `0102030405060708` y el índice `2`:
+For example, with the hex prefix `0102030405060708` and index `2`:
 
 ```text
 01 02 03 04 05 06 07 08 00 00 00 02
 ```
 
-La unicidad del nonce es crítica para AES-GCM. Un cliente PUEDE reintentar el
-mismo ciphertext ya calculado, pero NO DEBE cifrar bytes diferentes con la misma
-tripla `(key, noncePrefix, index)`. Si cambian archivo, metadatos o TTL, debe
-crear una cápsula con secretos nuevos.
+Nonce uniqueness is critical for AES-GCM. A client MAY retry the same already
+computed ciphertext, but MUST NOT encrypt different bytes under the same
+`(key, noncePrefix, index)` triple. If the file, metadata or TTL change, it must
+create a capsule with new secrets.
 
 ### 4.4 Additional Authenticated Data
 
-Para cada índice `i`, el AAD es exactamente:
+For each index `i`, the AAD is exactly:
 
 ```text
 UTF8("CAPSULE/v1/chunk/" || decimal(i))
 ```
 
-No contiene NUL, salto de línea ni espacios. Ejemplos:
+It contains no NUL, newline or spaces. Examples:
 
 ```text
 CAPSULE/v1/chunk/0
@@ -130,10 +134,10 @@ CAPSULE/v1/chunk/1
 CAPSULE/v1/chunk/27
 ```
 
-El AAD autentica versión, función e índice. Por lo tanto, mover un chunk a otra
-posición o descifrarlo como manifiesto hace fallar el tag.
+The AAD authenticates version, function and index. Therefore moving a chunk to
+another position, or decrypting it as the manifest, makes the tag fail.
 
-### 4.5 Operaciones
+### 4.5 Operations
 
 ```text
 encrypt(i, plaintext):
@@ -146,63 +150,64 @@ encrypt(i, plaintext):
   )
 
 decrypt(i, ciphertextAndTag):
-  return AES-256-GCM-DEC(... mismos parámetros ...)
-  // Cualquier fallo de tag aborta la cápsula completa.
+  return AES-256-GCM-DEC(... same parameters ...)
+  // Any tag failure aborts the whole capsule.
 ```
 
-Cada bloque cifrado mide `plaintextLength + 16` bytes.
+Each encrypted block is `plaintextLength + 16` bytes.
 
-## 5. Manifiesto cifrado
+## 5. Encrypted manifest
 
-El manifiesto es un objeto JSON UTF-8 cifrado con el índice criptográfico `0`.
-No se exige un orden canónico de claves.
+The manifest is a UTF-8 JSON object encrypted at cryptographic index `0`. No
+canonical key order is required.
 
 ```json
 {
   "version": 1,
-  "filename": "foto.jpg",
+  "filename": "photo.jpg",
   "mimeType": "image/jpeg",
   "byteLength": 2539041,
   "chunkSize": 1048576,
   "chunkCount": 3,
   "createdAt": "2026-08-29T03:00:00.000Z",
   "expiresAt": "2026-08-30T03:00:00.000Z",
-  "note": "opcional"
+  "note": "optional"
 }
 ```
 
-| Campo        | Tipo   | Regla                                                      |
-| ------------ | ------ | ---------------------------------------------------------- |
-| `version`    | entero | Debe ser `1`                                               |
-| `filename`   | string | No vacío; dato no confiable que el receptor debe sanitizar |
-| `mimeType`   | string | No vacío; informativo y no confiable                       |
-| `byteLength` | entero | `>= 0`; bytes del archivo original                         |
-| `chunkSize`  | entero | `> 0`; tamaño objetivo del texto plano por chunk           |
-| `chunkCount` | entero | `ceil(byteLength / chunkSize)`, con `0` para archivo vacío |
-| `createdAt`  | string | Timestamp informativo del cliente                          |
-| `expiresAt`  | string | Vencimiento solicitado/informativo                         |
-| `note`       | string | Opcional                                                   |
+| Field        | Type    | Rule                                                  |
+| ------------ | ------- | ----------------------------------------------------- |
+| `version`    | integer | Must be `1`                                           |
+| `filename`   | string  | Non-empty; untrusted data the receiver must sanitise  |
+| `mimeType`   | string  | Non-empty; informational and untrusted                |
+| `byteLength` | integer | `>= 0`; bytes of the original file                    |
+| `chunkSize`  | integer | `> 0`; target plaintext size per chunk                |
+| `chunkCount` | integer | `ceil(byteLength / chunkSize)`, `0` for an empty file |
+| `createdAt`  | string  | Informational client timestamp                        |
+| `expiresAt`  | string  | Requested/informational expiry                        |
+| `note`       | string  | Optional                                              |
 
-El cliente receptor DEBE comprobar que:
+The receiving client MUST check that:
 
-1. `version` es compatible;
-2. `chunkCount` concuerda con `byteLength` y `chunkSize`;
-3. la suma de plaintext descifrado es exactamente `byteLength`;
-4. todos los chunks `0 .. chunkCount - 1` de la API están presentes y
-   autentican con los índices criptográficos `1 .. chunkCount`.
+1. `version` is supported;
+2. `chunkCount` agrees with `byteLength` and `chunkSize`;
+3. the sum of decrypted plaintext is exactly `byteLength`;
+4. every API chunk `0 .. chunkCount - 1` is present and authenticates at
+   cryptographic indices `1 .. chunkCount`.
 
-El `expiresAt` autoritativo es el fijado por el relay y devuelto por la API. El
-valor cifrado puede diferir algunos segundos por latencia y no amplía el TTL.
+The authoritative `expiresAt` is the one the relay sets and the API returns. The
+encrypted value may differ by a few seconds because of latency and does not
+extend the TTL.
 
 ## 6. Capability URL
 
-### 6.1 Forma
+### 6.1 Form
 
 ```text
 https://app.example/#capsule=<base64url(UTF8(JSON capability))>
 ```
 
-El objeto decodificado es:
+The decoded object is:
 
 ```json
 {
@@ -215,24 +220,24 @@ El objeto decodificado es:
 }
 ```
 
-El orden de campos no es significativo. `relayUrl` debe ser un origen HTTP(S)
-absoluto; en producción DEBE usar HTTPS. El cliente debe rechazar esquemas
-distintos y DEBERÍA pedir confirmación antes de contactar un origen inesperado.
+Field order is not significant. `relayUrl` must be an absolute HTTP(S) origin;
+in production it MUST use HTTPS. The client must refuse other schemes and
+SHOULD ask for confirmation before contacting an unexpected origin.
 
-### 6.2 Propiedades y tratamiento
+### 6.2 Properties and handling
 
-- El fragmento (`#...`) no forma parte de una solicitud HTTP estándar. La
-  aplicación cliente sí puede leerlo mediante JavaScript.
-- Toda la capability URL es secreta. Copiarla equivale a conceder lectura y
-  descifrado.
-- La aplicación NO DEBE mover el fragmento a query, path, analytics, crash
-  reports ni almacenamiento sincronizado sin consentimiento explícito.
-- Después de parsearlo, la UI DEBERÍA limpiar la barra de direcciones con
-  `history.replaceState`, manteniendo la capacidad sólo durante el flujo.
-- El navegador, historial, portapapeles, extensiones, capturas y canal de
-  mensajería aún pueden filtrar el enlace.
+- The fragment (`#...`) is not part of a standard HTTP request. The client
+  application can read it with JavaScript.
+- The whole capability URL is a secret. Copying it grants read and decrypt.
+- The application MUST NOT move the fragment into a query, a path, analytics,
+  crash reports or synchronised storage without explicit consent.
+- After parsing it, the UI SHOULD clear the address bar with
+  `history.replaceState`, keeping the capability only for the duration of the
+  flow.
+- The browser, history, clipboard, extensions, screenshots and the messaging
+  channel can still leak the link.
 
-La capacidad de propietario se conserva por separado:
+The owner capability is kept separately:
 
 ```json
 {
@@ -242,25 +247,25 @@ La capacidad de propietario se conserva por separado:
 }
 ```
 
-No se incluye `deleteToken` en el enlace de lectura.
+`deleteToken` is never included in the read link.
 
 ## 7. Relay API v1
 
-### 7.1 Reglas comunes
+### 7.1 Common rules
 
 - Base: `{relayUrl}/v1`.
-- Cuerpos JSON: `Content-Type: application/json; charset=utf-8`.
+- JSON bodies: `Content-Type: application/json; charset=utf-8`.
 - Chunks: `application/octet-stream`.
-- Capacidades: `Authorization: Bearer <token>`.
-- Respuestas que dependan de una capacidad DEBEN incluir
-  `Cache-Control: no-store`.
-- El relay no debe redirigir endpoints autenticados. Los clientes DEBEN rechazar
-  redirects para evitar entregar el bearer token a otro origen.
-- En producción se requiere HTTPS. HTTP se admite sólo para loopback/desarrollo.
-- Para no facilitar enumeración, ID inexistente, expirado o token inválido
-  responden de manera pública equivalente, recomendada `404 not_found`.
+- Capabilities: `Authorization: Bearer <token>`.
+- Responses that depend on a capability MUST include `Cache-Control: no-store`.
+- The relay must not redirect authenticated endpoints. Clients MUST refuse
+  redirects, to avoid handing the bearer token to another origin.
+- HTTPS is required in production. HTTP is allowed only for loopback and
+  development.
+- To avoid aiding enumeration, a non-existent ID, an expired capsule and an
+  invalid token answer equivalently in public; `404 not_found` is recommended.
 
-Formato de error recomendado:
+Recommended error format:
 
 ```json
 {
@@ -269,9 +274,9 @@ Formato de error recomendado:
 }
 ```
 
-`message` no debe contener rutas internas, tokens ni detalles criptográficos.
+`message` must contain no internal paths, tokens or cryptographic detail.
 
-### 7.2 Crear una reserva
+### 7.2 Create a reservation
 
 ```http
 POST /v1/capsules
@@ -287,14 +292,15 @@ Content-Type: application/json
 }
 ```
 
-`totalCiphertextBytes` es la suma de los chunks de archivo cifrados y excluye el
-manifiesto. Para un archivo de `P` bytes dividido en `N` chunks:
+`totalCiphertextBytes` is the sum of the encrypted file chunks and excludes the
+manifest. For a file of `P` bytes split into `N` chunks:
 
 ```text
 totalCiphertextBytes = P + 16 * N
 ```
 
-El relay valida límites, reserva espacio, genera ID y tokens y responde `201`:
+The relay validates limits, reserves space, generates the ID and tokens, and
+answers `201`:
 
 ```json
 {
@@ -306,10 +312,10 @@ El relay valida límites, reserva espacio, genera ID y tokens y responde `201`:
 }
 ```
 
-Los cuatro valores sensibles de la respuesta se devuelven una única vez. La
-reserva permanece en estado `uploading` y no puede leerse con `readToken`.
+The four sensitive values are returned exactly once. The reservation stays in
+the `uploading` state and cannot be read with the `readToken`.
 
-### 7.3 Subir un chunk
+### 7.3 Upload a chunk
 
 ```http
 PUT /v1/capsules/{capsuleId}/chunks/{apiIndex}
@@ -319,22 +325,21 @@ Content-Type: application/octet-stream
 <ciphertext || 16-byte-tag>
 ```
 
-- `apiIndex` va de `0` a `chunkCount - 1`.
-- El índice criptográfico es `apiIndex + 1`.
-- Un `PUT` idéntico es idempotente y devuelve `204`.
-- Repetir el índice con bytes diferentes DEBE devolver `409 conflict`.
-- Un chunk tiene al menos 16 bytes y no supera el máximo configurado.
-- La suma almacenada no puede superar `totalCiphertextBytes`.
+- `apiIndex` runs from `0` to `chunkCount - 1`.
+- The cryptographic index is `apiIndex + 1`.
+- An identical `PUT` is idempotent and returns `204`.
+- Repeating an index with different bytes MUST return `409 conflict`.
+- A chunk is at least 16 bytes and no larger than the configured maximum.
+- The stored sum may not exceed `totalCiphertextBytes`.
 
-### 7.4 Consultar estado
+### 7.4 Query the state
 
 ```http
 GET /v1/capsules/{capsuleId}/status
 Authorization: Bearer {writeToken|readToken}
 ```
 
-El `writeToken` puede consultar durante la carga; `readToken`, después de la
-finalización.
+The `writeToken` can query during upload; the `readToken` after finalisation.
 
 ```json
 {
@@ -348,23 +353,23 @@ finalización.
 }
 ```
 
-`state` es `uploading` o `ready` en v1.
+`state` is `uploading` or `ready` in v1.
 
-### 7.5 Finalizar
+### 7.5 Finalise
 
 ```http
 POST /v1/capsules/{capsuleId}/finalize
 Authorization: Bearer {writeToken}
 ```
 
-El relay comprueba que existan exactamente los índices declarados y que la suma
-coincida con `totalCiphertextBytes`. Si falta contenido, responde `409`. Si todo
-coincide, cambia de forma atómica a `ready` y devuelve `200` con `RelayStatus`.
-La finalización repetida por el mismo propietario DEBERÍA ser idempotente.
+The relay checks that exactly the declared indices exist and that the sum
+matches `totalCiphertextBytes`. If content is missing it answers `409`. If
+everything matches, it atomically moves to `ready` and returns `200` with a
+`RelayStatus`. Repeated finalisation by the same owner SHOULD be idempotent.
 
-Después de finalizar no se permiten nuevos `PUT` ni cambios de manifiesto.
+After finalising, no new `PUT` and no manifest change are allowed.
 
-### 7.6 Descargar manifiesto
+### 7.6 Download the manifest
 
 ```http
 GET /v1/capsules/{capsuleId}/manifest
@@ -372,11 +377,11 @@ Authorization: Bearer {readToken}
 Accept: application/octet-stream
 ```
 
-Devuelve `200`, `Content-Type: application/octet-stream` y el manifiesto cifrado
-binario (`ciphertext || tag`). Sólo está disponible en estado `ready` y antes del
-vencimiento.
+Returns `200`, `Content-Type: application/octet-stream` and the binary
+encrypted manifest (`ciphertext || tag`). Available only in the `ready` state
+and before expiry.
 
-### 7.7 Descargar un chunk
+### 7.7 Download a chunk
 
 ```http
 GET /v1/capsules/{capsuleId}/chunks/{apiIndex}
@@ -384,168 +389,170 @@ Authorization: Bearer {readToken}
 Accept: application/octet-stream
 ```
 
-Devuelve los mismos bytes cargados. v1 no define rangos parciales dentro de un
-chunk; el cliente reintenta el chunk completo.
+Returns the same bytes that were uploaded. v1 defines no partial ranges inside
+a chunk; the client retries the whole chunk.
 
-### 7.8 Eliminar
+### 7.8 Delete
 
 ```http
 DELETE /v1/capsules/{capsuleId}
 Authorization: Bearer {deleteToken}
 ```
 
-Devuelve `204`. La operación es idempotente y no debe distinguir públicamente
-entre ya eliminada, vencida o inexistente. El borrado se refiere al
-almacenamiento primario bajo control del relay, no prueba eliminación de backups
-o copias externas.
+Returns `204`. The operation is idempotent and must not publicly distinguish
+between already deleted, expired and non-existent. Deletion refers to primary
+storage under the relay's control; it does not prove that backups or external
+copies are gone.
 
-### 7.9 Endpoints operativos
+### 7.9 Operational endpoints
 
-Una implementación DEBERÍA ofrecer:
+An implementation SHOULD offer:
 
 ```http
 GET /healthz
 GET /v1/config
 ```
 
-`/healthz` informa sólo liveness. `/v1/config` puede anunciar versión, tamaños y
-TTL permitidos, pero nunca rutas internas, uso total, IDs ni capacidades.
+`/healthz` reports liveness only. `/v1/config` may advertise the version,
+permitted sizes and TTLs, but never internal paths, total usage, IDs or
+capabilities.
 
-### 7.10 Estados HTTP
+### 7.10 HTTP statuses
 
-| Estado | Uso                                                                    |
-| -----: | ---------------------------------------------------------------------- |
-|  `200` | Lectura o transición con cuerpo                                        |
-|  `201` | Reserva creada                                                         |
-|  `204` | Escritura/borrado exitoso sin cuerpo                                   |
-|  `400` | JSON, base64url, índice o parámetros malformados                       |
-|  `404` | No disponible, inexistente, vencida o capacidad inválida               |
-|  `409` | Índice ya ocupado con otros bytes, faltan chunks o estado incompatible |
-|  `413` | Manifiesto, chunk o cápsula excede límite                              |
-|  `415` | Content-Type no admitido                                               |
-|  `422` | Parámetros bien formados pero inconsistentes                           |
-|  `429` | Límite de tasa o cuota                                                 |
-|  `500` | Error interno sin detalles sensibles                                   |
+| Status | Use                                                                            |
+| -----: | ------------------------------------------------------------------------------ |
+|  `200` | A read or a transition with a body                                             |
+|  `201` | Reservation created                                                            |
+|  `204` | Successful write/delete with no body                                           |
+|  `400` | Malformed JSON, base64url, index or parameters                                 |
+|  `404` | Unavailable, non-existent, expired or invalid capability                       |
+|  `409` | Index already taken with other bytes, missing chunks, or an incompatible state |
+|  `413` | Manifest, chunk or capsule over the limit                                      |
+|  `415` | Unsupported Content-Type                                                       |
+|  `422` | Well-formed but inconsistent parameters                                        |
+|  `429` | Rate limit or quota                                                            |
+|  `500` | Internal error, with no sensitive detail                                       |
 
-## 8. Secuencia completa
+## 8. Full sequence
 
 ```text
-Remitente                    Relay                        Destinatario
+Sender                       Relay                        Recipient
     |                           |                              |
-    | genera key + prefix       |                              |
-    | cifra manifest (i=0)      |                              |
+    | generates key + prefix    |                              |
+    | encrypts manifest (i=0)   |                              |
     | POST /capsules ---------->|                              |
     |<-- id + read/write/delete |                              |
     | PUT chunk/0 (crypto i=1)->|                              |
     | ...                       |                              |
     | POST /finalize ---------->|                              |
     |<-- ready                  |                              |
-    | comparte URL #capability ------------------------------>|
+    | shares URL #capability -------------------------------->|
     |                           |<-- GET manifest + readToken  |
     |                           |--> encrypted manifest        |
     |                           |<-- GET chunks + readToken    |
     |                           |--> encrypted chunks          |
-    |                           |        valida y descifra     |
+    |                           |      validates and decrypts  |
 ```
 
-## 9. Validaciones obligatorias del cliente
+## 9. Mandatory client validations
 
-Un cliente conforme:
+A conforming client:
 
-1. rechaza versiones desconocidas y longitudes de secretos incorrectas;
-2. no inicia red para un fragmento inválido;
-3. valida todos los tags GCM;
-4. no usa plaintext parcial después de un fallo;
-5. verifica recuento y tamaño final autenticados;
-6. sanitiza `filename` y trata `mimeType` como no confiable;
-7. no sigue redirects autenticados a otro origen;
-8. borra referencias a claves y plaintext de memoria cuando sea razonablemente
-   posible, sin prometer borrado físico de memoria administrada;
-9. nunca registra la capability URL completa.
+1. refuses unknown versions and incorrect secret lengths;
+2. starts no network activity for an invalid fragment;
+3. validates every GCM tag;
+4. does not use partial plaintext after a failure;
+5. verifies the authenticated final count and size;
+6. sanitises `filename` and treats `mimeType` as untrusted;
+7. does not follow authenticated redirects to another origin;
+8. drops references to keys and plaintext from memory where reasonably
+   possible, without promising physical erasure of managed memory;
+9. never logs the complete capability URL.
 
-## 10. Compatibilidad y evolución
+## 10. Compatibility and evolution
 
-- La versión del fragmento y del manifiesto debe coincidir.
-- Cualquier cambio de nonce, AAD, algoritmo, semántica de índices o campos
-  requeridos exige una nueva versión de protocolo.
-- Agregar campos JSON opcionales no cambia la versión si clientes antiguos pueden
-  ignorarlos con seguridad.
-- v1 no negocia algoritmos: la agilidad criptográfica se introduce mediante una
-  versión nueva, no mediante parámetros controlados por el atacante.
-- No existe downgrade automático. Un cliente v1 rechaza una cápsula de versión
-  desconocida.
+- The fragment version and the manifest version must match.
+- Any change to the nonce, AAD, algorithm, index semantics or required fields
+  requires a new protocol version.
+- Adding optional JSON fields does not change the version if older clients can
+  safely ignore them.
+- v1 negotiates no algorithms: cryptographic agility arrives through a new
+  version, not through attacker-controlled parameters.
+- There is no automatic downgrade. A v1 client refuses a capsule of an unknown
+  version.
 
-## 11. Notas de seguridad para implementadores
+## 11. Security notes for implementers
 
-- No inventar primitivas ni reemplazar AES-GCM sin revisión criptográfica.
-- No deduplicar ciphertext entre cápsulas ni derivar nonces desde el nombre.
-- No incluir claves o tokens en URLs del relay. `Authorization` también puede ser
-  registrado por proxies mal configurados, por lo que debe redactarse allí.
-- La expiración es control de acceso y política operativa, no “autodestrucción”:
-  un destinatario puede guardar el archivo y un relay malicioso puede retener
-  ciphertext.
-- El cifrado no vuelve seguro al archivo descargado. La aplicación no debe
-  previsualizar ni ejecutar contenido activo sin aislamiento explícito.
+- Do not invent primitives or replace AES-GCM without cryptographic review.
+- Do not deduplicate ciphertext between capsules or derive nonces from the
+  name.
+- Do not put keys or tokens in relay URLs. `Authorization` can also be logged by
+  a misconfigured proxy, so it must be redacted there.
+- Expiry is access control and operational policy, not "self-destruction": a
+  recipient can save the file and a malicious relay can retain ciphertext.
+- Encryption does not make the downloaded file safe. The application must not
+  preview or execute active content without explicit isolation.
 
-## 12. Versión 2
+## 12. Version 2
 
-La versión 2 no cambia la primitiva, el espacio de índices ni la derivación del
-nonce. Cambia el AAD, agrega tres campos opcionales y agrega endpoints al relay.
-Un lector debe usar la versión declarada en la capability para todo, incluido el
-AAD; nunca debe asumir la versión propia.
+Version 2 changes neither the primitive, the index space nor the nonce
+derivation. It changes the AAD, adds three optional fields, and adds endpoints
+to the relay. A reader must use the version declared in the capability for
+everything, including the AAD; it must never assume its own version.
 
-### 12.1 Additional Authenticated Data ligado a la versión
+### 12.1 Version-bound Additional Authenticated Data
 
 ```text
 CAPSULE/v<version>/chunk/<index>
 ```
 
-`<version>` es la versión de la cápsula (`1` o `2`), no la del lector. Una
-cápsula v1 descifrada con AAD v2 falla la autenticación, y viceversa: el
-downgrade de versión no es silencioso, es un error criptográfico.
+`<version>` is the capsule's version (`1` or `2`), not the reader's. A v1
+capsule decrypted with a v2 AAD fails authentication, and vice versa: a version
+downgrade is not silent, it is a cryptographic error.
 
-### 12.2 Manifiesto: `expiresAt` nulo
+### 12.2 Manifest: null `expiresAt`
 
-`expiresAt` acepta `null` en v2. Significa que el remitente pidió una cápsula
-sin vencimiento y el relay la aceptó. No significa “permanente”: sigue
-existiendo mientras ese relay la conserve y la `deleteToken` la retira.
+`expiresAt` accepts `null` in v2. It means the sender asked for a capsule
+without expiry and the relay accepted. It does not mean "permanent": it exists
+while that relay keeps it, and the `deleteToken` withdraws it.
 
-- En v1 `expiresAt` debe ser una fecha posterior a `createdAt`. `null` es
-  inválido y debe rechazarse.
-- Un relay sólo acepta `expiresInSeconds: null` si su operador lo habilitó.
-  Si no, responde `400 persistent_capsules_disabled`.
-- El relay expone `persistentCapsules` en `/v1/config` y `/v1/info` para que el
-  cliente lo sepa antes de cifrar.
+- In v1 `expiresAt` must be a date after `createdAt`. `null` is invalid and must
+  be refused.
+- A relay accepts `expiresInSeconds: null` only if its operator enabled it.
+  Otherwise it answers `400 persistent_capsules_disabled`.
+- The relay exposes `persistentCapsules` in `/v1/config` and `/v1/info` so the
+  client knows before encrypting.
 
-### 12.3 Manifiesto: `paddedLength`
+### 12.3 Manifest: `paddedLength`
 
-`paddedLength` es opcional y sólo existe en v2. Cuando está presente:
+`paddedLength` is optional and exists only from v2. When present:
 
 - `paddedLength >= byteLength`;
 - `paddedLength % chunkSize === 0`;
 - `chunkCount === paddedLength / chunkSize`.
 
-Los bytes entre `byteLength` y `paddedLength` son ceros, se cifran y se
-autentican igual que el resto, y el receptor los descarta después de descifrar.
-Todos los chunks quedan del mismo tamaño, de modo que el relay observa una
-clase de tamaño y una cantidad de chunks, no el tamaño del archivo.
+The bytes between `byteLength` and `paddedLength` are zeroes, encrypted and
+authenticated like the rest, and the receiver discards them after decryption.
+Every chunk ends up the same size, so the relay observes a size class and a
+chunk count, not the file's size.
 
-La clase de tamaño se calcula en pasos de un cuarto de octava con un piso de
-64 KiB, y luego se redondea a un múltiplo entero de `chunkSize`:
+The size class is computed in quarter-octave steps with a 64 KiB floor, then
+rounded up to a whole multiple of `chunkSize`:
 
 ```text
-clase(n)   = ceil(max(n, 65536) / (2^floor(log2(max(n, 65536))) / 4)) * paso
-padded(n)  = ceil(clase(n) / chunkSize) * chunkSize
+step(n)    = 2^floor(log2(max(n, 65536))) / 4
+class(n)   = ceil(max(n, 65536) / step(n)) * step(n)
+padded(n)  = ceil(class(n) / chunkSize) * chunkSize
 ```
 
-El receptor **debe** descargar los `chunkCount` chunks aunque sepa que los
-últimos son relleno: descargar sólo los chunks útiles le devuelve al relay el
-tamaño real.
+The receiver **must** download all `chunkCount` chunks even knowing the last
+ones are padding: downloading only the useful chunks hands the real size back
+to the relay.
 
-### 12.4 Capability con relays espejo
+### 12.4 Capability with mirror relays
 
-`CapsuleShareCapability` acepta `mirrors`, y `CapsuleOwnerCapability` acepta la
-lista equivalente con `deleteToken`:
+`CapsuleShareCapability` accepts `mirrors`, and `CapsuleOwnerCapability`
+accepts the equivalent list with `deleteToken`:
 
 ```json
 {
@@ -565,35 +572,38 @@ lista equivalente con `deleteToken`:
 }
 ```
 
-- Máximo 8 espejos; el fragmento se limita a 8192 caracteres.
-- Cada espejo guarda el mismo ciphertext bajo su propio `capsuleId` y sus
-  propios tokens: un relay no puede leer ni borrar la copia de otro.
-- La lectura intenta el relay primario y luego los espejos en orden. Un fallo de
-  autenticación **no** se reintenta en otro relay: el ciphertext está mal, no el
-  relay.
-- El borrado se dirige a todos y reporta honestamente cuáles no confirmaron.
-- Una capability v1 con `mirrors` es inválida.
+- At most 16 mirrors; the fragment is limited to 16,384 characters.
+- Each mirror keeps the same ciphertext under its own `capsuleId` and its own
+  tokens: one relay cannot read or delete another's copy.
+- Reading tries the primary relay and then the mirrors in order. An
+  authentication failure is **not** retried at another relay: the ciphertext is
+  wrong, not the relay.
+- Deletion is addressed to all of them, reporting honestly which did not
+  confirm.
+- A v1 capability with `mirrors` is invalid.
 
-### 12.5 Relay API: red abierta
+### 12.5 Relay API: the open network
 
-Un relay es cualquier host que responde `/v1/info`. No hay registro ni
-autoridad; la identidad es una clave Ed25519 que el relay genera al arrancar y
-guarda en `identity.json` dentro de su directorio de datos.
+A relay is any host that answers `/v1/info`. There is no registration and no
+authority; the identity is an Ed25519 key the relay generates at startup and
+stores in `identity.json` inside its data directory.
 
-`relayId = base64url(SHA-256(clave pública cruda))`
+`relayId = base64url(SHA-256(raw public key))`
 
 #### `GET /v1/info`
 
 ```json
 {
   "version": 1,
-  "software": "capsule-relay/0.2.0",
-  "protocolVersions": [1, 2],
+  "software": "capsule-relay/1.2.0",
+  "protocolVersions": [1, 2, 3],
   "relayId": "…",
   "publicKey": "…",
   "url": "https://relay.example",
-  "nickname": "relay del club",
+  "nickname": "the club relay",
   "persistentCapsules": true,
+  "mixPublicKey": "…",
+  "mixEnabled": true,
   "limits": {
     "maxCapsuleBytes": 0,
     "maxChunkBytes": 0,
@@ -602,20 +612,22 @@ guarda en `identity.json` dentro de su directorio de datos.
   },
   "defaultTtlSeconds": 86400,
   "maxTtlSeconds": 604800,
-  "peerCount": 12
+  "peerCount": 12,
+  "sitesEnabled": true,
+  "siteCount": 3
 }
 ```
 
 #### `GET /v1/peers`
 
-Devuelve `self` y la lista de relays conocidos (`url`, `relayId`, `publicKey`,
-`nickname`, `lastSeenAt`). No expone nada sobre cápsulas.
+Returns `self` and the list of known relays (`url`, `relayId`, `publicKey`,
+`nickname`, `lastSeenAt`). It exposes nothing about capsules.
 
 #### `POST /v1/peers/announce`
 
 ```json
 {
-  "url": "https://relay-nuevo.example",
+  "url": "https://new-relay.example",
   "relayId": "…",
   "publicKey": "…",
   "announcedAt": "2026-08-29T12:00:00.000Z",
@@ -623,7 +635,7 @@ Devuelve `self` y la lista de relays conocidos (`url`, `relayId`, `publicKey`,
 }
 ```
 
-La firma Ed25519 cubre exactamente:
+The Ed25519 signature covers exactly:
 
 ```text
 CAPSULE/relay-announce/v1
@@ -632,33 +644,34 @@ CAPSULE/relay-announce/v1
 <announcedAt>
 ```
 
-El receptor acepta el anuncio sólo si `relayId` es el digest de `publicKey`, la
-firma verifica, `announcedAt` está dentro de ±5 minutos y la URL es un origen
-HTTP(S) enrutable. Responde `202` con su propio `self` y sus peers.
+The receiver accepts the announcement only if `relayId` is the digest of
+`publicKey`, the signature verifies, `announcedAt` is within ±5 minutes and the
+URL is a routable HTTP(S) origin. It answers `202` with its own `self` and its
+peers.
 
-Una dirección aprendida de un tercero **no** se guarda por confiar en quien la
-pasó: se prueba con `GET /v1/info` y sólo se guarda si esa dirección responde
-con una identidad consistente. Esto evita que un peer invente relays; no
-convierte a un relay en confiable.
+An address learned from a third party is **not** stored out of trust in
+whoever passed it along: it is probed with `GET /v1/info` and stored only if
+that address answers with a consistent identity. This stops a peer inventing
+relays; it does not make a relay trustworthy.
 
-### 12.6 Compatibilidad
+### 12.6 Compatibility
 
-- Una cápsula v1 publicada sigue siendo legible por un cliente v2 sin cambios.
-- Un cliente v1 rechaza una cápsula v2: la versión del fragmento no coincide.
-- Un relay v0.1 acepta cápsulas v2 con TTL, porque el ciphertext le es opaco;
-  rechazará `expiresInSeconds: null` por no conocer el campo.
+- A published v1 capsule stays readable by a v2 client, unchanged.
+- A v1 client refuses a v2 capsule: the fragment version does not match.
+- A v0.1 relay accepts v2 capsules with a TTL, because the ciphertext is opaque
+  to it; it will refuse `expiresInSeconds: null`, not knowing the field.
 
-## 13. Versión 3
+## 13. Version 3
 
-La versión 3 mantiene la primitiva, el espacio de índices, la derivación del
-nonce y el manifiesto de la versión 2. Agrega una sola cosa al formato —
-erasure coding en la capability— y fija dos reglas que antes eran implícitas.
+Version 3 keeps the primitive, the index space, the nonce derivation and the
+manifest of version 2. It adds one thing to the format — erasure coding in the
+capability — and fixes two rules that were previously implicit.
 
-### 13.1 Erasure coding `k de n`
+### 13.1 `k`-of-`n` erasure coding
 
-Con `sharding` presente, cada relay listado en la capability guarda **un shard
-por chunk** en vez de una copia completa. Menos de `k` relays no pueden
-reconstruir un solo byte del ciphertext; cualquier `k` sí.
+With `sharding` present, each relay listed in the capability stores **one shard
+per chunk** instead of a whole copy. Fewer than `k` relays cannot reconstruct a
+single byte of ciphertext; any `k` can.
 
 ```json
 {
@@ -684,60 +697,63 @@ reconstruir un solo byte del ciphertext; cualquier `k` sí.
 }
 ```
 
-Reglas obligatorias:
+Mandatory rules:
 
-- `2 <= k < n <= 16` y `n === mirrors.length + 1`. **El orden importa**: el
-  relay primario es el shard 0 y cada espejo es el shard `i + 1`.
-- `blockBytes === chunkSize + 16`, es decir el ciphertext completo de un chunk.
+- `2 <= k < n <= 16` and `n === mirrors.length + 1`. **Order matters**: the
+  primary relay is shard 0 and each mirror is shard `i + 1`.
+- `blockBytes === chunkSize + 16`, that is the complete ciphertext of one
+  chunk.
 - `shardBytes === ceil(blockBytes / k)`.
-- El relleno es obligatorio (`paddedLength` presente), porque todos los chunks
-  deben medir lo mismo para que un shard tenga un tamaño único.
-- El manifiesto **no** se reparte: se replica completo en los `n` relays, así
-  cualquiera de ellos puede entregarlo.
-- El `totalCiphertextBytes` declarado a cada relay es `chunkCount * shardBytes`.
+- Padding is mandatory (`paddedLength` present), because every chunk must be
+  the same size for a shard to have a single size.
+- The manifest is **not** shared out: it is replicated whole to all `n` relays,
+  so any of them can serve it.
+- The `totalCiphertextBytes` declared to each relay is
+  `chunkCount * shardBytes`.
 
-**Codificación.** Reed-Solomon sistemático sobre GF(2^8) con el polinomio
-`0x11d`. Las primeras `k` filas de la matriz generadora son la identidad; las
-`n - k` restantes son una matriz de Cauchy `C[i][j] = 1 / (x_i ⊕ y_j)` con
-`x_i = k + i` e `y_j = j`. Toda submatriz cuadrada de una matriz de Cauchy es
-invertible, que es lo que hace cierto "cualquier `k`" y no "casi siempre `k`".
+**Encoding.** Systematic Reed-Solomon over GF(2^8) with the polynomial `0x11d`.
+The first `k` rows of the generator matrix are the identity; the remaining
+`n - k` are a Cauchy matrix `C[i][j] = 1 / (x_i ⊕ y_j)` with `x_i = k + i` and
+`y_j = j`. Every square submatrix of a Cauchy matrix is invertible, which is
+what makes "any `k`" true rather than "almost always `k`".
 
-El bloque se parte en `k` shards de `shardBytes`, rellenando el último con
-ceros hasta `k * shardBytes`.
+The block is split into `k` shards of `shardBytes`, padding the last with
+zeroes up to `k * shardBytes`.
 
-**Reconstrucción.** Se toman `k` shards disponibles, se invierte la submatriz
-correspondiente a sus índices y se recuperan los shards de datos. Los shards
-**no** están autenticados individualmente: un relay que entrega un shard
-alterado produce ruido, y quien lo detecta es el tag AES-GCM del chunk. Por eso
-un lector **debe** reintentar con otra combinación de `k` shards ante un fallo
-de autenticación antes de dar la cápsula por perdida; así un relay mentiroso se
-aísla en vez de romper la descarga.
+**Reconstruction.** Take `k` available shards, invert the submatrix
+corresponding to their indices, and recover the data shards. Shards are **not**
+individually authenticated: a relay serving an altered shard produces noise, and
+what detects it is the chunk's AES-GCM tag. A reader therefore **must** retry
+with another combination of `k` shards on an authentication failure before
+giving the capsule up as lost; that isolates a lying relay instead of breaking
+the download.
 
-### 13.2 Direcciones de relay admisibles
+### 13.2 Admissible relay addresses
 
-Un relay aprende direcciones de otros relays y un cliente las aprende de los
-relays; ambos después se conectan. Una dirección sólo es admisible si es un
-origen HTTP(S) canónico, sin credenciales, ruta, query ni fragmento, y su host
-**no** es ninguna de estas cosas, escrita de cualquier forma:
+A relay learns addresses from other relays and a client learns them from
+relays; both then connect. An address is admissible only if it is a canonical
+HTTP(S) origin with no credentials, path, query or fragment, and its host is
+**none** of the following, written in any form:
 
-- IPv4 en `0.0.0.0/8`, `10/8`, `127/8`, `169.254/16`, `172.16/12`,
+- IPv4 in `0.0.0.0/8`, `10/8`, `127/8`, `169.254/16`, `172.16/12`,
   `192.168/16`, `100.64/10`, `192.0.0.0/24`, `192.0.2.0/24`, `198.18/15`,
-  `198.51.100/24`, `203.0.113/24`, `224/4` o `240/4`;
-- IPv6 `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8` o `2001:db8::/32`;
-- **una IPv4 de esa lista embebida en IPv6**: `::ffff:7f00:1` es `127.0.0.1`,
-  y también lo son `::ffff:127.0.0.1`, `::127.0.0.1` y `64:ff9b::7f00:1`;
-- `localhost`, un nombre de una sola etiqueta, o un nombre terminado en
-  `.local`, `.localhost`, `.internal`, `.home.arpa` o `.arpa`.
+  `198.51.100/24`, `203.0.113/24`, `224/4` or `240/4`;
+- IPv6 `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8` or `2001:db8::/32`;
+- **one of those IPv4 addresses embedded in IPv6**: `::ffff:7f00:1` is
+  `127.0.0.1`, and so are `::ffff:127.0.0.1`, `::127.0.0.1` and
+  `64:ff9b::7f00:1`;
+- `localhost`, a single-label name, or a name ending in `.local`,
+  `.localhost`, `.internal`, `.home.arpa` or `.arpa`.
 
-Un nombre que resuelve a una de esas direcciones sólo puede detectarse
-resolviéndolo: **el relay debe resolver el nombre y rechazarlo si alguna
-dirección resultante no es admisible**, antes de conectarse. Un cliente en un
-navegador no puede resolver, y por lo tanto no debe seguir direcciones privadas
-salvo que el operador lo habilite explícitamente para una red local.
+A name resolving to one of those addresses can only be detected by resolving
+it: **the relay must resolve the name and refuse it if any resulting address is
+inadmissible**, before connecting. A client in a browser cannot resolve, and so
+must not follow private addresses unless the operator explicitly enables it for
+a local network.
 
-### 13.3 Anuncios entre relays
+### 13.3 Announcements between relays
 
-El mensaje firmado incorpora un nonce de prueba de trabajo:
+The signed message includes a proof-of-work nonce:
 
 ```text
 CAPSULE/relay-announce/v2
@@ -747,25 +763,44 @@ CAPSULE/relay-announce/v2
 <nonce>
 ```
 
-(los campos van separados por saltos de línea, en ese orden, sin espacios)
+(the fields are newline-separated, in that order, with no spaces)
 
-- El anuncio contiene exactamente `url`, `relayId`, `publicKey`, `announcedAt`,
-  `nonce` y `signature`. **Nada más**: cualquier otro dato sobre el relay —su
-  nombre, sus límites— se lee de `/v1/info` en la dirección anunciada, no del
-  anuncio, así no hay nada que valga la pena falsificar.
-- La prueba de trabajo son los bits en cero iniciales de `SHA-256(mensaje)`. El
-  receptor exige al menos los que tenga configurados.
-- El receptor **debe** consultar `GET <url>/v1/info` y aceptar el anuncio sólo
-  si esa dirección responde con un `relayId` igual al anunciado y coherente con
-  su clave pública. Una firma válida prueba quién escribió el mensaje, no quién
-  controla la dirección que contiene.
+- The announcement contains exactly `url`, `relayId`, `publicKey`,
+  `announcedAt`, `nonce` and `signature`. **Nothing else**: any other data about
+  the relay — its name, its limits — is read from `/v1/info` at the announced
+  address, not from the announcement, so there is nothing worth forging.
+- The proof of work is the number of leading zero bits of `SHA-256(message)`.
+  The receiver demands at least as many as it has configured.
+- The receiver **must** query `GET <url>/v1/info` and accept the announcement
+  only if that address answers with a `relayId` equal to the announced one and
+  consistent with its public key. A valid signature proves who wrote the
+  message, not who controls the address inside it.
 
-## 14. Capabilities protegidas y divididas
+### 13.4 Manifest padding
 
-Ninguna de estas dos formas toca el formato de cápsula: envuelven la cadena de
-una capability. Se especifican acá porque son interoperables.
+Since 1.3, this implementation pads the manifest JSON to a size class before
+encrypting it. AES-GCM does not hide length, so without this the manifest's
+ciphertext measures the filename and the note.
 
-### 14.1 Protegida con frase de acceso
+- A field `p` is added, containing `-` repeated as needed.
+- The target is the first of `512, 1024, 2048, 4096, 8192, 16384` that is at
+  least the length of the JSON with an empty `p`; beyond that, the next
+  multiple of 1024.
+- A reader ignores unknown fields, so a manifest written this way is readable
+  by any earlier client, and a manifest written before this rule is readable by
+  a current one. Readers of this implementation strip `p` before returning the
+  metadata.
+
+It is **unconditional**. An anonymity feature that some senders enable splits
+the population into two distinguishable groups, and each is smaller than the
+whole.
+
+## 14. Protected and split capabilities
+
+Neither of these touches the capsule format: they wrap a capability's string.
+They are specified here because they are interoperable.
+
+### 14.1 Protected with a passphrase
 
 ```text
 capsule-recovery:<base64url(JSON)>
@@ -779,208 +814,207 @@ capsule-recovery:<base64url(JSON)>
   "salt": "<base64url, 16 bytes>",
   "nonce": "<base64url, 12 bytes>",
   "ciphertext": "<base64url>",
-  "label": "opcional, no secreto"
+  "label": "optional, not secret"
 }
 ```
 
-- Clave: PBKDF2-HMAC-SHA-256 sobre la frase normalizada en NFKC, con el `salt`
-  y las `iterations` del documento, hacia una clave AES-256-GCM.
-- AAD: `CAPSULE/recovery/v1/<kdf>/<iterations>/<salt>`. Liga los parámetros al
-  ciphertext, de modo que bajar `iterations` en un blob guardado no lo abre.
-- Mínimo aceptable: 100 000 iteraciones. PBKDF2 es lo único que Web Crypto
-  ofrece en todas partes; es más débil que Argon2id frente a una GPU, y el
-  campo `kdf` existe para agregar una función memory-hard sin romper lo ya
-  publicado.
+- Key: PBKDF2-HMAC-SHA-256 over the NFKC-normalised passphrase, with the
+  document's `salt` and `iterations`, into an AES-256-GCM key.
+- AAD: `CAPSULE/recovery/v1/<kdf>/<iterations>/<salt>`. It binds the parameters
+  to the ciphertext, so lowering `iterations` in a stored blob does not open it.
+- Minimum accepted: 100,000 iterations. PBKDF2 is the only thing Web Crypto
+  offers everywhere; it is weaker than Argon2id against a GPU, and the `kdf`
+  field exists so a memory-hard function can be added without breaking what is
+  already published.
 
-### 14.2 Dividida en partes
+### 14.2 Split into shares
 
 ```text
 capsule-share:<base64url(bytes)>
 ```
 
-| Offset | Bytes | Contenido                  |
-| ------ | ----- | -------------------------- |
-| 0      | 1     | versión de formato (`1`)   |
-| 1      | 1     | umbral `k` (2..16)         |
-| 2      | 1     | índice de la parte (1..16) |
-| 3      | 8     | identificador del reparto  |
-| 11     | resto | evaluación del polinomio   |
+| Offset | Bytes | Content               |
+| ------ | ----- | --------------------- |
+| 0      | 1     | Format version (`1`)  |
+| 1      | 1     | Threshold `k` (2..16) |
+| 2      | 1     | Share index (1..16)   |
+| 3      | 8     | Split identifier      |
+| 11     | rest  | Polynomial evaluation |
 
-Shamir sobre GF(2^8): por cada byte del secreto se toma un polinomio de grado
-`k - 1` cuyo término independiente es ese byte y cuyos demás coeficientes
-vienen del CSPRNG; la parte `i` es el polinomio evaluado en `i`. La combinación
-es interpolación de Lagrange en cero.
+Shamir over GF(2^8): for each byte of the secret a polynomial of degree `k - 1`
+is taken whose constant term is that byte and whose other coefficients come
+from the CSPRNG; share `i` is that polynomial evaluated at `i`. Combining is
+Lagrange interpolation at zero.
 
-El identificador de reparto detecta la mezcla de partes de dos repartos
-distintos. **No** hay digest del secreto en la parte: publicarlo permitiría, a
-quien tenga una sola parte, verificar conjeturas sin conocer las demás.
+The split identifier detects mixing shares from two different splits. There is
+**no** digest of the secret in a share: publishing one would let somebody
+holding a single share verify guesses without knowing the others.
 
-## 15. Estabilidad de la versión 1.0
+## 15. Stability of version 1.0
 
-- El formato de cápsula v1, v2 y v3, la API `/v1` del relay y la codificación
-  de capabilities quedan congelados. Un cambio incompatible exige una versión
-  de protocolo nueva y una entrada en el registro de cambios.
-- Los vectores de
+- The v1, v2 and v3 capsule format, the relay's `/v1` API and the capability
+  encoding are frozen. An incompatible change requires a new protocol version
+  and an entry in the changelog.
+- The vectors in
   [`capsule-test-vectors.json`](../packages/protocol/vectors/capsule-test-vectors.json)
-  son la referencia normativa. Se regeneran con `npm run vectors` y un cambio
-  en ellos es, por definición, un cambio de protocolo.
-- Agregar un campo JSON opcional que un lector viejo pueda ignorar sin riesgo
-  no cambia la versión. `sharding` no calificó: un lector que lo ignore leería
-  shards como si fueran chunks, así que exigió versión nueva.
-- No hay negociación de algoritmos y no hay downgrade automático. Un lector
-  rechaza una versión que no conoce.
+  are the normative reference. They are regenerated with `npm run vectors` and
+  a change in them is, by definition, a protocol change.
+- Adding an optional JSON field an old reader can safely ignore does not change
+  the version. `sharding` did not qualify: a reader ignoring it would read
+  shards as if they were chunks, so it required a new version. Manifest padding
+  (§13.4) does qualify, and did not.
+- There is no algorithm negotiation and no automatic downgrade. A reader
+  refuses a version it does not know.
 
-## 16. Formato de paquete de la red de mezcla
+## 16. Mix network packet format
 
-Esta sección especifica el paquete que viaja entre nodos de mezcla. No forma
-parte del formato de cápsula: una cápsula v3 es idéntica se haya enviado
-directo o por la red. El diseño y sus límites están en
+This section specifies the packet that travels between mix nodes. It is not
+part of the capsule format: a v3 capsule is identical whether it was sent
+directly or through the network. The design and its limits are in
 [MIXNET.md](./MIXNET.md).
 
-### 16.1 Constantes
+### 16.1 Constants
 
-| Nombre           | Valor  | Nota                                                    |
-| ---------------- | ------ | ------------------------------------------------------- |
-| `MAX_HOPS`       | 5      | Todo paquete reserva espacio para esta cantidad         |
-| `NODE_ID_BYTES`  | 16     | `HKDF(clave pública, "node-id")`                        |
-| Bloque de ruteo  | 64 B   | 32 de ruteo + 32 del MAC del salto siguiente            |
-| `BETA_BYTES`     | 320    | `MAX_HOPS × 64`                                         |
-| `HEADER_BYTES`   | 384    | `α(32) ‖ β(320) ‖ γ(32)`                                |
-| `PAYLOAD_BYTES`  | 65 536 | Idéntico para todo paquete                              |
-| `PACKET_BYTES`   | 65 920 | Cabecera más cuerpo                                     |
-| `MIX_CHUNK_SIZE` | 64 512 | Texto plano de un chunk, para que quepa uno por paquete |
+| Name             | Value  | Note                                           |
+| ---------------- | ------ | ---------------------------------------------- |
+| `MAX_HOPS`       | 5      | Every packet reserves space for this many      |
+| `NODE_ID_BYTES`  | 16     | `HKDF(public key, "node-id")`                  |
+| Routing block    | 64 B   | 32 of routing + 32 of the next hop's MAC       |
+| `BETA_BYTES`     | 320    | `MAX_HOPS × 64`                                |
+| `HEADER_BYTES`   | 384    | `α(32) ‖ β(320) ‖ γ(32)`                       |
+| `PAYLOAD_BYTES`  | 65,536 | Identical for every packet                     |
+| `PACKET_BYTES`   | 65,920 | Header plus body                               |
+| `MIX_CHUNK_SIZE` | 64,512 | Plaintext of one chunk, so one fits per packet |
 
-Grupo: Curve25519, mediante X25519 usado como multiplicación escalar de puntos.
-Derivación: `HKDF-SHA-256` con la etiqueta `capsule/mix/v1/<uso>`, donde `<uso>`
-es una de `blind`, `mac`, `stream`, `payload`, `replay-tag`, `node-id`,
-`lioness`, `lioness-stream`.
+Group: Curve25519, via X25519 used as scalar point multiplication. Derivation:
+`HKDF-SHA-256` with the label `capsule/mix/v1/<use>`, where `<use>` is one of
+`blind`, `mac`, `stream`, `payload`, `replay-tag`, `node-id`, `lioness`,
+`lioness-stream`.
 
-### 16.2 Bloque de ruteo
+### 16.2 Routing block
 
-64 bytes por salto:
+64 bytes per hop:
 
-| Offset | Bytes | Contenido                                                     |
-| ------ | ----- | ------------------------------------------------------------- |
-| 0      | 1     | Comando: `1` reenviar, `2` entregar, `3` buzón, `4` descartar |
-| 1      | 4     | Retardo en milisegundos, big-endian                           |
-| 5      | 16    | Identificador del siguiente salto, del destino o del buzón    |
-| 21     | 11    | Reservado                                                     |
-| 32     | 32    | MAC del salto siguiente                                       |
+| Offset | Bytes | Content                                                     |
+| ------ | ----- | ----------------------------------------------------------- |
+| 0      | 1     | Command: `1` forward, `2` deliver, `3` mailbox, `4` discard |
+| 1      | 4     | Delay in milliseconds, big-endian                           |
+| 5      | 16    | Identifier of the next hop, the destination or the mailbox  |
+| 21     | 11    | Reserved                                                    |
+| 32     | 32    | The next hop's MAC                                          |
 
-### 16.3 Construcción de la cabecera
+### 16.3 Building the header
 
-Con camino `n_0 … n_{k-1}` y escalar efímero `x`:
+With path `n_0 … n_{k-1}` and ephemeral scalar `x`:
 
 1. `α_0 = x·G`.
-2. Para cada salto `i`: el secreto es `Y_i` multiplicado por `x` y luego por
-   cada factor de enmascaramiento anterior `b_0 … b_{i-1}`, donde
-   `b_j = HKDF(s_j, "blind")`. El salto llega al mismo valor calculando
-   `x_i · α_i`.
+2. For each hop `i`: the secret is `Y_i` multiplied by `x` and then by each
+   preceding blinding factor `b_0 … b_{i-1}`, where `b_j = HKDF(s_j, "blind")`.
+   The hop reaches the same value by computing `x_i · α_i`.
 3. `α_{i+1} = b_i · α_i`.
-4. Relleno: para `i` de `0` a `k-2`, se hace crecer la cadena un bloque y se
-   la XOR-ea con los últimos bytes del flujo `AES-256-CTR` derivado de
-   `HKDF(s_i, "stream")` sobre `BETA_BYTES + 64` bytes. El resultado mide
-   `(k-1)·64`.
-5. Último salto: bloque de destino, relleno aleatorio hasta
-   `BETA_BYTES − (k-1)·64`, XOR con su flujo, y a continuación el relleno del
-   punto 4.
-6. Hacia atrás, para `i` de `k-2` a `0`:
-   `β_i = (bloque_i ‖ β_{i+1}[0 … BETA_BYTES−64]) ⊕ flujo_i`, y
+4. Filler: for `i` from `0` to `k-2`, grow the chain by one block and XOR it
+   with the last bytes of the `AES-256-CTR` stream derived from
+   `HKDF(s_i, "stream")` over `BETA_BYTES + 64` bytes. The result is
+   `(k-1)·64` long.
+5. Last hop: the destination block, random filler up to
+   `BETA_BYTES − (k-1)·64`, XOR with its stream, followed by the filler from
+   step 4.
+6. Backwards, for `i` from `k-2` to `0`:
+   `β_i = (block_i ‖ β_{i+1}[0 … BETA_BYTES−64]) ⊕ stream_i`, and
    `γ_i = HMAC-SHA-256(HKDF(s_i, "mac"), β_i)`.
 
-### 16.4 Procesamiento en un salto
+### 16.4 Processing at a hop
 
-1. `s = x_i · α`; si `γ ≠ HMAC(HKDF(s,"mac"), β)`, descartar sin responder.
-2. Rechazar si `HKDF(s, "replay-tag")` ya se vio dentro de la ventana.
-3. `(β ‖ 0^64) ⊕ flujo` da el bloque de este salto y la β siguiente.
+1. `s = x_i · α`; if `γ ≠ HMAC(HKDF(s,"mac"), β)`, discard without answering.
+2. Reject if `HKDF(s, "replay-tag")` has been seen within the window.
+3. `(β ‖ 0^64) ⊕ stream` gives this hop's block and the next β.
 4. `α' = HKDF(s,"blind") · α`.
-5. Cuerpo: `LIONESS_descifrar(HKDF(s,"payload"), δ)`.
-6. Esperar el retardo, acotado por el máximo del nodo, y actuar según el
-   comando.
+5. Body: `LIONESS_decrypt(HKDF(s,"payload"), δ)`.
+6. Wait the delay, capped at the node's maximum, and act on the command.
 
-Un nodo responde siempre igual —`202`— haya reenviado, entregado o descartado.
-Un código distinto sería un oráculo sobre el contenido del paquete.
+A node always answers the same — `202` — whether it forwarded, delivered or
+discarded. A different code would be an oracle about the packet's contents.
 
-### 16.5 Cuerpo
+### 16.5 Body
 
-`LIONESS` (Anderson y Biham) con `AES-256-CTR` como cifrado de flujo y
-`HMAC-SHA-256` como función de hash, cuatro rondas, mitad izquierda de 32
-bytes. Es una permutación sobre el bloque entero: cambiar un bit aleatoriza los
-65 536 bytes. Eso es lo que impide marcar un paquete para reconocerlo después.
+`LIONESS` (Anderson and Biham) with `AES-256-CTR` as the stream cipher and
+`HMAC-SHA-256` as the hash function, four rounds, 32-byte left half. It is a
+permutation over the whole block: changing one bit randomises all 65,536 bytes.
+That is what prevents tagging a packet to recognise it later.
 
-Texto plano dentro del cuerpo: `"CAPSULEMIX1"` (11 B), longitud `uint32`
-big-endian, mensaje, y relleno aleatorio hasta `PAYLOAD_BYTES`. Un destino que
-no encuentra esa marca descarta el paquete: fue alterado en el camino.
+Plaintext inside the body: `"CAPSULEMIX1"` (11 B), a big-endian `uint32`
+length, the message, and random filler up to `PAYLOAD_BYTES`. A destination
+that does not find that marker discards the packet: it was altered on the way.
 
-### 16.6 Mensaje entregado
+### 16.6 The delivered message
 
-Petición:
+Request:
 
-| Offset | Bytes | Contenido                                                                                                    |
-| ------ | ----- | ------------------------------------------------------------------------------------------------------------ |
-| 0      | 1     | Versión (`1`)                                                                                                |
-| 1      | 1     | Operación: `1` crear, `2` subir chunk, `3` finalizar, `4` manifiesto, `5` leer chunk, `6` estado, `7` borrar |
-| 2      | 432   | Bloque de respuesta                                                                                          |
-| 434    | 1+n   | Identificador de cápsula, con largo previo                                                                   |
-| …      | 1+n   | Token, con largo previo                                                                                      |
-| …      | 4     | Índice de chunk, big-endian                                                                                  |
-| …      | 4     | Largo de los datos, big-endian                                                                               |
-| …      | n     | Datos                                                                                                        |
+| Offset | Bytes | Content                                                                                                 |
+| ------ | ----- | ------------------------------------------------------------------------------------------------------- |
+| 0      | 1     | Version (`1`)                                                                                           |
+| 1      | 1     | Operation: `1` create, `2` put chunk, `3` finalize, `4` manifest, `5` get chunk, `6` status, `7` delete |
+| 2      | 432   | Reply block                                                                                             |
+| 434    | 1+n   | Capsule identifier, length-prefixed                                                                     |
+| …      | 1+n   | Token, length-prefixed                                                                                  |
+| …      | 4     | Chunk index, big-endian                                                                                 |
+| …      | 4     | Data length, big-endian                                                                                 |
+| …      | n     | Data                                                                                                    |
 
-Respuesta: versión (1 B), éxito (1 B), largo `uint32` (4 B), datos.
+Response: version (1 B), success (1 B), `uint32` length (4 B), data.
 
-Bloque de respuesta (432 B): identificador del primer salto (16), `α` (32),
-`β` (320), `γ` (32), clave de sellado (32).
+Reply block (432 B): the first hop's identifier (16), `α` (32), `β` (320),
+`γ` (32), sealing key (32).
 
-### 16.7 API HTTP del nodo
+### 16.7 The node's HTTP API
 
-- `POST /v1/mix` con `Content-Type: application/capsule-mix` y exactamente
-  `PACKET_BYTES` bytes. Responde `202` siempre.
-- `GET /v1/mix/mailbox/<token hexadecimal de 32 caracteres>` devuelve
-  `{ version, messages: [base64url] }` y vacía el buzón.
-- `GET /v1/info` incluye `mixEnabled` y, cuando corresponde, `mixPublicKey`.
+- `POST /v1/mix` with `Content-Type: application/capsule-mix` and exactly
+  `PACKET_BYTES` bytes. Always answers `202`.
+- `GET /v1/mix/mailbox/<32 hex characters of token>` returns
+  `{ version, messages: [base64url] }` and empties the mailbox.
+- `GET /v1/info` includes `mixEnabled` and, where applicable, `mixPublicKey`.
 
-Estos dos endpoints llevan su propio límite de peticiones: el tráfico de mezcla
-y el sondeo de un buzón no se parecen al tráfico de API, y contarlos juntos
-deja a la red sin servicio justo cuando está funcionando.
+These two endpoints carry their own rate limit: mix traffic and mailbox polling
+look nothing like API traffic, and counting them together takes the network out
+of service exactly when it is working.
 
-## 17. Nombres, registros y paquetes de sitio
+## 17. Names, records and site bundles
 
-Esta sección especifica la capa de nombres `.capsule`. No forma parte del
-formato de cápsula: un sitio es una cápsula v3 corriente cuyo contenido resulta
-ser un paquete de sitio. El diseño y sus límites están en
-[SITES.md](./SITES.md).
+This section specifies the `.capsule` naming layer. It is not part of the
+capsule format: a site is an ordinary v3 capsule whose content happens to be a
+site bundle. The design and its limits are in [SITES.md](./SITES.md).
 
-### 17.1 Nombre
+### 17.1 The name
 
 ```
-base32( clave pública Ed25519 (32) ‖ suma (2) ‖ versión (1) ) ‖ ".capsule"
+base32( Ed25519 public key (32) ‖ checksum (2) ‖ version (1) ) ‖ ".capsule"
 ```
 
-- Base32 es el alfabeto RFC 4648 en minúsculas, sin relleno. Los bits sobrantes
-  del último carácter deben ser cero: un nombre tiene una sola escritura.
-- `suma = SHA-256("CAPSULE/site-name/v1" ‖ clave ‖ versión)[0..2]`.
-- `versión = 1`.
-- La etiqueta mide siempre 56 caracteres.
+- Base32 is the RFC 4648 alphabet in lowercase, with no padding. The leftover
+  bits of the last character must be zero: a name has exactly one spelling.
+- `checksum = SHA-256("CAPSULE/site-name/v1" ‖ key ‖ version)[0..2]`.
+- `version = 1`.
+- The label is always 56 characters.
 
-Un nombre se compara en minúsculas, sin el punto final opcional. Un nombre cuya
-suma no coincide se rechaza; no resuelve a nada y no se pide a ningún relay.
+A name is compared in lowercase, without the optional trailing dot. A name
+whose checksum does not match is refused; it resolves to nothing and is
+requested from no relay.
 
-### 17.2 Registro
+### 17.2 The record
 
 ```json
 {
   "version": 1,
-  "name": "<etiqueta>.capsule",
+  "name": "<label>.capsule",
   "sequence": 7,
   "publishedAt": "2026-08-30T16:39:44.940Z",
   "capability": "capsule=<base64url>",
-  "title": "opcional, ≤ 120 caracteres",
+  "title": "optional, ≤ 120 characters",
   "signature": "<base64url, 64 bytes>"
 }
 ```
 
-El texto firmado es exactamente, con `\n` entre campos:
+The signed text is exactly this, with `\n` between fields:
 
 ```
 CAPSULE/site-record/v1
@@ -989,55 +1023,151 @@ CAPSULE/site-record/v1
 <sequence>
 <publishedAt>
 <capability>
-<title, o cadena vacía>
+<title, or the empty string>
 ```
 
-Ningún campo puede contener `\r` ni `\n`, así que dos registros distintos no
-pueden producir el mismo texto. La firma es Ed25519 con la clave que está dentro
-del nombre; no hay otra fuente de verdad.
+No field may contain `\r` or `\n`, so two different records cannot produce the
+same text. The signature is Ed25519 with the key inside the name; there is no
+other source of truth.
 
-Reglas de aceptación, iguales en el relay y en el cliente:
+Acceptance rules, identical at the relay and at the client:
 
-| Regla                                        | Motivo                                           |
-| -------------------------------------------- | ------------------------------------------------ |
-| El nombre debe reparsear a sí mismo          | Un nombre con otra escritura sería otro nombre   |
-| La firma verifica contra la clave del nombre | Es toda la confianza del sistema                 |
-| `sequence` es entero seguro y no retrocede   | Una firma vieja sigue siendo válida para siempre |
-| `publishedAt` no más de 10 min en el futuro  | Reloj adelantado o fecha inventada               |
-| `publishedAt` no más de 90 días en el pasado | Que un registro viejo no circule eternamente     |
-| `capability` ≤ 16 384 caracteres             | Techo del fragmento de una capability            |
+| Rule                                                   | Reason                                             |
+| ------------------------------------------------------ | -------------------------------------------------- |
+| The name must reparse to itself                        | A name with another spelling would be another name |
+| The signature verifies against the key in the name     | This is the entire trust of the system             |
+| `sequence` is a safe integer and does not go backwards | An old signature stays valid forever               |
+| `publishedAt` no more than 10 min in the future        | A fast clock or an invented date                   |
+| `publishedAt` no more than 90 days in the past         | So an old record does not circulate forever        |
+| `capability` ≤ 16,384 characters                       | The ceiling on a capability fragment               |
 
-### 17.3 Paquete de sitio
+### 17.3 The site bundle
 
-| Offset | Bytes | Contenido                                     |
-| ------ | ----- | --------------------------------------------- |
-| 0      | 8     | `"CAPSITE1"`                                  |
-| 8      | 4     | Largo del índice, `uint32` big-endian         |
-| 12     | n     | Índice, JSON UTF-8                            |
-| 12+n   | …     | Archivos concatenados, en el orden del índice |
+| Offset | Bytes | Content                            |
+| ------ | ----- | ---------------------------------- |
+| 0      | 8     | `"CAPSITE1"`                       |
+| 8      | 4     | Index length, `uint32` big-endian  |
+| 12     | n     | Index, UTF-8 JSON                  |
+| 12+n   | …     | Files concatenated, in index order |
 
-Índice: `{ "v": 1, "entries": [ { "path", "type", "offset", "length" } ] }`,
-donde `offset` es relativo al primer byte después del índice.
+Index: `{ "v": 1, "entries": [ { "path", "type", "offset", "length" } ] }`,
+where `offset` is relative to the first byte after the index.
 
-Una ruta se acepta sólo si es relativa, separada por `/`, sin segmentos vacíos
-ni `.` ni `..`, sin `\`, sin caracteres de control, de 1 a 512 caracteres. Un
-paquete tiene como mucho 4096 entradas, ninguna repetida, y debe incluir
-`index.html` en la raíz. Estas reglas se aplican tanto al empaquetar como al
-desempaquetar: el paquete lo escribió quien tenga una clave y no es confiable.
+A path is accepted only if it is relative, `/`-separated, with no empty
+segments and no `.` or `..`, no `\`, no control characters, and 1 to 512
+characters long. A bundle has at most 4096 entries, none repeated, and must
+include `index.html` at its root. These rules apply on packing and on
+unpacking: the bundle was written by whoever holds a key and is not trusted.
 
-Todo lo demás del contenido son bytes de la cápsula: relleno a clase de tamaño,
-cifrado por chunk, espejos y reparto `k` de `n` funcionan sin cambios. El
-relleno queda después del último archivo y el índice dice dónde termina cada
-uno, así que desempaquetar no necesita saber cuánto relleno hubo.
+Everything else about the content is capsule bytes: size-class padding, per
+chunk encryption, mirrors and `k`-of-`n` sharing all work unchanged. The
+padding sits after the last file and the index says where each one ends, so
+unpacking does not need to know how much padding there was.
 
-### 17.4 API HTTP del relay
+### 17.4 The relay's HTTP API
 
-| Método y ruta           | Respuesta                                                                         |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| `GET /v1/sites/:name`   | `{ version, record }` o `404`                                                     |
-| `PUT /v1/sites/:name`   | `202` si lo guardó, `200` si ya tenía uno igual o más nuevo, `400` si no verifica |
-| `GET /v1/sites?limit=n` | `{ version, records: [...] }`, más recientes primero                              |
+| Method and path         | Response                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| `GET /v1/sites/:name`   | `{ version, record }` or `404`                                                              |
+| `PUT /v1/sites/:name`   | `202` if stored, `200` if it already had an equal or newer one, `400` if it does not verify |
+| `GET /v1/sites?limit=n` | `{ version, records: [...] }`, newest first                                                 |
 
-El nombre en la ruta y el del registro deben coincidir, o un publicador podría
-dejar un registro válido donde nadie va a buscarlo. `GET /v1/info` incluye
-`sitesEnabled` y `siteCount`.
+The name in the path and the one in the record must agree, or a publisher could
+leave a valid record where nobody will look for it. `GET /v1/info` includes
+`sitesEnabled` and `siteCount`.
+
+## 18. Bridge lines and bridge authentication
+
+A bridge is a relay that never announces itself and hides its API behind a
+secret derived from a key. This is not part of the capsule format; the design
+and its limits are in [CENSORSHIP.md](./CENSORSHIP.md).
+
+### 18.1 The bridge line
+
+```
+capsule-bridge:<version>:<base64url(host)>:<port>:<tls>:<base64url(key)>
+```
+
+- `version` is `1`.
+- `host` is base64url-encoded so that an IPv6 address does not collide with the
+  separator; it is compared lowercase and may contain no whitespace, `/` or
+  `\`.
+- `port` is 1..65535.
+- `tls` is `1` or `0`.
+- `key` is 32 bytes.
+
+One token with no spaces: a bridge line is pasted into chat applications that
+would otherwise break it across lines.
+
+### 18.2 Derived secrets
+
+From the 32-byte key `K`, using `HKDF-SHA-256` with an empty salt:
+
+- `pathPrefix` = the first 16 base32 characters (lowercase RFC 4648 alphabet)
+  of `HKDF(K, "capsule/bridge/v1/path", 10 bytes)`;
+- `authKey` = `HKDF(K, "capsule/bridge/v1/auth", 32 bytes)`.
+
+Every real request travels under `/<pathPrefix>` and is otherwise identical to
+the ordinary API. Everything else the bridge serves is a decoy.
+
+### 18.3 The authenticator
+
+A session cookie, so that there is no distinctive header for a censor to match
+and so that `Authorization` remains free for the capsule's own bearer tokens.
+
+The cookie's **name** is chosen from
+`sid, sessid, session, PHPSESSID, JSESSIONID, connect.sid, _session, SSID` by
+`authKey[0] mod 8`, so two bridges do not look alike.
+
+Its **value** is `base64url(uint32be(seconds) ‖ nonce(16) ‖ mac(32))`, where:
+
+```text
+mac = HMAC-SHA-256(
+        authKey,
+        "CAPSULE/bridge-auth/v1" ‖ "\n" ‖ METHOD ‖ "\n" ‖ path ‖ "\n" ‖
+        decimal(seconds) ‖ "\n" ‖ nonce
+      )
+```
+
+`path` is the inner path, without the prefix, including any query string —
+exactly what the server sees after stripping the prefix.
+
+The bridge accepts it only if the timestamp is within ±5 minutes, the MAC
+matches in constant time, and the nonce has not been seen inside that window. A
+failure of any kind produces the decoy, identical to the answer for a path that
+does not exist.
+
+## 19. Offline capsules
+
+A capsule with no relay anywhere in it, meant to travel on a disk or across an
+air gap. See [OFFLINE.md](./OFFLINE.md).
+
+```text
+"CAPSOFF1"        8 bytes
+header length     uint32, big-endian
+header            UTF-8 JSON
+chunks            uint32 length prefix, then ciphertext, repeated
+```
+
+Header:
+
+```json
+{
+  "v": 1,
+  "manifest": "<base64url of the encrypted manifest>",
+  "chunkCount": 3,
+  "createdAt": "2026-08-30T00:00:00.000Z",
+  "secrets": { "key": "…", "noncePrefix": "…", "version": 3 }
+}
+```
+
+- `secrets` is **optional and absent by default**. When absent the file is
+  sealed: it is ciphertext and nothing that opens it, and the key travels
+  separately as `capsule-offline:<base64url(JSON secrets)>`.
+- The manifest and the chunks use the same encryption, index space, nonce
+  derivation and AAD as any capsule of the declared version.
+- `expiresAt` is `null`: there is no relay running a clock, so there is nothing
+  to enforce an expiry and claiming one would be false.
+- At most 100,000 chunks and a 1 MiB header.
+- A reader must refuse a file whose declared chunk count does not match the
+  manifest, or whose length prefixes run past the end of the file.

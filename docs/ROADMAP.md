@@ -1,538 +1,582 @@
-# CAPSULE — Roadmap de producto y protocolo
+# CAPSULE — product and protocol roadmap
 
-**Estado:** 1.0 publicada; lo siguiente es propuesta por hitos, sin fechas  
-**Fecha:** 2026-08-29
+**Status:** 1.3 released; what follows is proposed by milestone, with no dates
+**Date:** 2026-08-30
 
-## 1. Norte del proyecto
+## 1. Where the project is going
 
-CAPSULE busca convertir el envío privado y temporal de archivos en una acción
-tan simple como compartir un enlace, sin exigir cuenta, wallet ni configuración
-de red. La arquitectura evolucionará por capas: primero un transporte cifrado
-que pueda ejecutarse y probarse; después disponibilidad distribuida, transporte
-directo/local y, sólo tras investigación específica, protección fuerte de
-metadata.
+CAPSULE aims to make sending a private, temporary file as simple as sharing a
+link, with no account, no wallet and no network configuration. The architecture
+grows in layers: first an encrypted transport that can be run and tested; then
+distributed availability, direct and local transport; and only after specific
+research, strong metadata protection.
 
-La versión 0.1 no debe venderse como una red anónima. Su valor concreto es:
+Version 0.1 was not to be sold as an anonymity network. Its concrete value was:
 
-- cifrado y autenticación en el cliente;
-- relay incapaz de leer contenido o metadatos privados;
-- enlace-capacidad temporal;
-- eliminación anticipada y operación sin cuentas;
-- implementación pequeña, auditable e interoperable.
+- encryption and authentication on the client;
+- a relay unable to read content or private metadata;
+- a temporary capability link;
+- early deletion and operation with no accounts;
+- a small, auditable, interoperable implementation.
 
-## 2. Principios de evolución
+## 2. Principles of evolution
 
-1. **Producto utilizable antes que red vacía.** Cada capa debe resolver un flujo
-   completo para personas reales.
-2. **No inventar criptografía.** Usar primitivas y protocolos revisados; cualquier
-   construcción nueva requiere revisión especializada.
-3. **Afirmaciones proporcionales a evidencia.** P2P no implica anonimato,
-   multi-relay no implica unlinkability y TTL no implica autodestrucción.
-4. **Sin token obligatorio.** Ningún usuario debe poseer criptoactivos para enviar
-   o recibir. Los incentivos de operadores se evalúan después de medir costos.
-5. **Compatibilidad versionada.** Una cápsula publicada conserva semántica; no se
-   cambia silenciosamente nonce, AAD, fragmento o API.
-6. **Privacidad por omisión.** Minimizar logs, dependencias, terceros, identidad y
-   retención antes de agregar mecanismos complejos.
-7. **Hitos por puertas de calidad.** No avanzar sólo porque “funciona en demo”.
+1. **A usable product before an empty network.** Every layer must solve a
+   complete flow for real people.
+2. **Do not invent cryptography.** Use reviewed primitives and protocols; any
+   new construction needs specialist review.
+3. **Claims proportional to evidence.** P2P does not imply anonymity, multi-relay
+   does not imply unlinkability, and a TTL does not imply self-destruction.
+4. **No mandatory token.** No user should have to hold a cryptoasset to send or
+   receive. Operator incentives are considered after costs are measured.
+5. **Versioned compatibility.** A published capsule keeps its semantics; nonce,
+   AAD, fragment and API do not change silently.
+6. **Privacy by default.** Minimise logs, dependencies, third parties, identity
+   and retention before adding complex mechanisms.
+7. **Milestones behind quality gates.** Do not advance just because it "works
+   in a demo".
 
-## 3. Vista general
+## 3. Overview
 
-| Hito    | Resultado principal                                                     | Mejora                                              | No resuelve todavía                                 |
-| ------- | ----------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
-| v0.1 ✅ | Web + CLI + relay temporal interoperables                               | Confidencialidad de contenido, integridad y TTL     | Anonimato, alta disponibilidad, recuperación        |
-| v0.1.x  | Endurecimiento y operación reproducible                                 | Menos fallos, abuso y filtraciones operativas       | Dependencia de un relay                             |
-| v0.2 ✅ | Red abierta de relays, anonimización parcial y cápsulas sin vencimiento | Disponibilidad, menos metadata en archivo/tamaño/IP | Correlación global, anonimato de red en la web      |
-| v0.3    | Transferencia P2P con fallback                                          | Menos almacenamiento central, rapidez local         | P2P revela IP a pares/infraestructura               |
-| v0.4    | Cercanía: BLE y Wi-Fi local                                             | Intercambio sin Internet                            | Anonimato de proximidad y background móvil perfecto |
-| v0.5    | Recovery opt-in                                                         | Menos pérdidas irreversibles                        | Recuperación sin ampliar superficie de ataque       |
-| v0.6    | Transporte mix experimental                                             | Protección de metadata bajo un adversario definido  | Baja latencia gratuita o anonimato con red pequeña  |
-| v1.0    | Protocolo estable y auditado                                            | Confianza verificable para terceros                 | Seguridad absoluta                                  |
+| Milestone | Main result                                                    | Improvement                                                | Still unsolved                                       |
+| --------- | -------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
+| v0.1 ✅   | Web + CLI + temporary relay, interoperable                     | Content confidentiality, integrity and TTL                 | Anonymity, high availability, recovery               |
+| v0.1.x    | Hardening and reproducible operation                           | Fewer failures, less abuse, fewer operational leaks        | Dependence on one relay                              |
+| v0.2 ✅   | Open relay network, partial anonymisation, optional permanence | Availability, less metadata in name/size/IP                | Global correlation, network anonymity in the web app |
+| v0.3      | P2P transfer                                                   | Less central storage, local speed                          | P2P reveals IP to peers and infrastructure           |
+| v0.4      | Proximity: BLE and local Wi-Fi                                 | Exchange with no internet                                  | Proximity anonymity and perfect mobile background    |
+| v0.5 ✅   | Opt-in recovery (shipped in 1.0)                               | Fewer irreversible losses                                  | Recovery without widening the attack surface         |
+| v0.6 ✅   | Mix transport (shipped in 1.1)                                 | Metadata protection against a defined adversary            | Free low latency, or anonymity with a small network  |
+| v1.0 ✅   | Stable protocol, internal review                               | Verifiable trust for third parties                         | Absolute security; an external audit                 |
+| v1.2 ✅   | `.capsule` sites and a browser extension                       | Publishing with no registrar and no certificate            | Mix routing from the browser                         |
+| v1.3 ✅   | Bridges, offline capsules, uniform manifests                   | Reaching the network when it is blocked; working with none | A large anonymity set; a TCP tunnel                  |
 
-Las etiquetas futuras son direccionales: pueden reordenarse si las pruebas
-demuestran otra dependencia. Cada hito mantiene compatibilidad de lectura o
-publica una versión de protocolo nueva.
+Future labels are directional: they can be reordered if testing shows a
+different dependency. Every milestone either preserves read compatibility or
+publishes a new protocol version.
 
-El recovery se adelantó a 1.0 porque las cápsulas sin vencimiento lo volvieron
-urgente: perder la clave de retiro de una cápsula que no vence nunca es una
-pérdida definitiva, y esperar dos hitos para resolverlo no tenía defensa. El
-detalle de lo que viene después de 1.0 está en la sección 14.
+Recovery was pulled forward into 1.0 because capsules without expiry made it
+urgent: losing the owner capability of a capsule that never expires is a
+permanent loss, and waiting two milestones for that had no defence.
 
-## 4. v0.1 — Mínimo ejecutable
+## 4. v0.1 — Minimum runnable
 
-### 4.1 Entregables
+### 4.1 Deliverables
 
-#### Protocolo y SDK
+#### Protocol and SDK
 
-- Formato CAPSULE v1 conforme a [PROTOCOL.md](./PROTOCOL.md).
-- Clave aleatoria AES-256-GCM y prefijo de nonce por cápsula.
-- Manifiesto cifrado en índice criptográfico 0 y chunks independientes desde 1.
-- Capability URL en fragmento y owner capability separada.
-- SDK con create/upload/finalize/download/delete y progreso.
-- Pruebas de interoperabilidad, límites y alteración.
+- CAPSULE v1 format as described in [PROTOCOL.md](./PROTOCOL.md).
+- A random AES-256-GCM key and nonce prefix per capsule.
+- The encrypted manifest at cryptographic index 0, and independent chunks from 1.
+- A capability URL in the fragment, and a separate owner capability.
+- An SDK with create/upload/finalize/download/delete and progress.
+- Interoperability, limit and tampering tests.
 
 #### Relay
 
-- API HTTP v1 con reservas, carga por chunks, finalización atómica, lectura y
-  borrado.
-- Almacenamiento local con permisos mínimos y tokens hasheados.
-- TTL aplicado antes de leer y limpieza periódica del almacenamiento primario.
-- Configuración por entorno para CORS, tamaños, cantidad de chunks y TTL.
-- Límites de request, rate limiting básico y limpieza de reservas incompletas.
-- Health check que no revele información de cápsulas.
+- HTTP v1 API with reservations, chunked upload, atomic finalisation, reading
+  and deletion.
+- Local storage with minimum permissions and hashed tokens.
+- TTL applied before reading, and periodic cleanup of primary storage.
+- Environment configuration for CORS, sizes, chunk count and TTL.
+- Request limits, basic rate limiting and cleanup of incomplete reservations.
+- A health check that reveals nothing about capsules.
 
-#### Aplicación web
+#### Web application
 
-- Flujo de crear: archivo, TTL, nota opcional, progreso, enlace y capability de
-  propietario.
-- Flujo de recibir: validar fragmento, descargar, autenticar, guardar.
-- Interfaz por teclado, foco visible y errores accionables.
-- Sin analytics, publicidad ni scripts de terceros en la vista sensible.
-- Aviso visible: “quien posee el enlace puede leer; v0.1 no oculta tu IP”.
+- Create flow: file, TTL, optional note, progress, link and owner capability.
+- Receive flow: validate the fragment, download, authenticate, save.
+- Keyboard-usable interface, visible focus and actionable errors.
+- No analytics, advertising or third-party scripts in the sensitive view.
+- A visible notice: "whoever holds the link can read it; v0.1 does not hide
+  your IP".
 
 #### CLI
 
-- `create`, `download` y `delete` con códigos de salida estables.
-- Progreso en terminal y salida JSON opcional para scripting.
-- Protección contra impresión accidental de secretos en modo verboso.
-
-#### Operación y documentación
-
-- Ejecución local reproducible y configuración de ejemplo.
-- Guía de despliegue HTTPS y redacción de logs/proxy.
-- SRS, protocolo, modelo de amenazas y este roadmap sincronizados.
-- Política de vulnerabilidades y contacto de seguridad antes de una instancia
-  pública.
-
-### 4.2 Puerta de salida v0.1
-
-v0.1 se publica sólo si:
-
-- web, CLI y SDK intercambian archivos de 0 bytes, límites de chunk y al menos
-  10 MiB con hash final idéntico;
-- alterar manifest, chunk, tag o índice siempre falla de forma cerrada;
-- no aparecen claves ni capabilities completas en logs, URLs del relay, errores
-  o artefactos de prueba;
-- una cápsula incompleta nunca es legible;
-- expiración y DELETE poseen pruebas de carrera y limpieza;
-- límites se aplican antes de consumir memoria/disco no acotados;
-- los headers web, CORS, CSP y redirects han sido revisados;
-- la UI no usa “anónimo”, “irrastreable” o “autodestructivo”.
-
-## 5. v0.1.x — Endurecimiento
-
-Objetivo: operar v0.1 de forma honesta antes de distribuir la arquitectura.
-
-- Upload y descarga reanudables por inventario de chunks.
-- Idempotencia definida para reintentos de chunk/finalize sin permitir
-  sobrescritura con bytes distintos.
-- Errores externos uniformes para reducir enumeración de IDs válidos.
-- Cuotas por instancia y defensa contra reservas abandonadas.
-- Métricas agregadas sin IDs, tokens, IP persistente ni alta cardinalidad.
-- Backends de almacenamiento intercambiables y pruebas de crash/recuperación.
-- Builds firmados de CLI, checksums y SBOM.
-- Fuzzing del fragmento, manifiesto, JSON de relay y máquinas de estado.
-- Compatibilidad cruzada en Windows, macOS, Linux y navegadores objetivo.
-- Revisión de dependencias, superficie de supply chain y política de upgrades.
-
-**Puerta:** una instancia de prueba debe funcionar durante un período sostenido,
-con fallos de limpieza y uso de disco observables, sin conservar secretos en
-telemetría.
-
-## 6. v0.2 — Red abierta, anonimización parcial y permanencia opcional
-
-**Estado: implementado.** Objetivo: que una caída o censura de un único relay no
-destruya la cápsula, que el remitente pueda decidir cuánto revela, y que quien
-quiera aportar infraestructura pueda hacerlo sin pedir permiso.
-
-### 6.0 Entregado
-
-**Red abierta de relays**
-
-- Identidad Ed25519 por relay, generada al arrancar y persistida en
-  `identity.json`; `relayId` = digest de la clave pública.
-- `GET /v1/info`, `GET /v1/peers` y `POST /v1/peers/announce` con anuncios
-  firmados y ventana temporal de ±5 minutos.
-- Gossip periódico: saludo a peers configurados y conocidos, verificación de
-  cada dirección aprendida contra `/v1/info`, expulsión tras fallos repetidos y
-  tope `CAPSULE_MAX_PEERS`.
-- Defensa SSRF: se rechazan loopback, enlaces locales, rangos privados y CGNAT
-  salvo habilitación explícita para redes locales.
-- Descubrimiento del lado cliente (`discoverRelays`, `selectRelays`), replicación
-  opcional con `mirrors` en la capability, failover de lectura y borrado dirigido
-  a todos los relays con reporte honesto de los que no confirmaron.
-
-**Anonimización**
-
-- Limpieza de metadatos del archivo antes de cifrar: JPEG (APPn y comentarios),
-  PNG (`tEXt`/`zTXt`/`iTXt`/`eXIf`/`tIME`) y WebP (`EXIF`/`XMP` más los flags de
-  `VP8X`). Los formatos no soportados se reportan como tales.
-- Nombre y mime neutros en el manifiesto.
-- Relleno por clases de tamaño en pasos de un cuarto de octava con piso de
-  64 KiB; todos los chunks quedan del mismo tamaño y el receptor descarga
-  también el relleno.
-- Jitter opcional entre chunks.
-- Transporte SOCKS5/Tor en la CLI (`--proxy`, `--tor`), con resolución de nombre
-  en el proxy y soporte de `.onion`.
-- Relay sin retención de IP por defecto: sin direcciones en logs y rate limiting
-  por hash con sal rotativa.
-
-**Cápsulas sin vencimiento**
-
-- `expiresAt: null` en el manifiesto v2 y `expiresInSeconds: null` en la API.
-- Desactivado por defecto; el operador lo habilita y fija una cuota
-  (`CAPSULE_MAX_PERSISTENT_BYTES`), con `507` al agotarla.
-- La limpieza periódica nunca las toca; sólo la capability de retiro las borra.
-
-### 6.1 Diseño pendiente de validar
-
-- Capability con una lista autenticada de relays y tokens independientes.
-- Política configurable:
-  - **réplica completa** (implementada), simple pero costosa y correlacionable; o
-  - **fragmentación/erasure coding `k-of-n`** (pendiente), más eficiente pero
-    compleja.
-- Descarga concurrente acotada, fallback y reconstrucción determinista.
-- Consenso del cliente sobre TTL y estado; ningún relay amplía la retención
-  prometida por los demás.
-- Borrado best-effort dirigido a todos los relays, con reporte honesto de los que
-  no confirmaron.
-- Selección de operadores independientes y discovery firmado/versionado.
-
-### 6.2 Riesgos nuevos
-
-- Más relays observan horarios y tamaño, aumentando superficie de metadata.
-- Un manifiesto con endpoints puede facilitar correlación.
-- Operadores coludidos pueden retener fragmentos o bloquear reconstrucción.
-- Erasure coding no es cifrado; los fragmentos permanecen dentro de la envoltura
-  cifrada y no sustituyen AES-GCM.
-
-**Afirmación permitida:** “tolera la indisponibilidad configurada de relays”.  
-**Afirmación no permitida:** “es anónimo porque usa varios servidores”.
-
-## 7. v0.3 — Transferencia P2P
-
-Objetivo: permitir entrega directa cuando ambos dispositivos están disponibles,
-manteniendo relay como fallback temporal.
-
-- Negociación de sesión autenticada por una capability efímera.
-- Transporte inicial candidato: WebRTC DataChannel o QUIC/libp2p, evaluado por
-  portabilidad y superficie de identificación.
-- ICE/STUN/TURN documentado; el usuario debe saber cuándo se revela IP al par o a
-  infraestructura de señalización.
-- Reanudación, control de congestión y verificación por chunk idénticos al flujo
-  relay.
-- Modo “directo sólo” y modo “relay fallback” claramente separados.
-- Señalización mínima, sin directorio global de usuarios.
-
-**Puerta:** interoperabilidad web/escritorio, comportamiento correcto bajo NAT y
-cortes, y una pantalla que explique la exposición de IP antes de P2P.
-
-## 8. v0.4 — BLE y Wi-Fi local
-
-Objetivo: compartir cápsulas cercanas sin depender de Internet, especialmente en
-móviles y redes inestables.
-
-- Emparejamiento mediante QR/NFC/código corto autenticado.
-- Descubrimiento BLE con identificadores efímeros y rotatorios.
-- Transporte de datos por Wi-Fi local/Wi-Fi Direct cuando esté disponible; BLE
-  se usa preferentemente para discovery y control, no para archivos grandes.
-- Store-and-forward opcional con TTL local y límites de batería/espacio.
-- Protección contra replay, dispositivo equivocado y downgrade de transporte.
-- Estrategia explícita para restricciones de background en Android/iOS.
-
-**No-garantías:** dispositivos cercanos pueden observar radio, presencia y
-patrones; permisos y APIs del sistema operativo siguen siendo puntos de confianza.
-
-## 9. v0.5 — Recovery opt-in
-
-**Estado: implementado en 1.0.** Se entregaron dos de los candidatos que
-siguen: la exportación cifrada con frase de acceso (PBKDF2-SHA-256 + AES-GCM,
-parámetros versionados y ligados al ciphertext) y la división `k de n` de una
-capability entre personas o dispositivos, sin digest del secreto en las partes.
-No se incorporó escrow central ni "restablecer por email", y no se incorporará.
-Queda pendiente Argon2id, anotado en la sección 14.1.
-
-En v0.1 una clave perdida no puede recuperarse. Añadir recuperación siempre crea
-otra ruta de acceso; por eso debe ser opcional, visible y separada del relay de
-contenido.
-
-Candidatos a prototipar:
-
-- código de recuperación offline generado por el cliente;
-- división de secreto `k-of-n` entre dispositivos o contactos elegidos;
-- exportación cifrada con passphrase y KDF resistente a fuerza bruta, por ejemplo
-  Argon2id con parámetros versionados;
-- sincronización E2EE entre dispositivos ya autorizados;
-- recuperación independiente de `deleteToken`, sin conceder lectura cuando no
-  sea necesario.
-
-No se incorporará escrow central por defecto ni “restablecer por email” que
-entregue al servidor poder unilateral de descifrado.
-
-**Puerta:** análisis formal de compromisos, UI que muestre quién puede recuperar,
-pruebas de pérdida/rotación y revisión criptográfica del esquema seleccionado.
-
-## 10. v0.6 — Mix routing experimental
-
-Objetivo: investigar protección de metadata frente a un adversario definido, no
-agregar una cadena cosmética de proxies.
-
-Trabajo previo obligatorio:
-
-1. Definir si se busca resistir al relay, ISP local, varios relays coludidos o un
-   observador global pasivo.
-2. Medir latencia, ancho de banda y batería aceptables en redes móviles de LATAM.
-3. Seleccionar una construcción publicada —por ejemplo paquetes tipo Sphinx y
-   una mixnet con batching/delays— en vez de diseñar criptografía ad hoc.
-4. Diseñar directorio, rotación y admisión de nodos con defensa Sybil.
-5. Evaluar padding por clases de tamaño, fragmentación, delays, reordenamiento y
-   tráfico de cobertura.
-6. Resolver bootstrap censurable y actualización de listas sin una autoridad
-   única silenciosa.
-7. Publicar simulaciones y un testnet antes de integrar el modo en la aplicación
-   estable.
-
-El cliente podrá elegir automáticamente una vía rápida para transferencias
-ordinarias y una vía mix para alto riesgo, mostrando costo y garantía. Esta
-selección no debe ocultar que un anonimato set pequeño ofrece poca protección.
-
-**Puerta:** threat model específico, mediciones públicas, revisión académica o
-externa, diversidad real de operadores y ausencia de afirmaciones de anonimato
-basadas sólo en el número de saltos.
-
-## 11. v1.0 — Estabilidad y auditoría externa
-
-v1.0 no significa “sin bugs”; significa contrato estable, evidencia reproducible
-y proceso de respuesta maduro.
-
-### 11.1 Congelamiento previo
-
-- Especificación byte a byte y API candidatas a estabilidad.
-- Vectores de prueba oficiales y suite de conformidad para terceros.
-- Política de compatibilidad, migración y fin de vida de versiones.
-- Threat model actualizado para cada transporte habilitado por defecto.
-- Reproducible builds, artefactos firmados, lockfiles y SBOM.
-
-### 11.2 Revisiones independientes
-
-- Auditoría criptográfica de protocolo, nonces, capacidades y recovery.
-- Pentest de web, CLI, relay, CORS/CSP, storage y despliegue.
-- Revisión de privacidad/metadata con captura de tráfico.
-- Fuzzing y análisis estático/dinámico continuos.
-- Revisión móvil para keystore, background, BLE/Wi-Fi y backups del SO.
-
-Hallazgos críticos y altos deben corregirse y revalidarse antes de v1.0. El
-informe público puede redactar detalles explotables durante el embargo, pero debe
-publicar alcance, metodología, fecha y estado de remediación.
-
-### 11.3 Operación posterior
-
-- `security.txt`, canal coordinado de divulgación y SLA de triage.
-- Historial público de incidentes y advisories por versión.
-- Rotación/revocación de claves de distribución.
-- Programa de bug bounty cuando exista capacidad de respuesta.
-- Auditorías repetidas después de cambios de protocolo, no como sello permanente.
-
-## 12. Métricas de decisión
-
-Las métricas sirven para decidir arquitectura, no para afirmar seguridad por
-popularidad.
-
-| Área                 | Medida útil                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------ |
-| Fiabilidad           | Porcentaje de round-trips completos por tamaño/red y causa de fallo                                    |
-| Integridad           | Cero archivos publicados después de una autenticación parcial/fallida                                  |
-| Temporalidad         | Retraso p50/p95 entre vencimiento y eliminación primaria                                               |
-| Privacidad operativa | Cero secretos en logs/telemetría; inventario de metadata retenida                                      |
-| Recursos             | CPU, memoria, bytes extra y batería por MiB                                                            |
-| Multi-relay          | Éxito de reconstrucción ante `n-k` fallos y costo de almacenamiento                                    |
-| P2P/local            | Éxito bajo NAT, tiempo de conexión, exposición de IP y gasto de batería                                |
-| Mix                  | Latencia, padding, cover traffic, tamaño efectivo del anonymity set y resistencia medida a correlación |
-| Recovery             | Tasa de recuperación legítima, errores de usuario y nuevos caminos de compromiso                       |
-
-No se usará “número de nodos” como sustituto de diversidad jurisdiccional,
-independencia operativa, uso real o resistencia a Sybil.
-
-## 13. Decisiones que requieren evidencia antes de adoptarse
-
-- Blockchain o token de red.
-- Algoritmo criptográfico propio.
-- DHT público que exponga IDs o facilite enumeración.
-- Preview server-side de archivos cifrados.
-- CDN/analytics de terceros en la aplicación sensible.
-- Identidad global, número de teléfono o grafo social centralizado.
-- Recovery custodial habilitado por defecto.
-- Etiquetas de marketing como “anónimo”, “sin rastros” o “autodestructivo”.
-
-La ruta preferida es mantener un núcleo pequeño y componible: transporte cifrado
-usable primero; distribución y cercanía después; anonimato sólo cuando su modelo,
-costo y evidencia sean honestos.
-
-## 14. Después de 1.0: opciones y mejoras para la próxima versión
-
-v1.0 cerró el transporte cifrado, la anonimización de contenido y la red
-abierta. Lo que queda se agrupa en cuatro clases, y están ordenadas por lo que
-realmente aportan a alguien que usa CAPSULE hoy, no por lo vistoso que suenan.
-
-### 14.1 Cerrar lo que quedó a medias (v1.1)
-
-Trabajo acotado, con criterio de terminado claro, sin cambio de protocolo.
-
-| Pendiente                                  | Por qué importa                                                            | Criterio de terminado                                                          |
-| ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Limpieza de `/Info` en PDF                 | Es el formato de documento más común y el que más autoría filtra           | Reescritura incremental verificada contra un corpus real, sin corromper        |
-| TIFF, HEIF exóticos, contenedores de audio | Hoy se envían sin cambios                                                  | Soporte o rechazo explícito por formato, nunca silencio                        |
-| Fijar la conexión a la dirección resuelta  | Cierra la ventana de reasignación de DNS descrita en el modelo de amenazas | Conector propio con la dirección verificada, con prueba de regresión           |
-| Argon2id como KDF de recuperación          | PBKDF2 protege mal una frase corta frente a GPU                            | `kdf: "argon2id"` con parámetros versionados, leyendo lo anterior              |
-| Backends de almacenamiento intercambiables | Un relay serio no quiere todo en un disco local                            | Interfaz de almacenamiento y una implementación no local, con pruebas de caída |
-| Métricas agregadas                         | Un operador necesita ver uso sin retener nada                              | Contadores sin IDs, sin tokens, sin IP y sin alta cardinalidad                 |
-| Builds reproducibles y firmados            | Hoy se publican checksums y SBOM, pero la firma es manual                  | Build reproducible verificable por un tercero y firma en el proceso            |
-
-### 14.2 Alcance nuevo con transporte nuevo (v1.2 en adelante)
-
-Cada uno cambia el modelo de amenazas y necesita su propia sección antes de
-escribirse una línea de código.
-
-**Transferencia P2P.** Entrega directa cuando ambos dispositivos están
-disponibles, con el relay como respaldo. Puerta de entrada: una pantalla que
-explique la exposición de IP **antes** de conectar, comportamiento correcto
-bajo NAT, y modos "sólo directo" y "con respaldo" separados sin ambigüedad. No
-se empieza sin decidir el transporte (WebRTC o QUIC) midiendo su superficie de
-identificación, no su comodidad.
-
-**Cercanía: BLE y Wi-Fi local.** Intercambio sin Internet. Puerta de entrada:
-emparejamiento autenticado por QR o código corto, identificadores efímeros y
-rotatorios en el descubrimiento, y una estrategia explícita para las
-restricciones de segundo plano de Android y iOS. BLE para descubrimiento y
-control; los archivos por Wi-Fi.
-
-**Sincronización E2EE entre dispositivos del remitente.** Hoy una capability
-vive donde se creó. Puerta de entrada: un diseño donde el segundo dispositivo
-se autoriza sin que ningún servidor pueda descifrar.
-
-### 14.3 Protección de metadata
-
-**Construida en 1.1**, con los puntos 1, 3 y 4 de la lista original resueltos:
-el adversario está definido (el relay que almacena, y hasta cierto punto los
-nodos intermedios), la construcción es publicada (Sphinx y Loopix, usadas como
-están especificadas), y hay retardos y tráfico de cobertura. El diseño está en
-[MIXNET.md](./MIXNET.md) y el modelo en [THREAT_MODEL.md](./THREAT_MODEL.md)
-§14.
-
-Lo que **falta**, en orden de importancia:
-
-1. **Operadores independientes y usuarios.** Es el punto que domina a todos los
-   demás y el único que no se resuelve escribiendo código. Sin varios
-   operadores que no se conozcan entre sí, la red es maquinaria alrededor de
-   una sola parte que ve las dos puntas.
-2. **Mediciones publicadas**: latencia real, costo de la cobertura, tamaño
-   efectivo del conjunto de anonimato y resistencia medida a correlación, en
-   redes móviles reales de la región.
-3. **Una decisión fundada sobre nodos guardián.** Hoy el primer salto se
-   reelige en cada petición. Tor eligió al revés tras años de análisis; acá la
-   decisión está tomada por omisión, no por evidencia.
-4. **Soporte en el navegador**, cuando X25519 en Web Crypto esté disponible en
-   todas partes.
-5. **Revisión criptográfica externa** de esta composición.
-6. **Resistencia a censura**: no hay puentes ni transportes conectables.
-
-Nada de esto se enciende por omisión, y ninguna versión dirá "anónimo" por
-tener más saltos. Un anonymity set chico ofrece poca protección aunque la
-topología se vea impresionante — y por eso la CLI imprime su tamaño real antes
-de cada envío.
-
-### 14.4 Confianza verificable por terceros
-
-- **Auditoría criptográfica externa** del protocolo, los nonces, las
-  capabilities y la recuperación. La revisión de v1.0 fue interna y así está
-  etiquetada; una auditoría independiente es otra cosa.
-- **Pentest** de web, CLI, relay, CORS/CSP, almacenamiento y despliegue.
-- **Revisión de privacidad con captura de tráfico**, para contrastar lo que el
-  modelo de amenazas afirma con lo que se ve en la red.
-- **Fuzzing continuo** en integración continua, no sólo la suite actual.
-- **`security.txt`, canal de divulgación coordinada y SLA de triage** antes de
-  operar una instancia pública con usuarios reales.
-- **Historial público de incidentes** y advisories por versión.
-
-Los hallazgos críticos y altos se corrigen y revalidan antes de anunciar
-cualquier auditoría; el informe puede omitir detalles explotables durante el
-embargo, pero debe publicar alcance, método, fecha y estado de remediación.
-
-### 14.5 Lo que sigue necesitando evidencia antes de adoptarse
-
-Sin cambios respecto de v0.1, y por las mismas razones:
-
-- blockchain o token de red;
-- algoritmo criptográfico propio;
-- DHT público que exponga identificadores o facilite enumeración;
-- previsualización de archivos del lado del servidor;
-- CDN o analítica de terceros en la aplicación sensible;
-- identidad global, número de teléfono o grafo social centralizado;
-- recuperación custodial habilitada por omisión;
-- etiquetas de marketing como "anónimo", "sin rastros" o "autodestructivo".
-
-## 15. Después de 1.2: lo que falta, en orden de importancia
-
-Sin fechas. El orden es por cuánto cambia lo que CAPSULE puede afirmar
-honestamente, no por cuánto cuesta hacerlo.
-
-### 15.1 Lo que hay que arreglar antes de agregar nada
-
-**Que la extensión pueda ir por la red de mezcla.** Hoy consulta relays
-directamente y un relay ve una dirección preguntando por un nombre. Es la
-diferencia entre «un sitio que no puede rastrearte» y «un sitio que no puede
-rastrearte pero el relay sí». Requiere portar el cliente de mezcla a WebCrypto y
-resolver que un service worker MV3 se duerme; ninguna de las dos es trivial y
-las dos son necesarias.
-
-**Auditoría externa.** De la composición, no de las primitivas. Con alcance,
-método y fecha publicados, y el resultado publicado sea cual sea. Hasta que
-exista, todo lo que dice este repositorio se apoya únicamente en este
-repositorio.
-
-**Una decisión fundada sobre nodos guardián.** Hoy el primer salto se reelige en
-cada petición. Tor eligió al revés después de años de análisis. La decisión de
-CAPSULE está tomada por omisión, no por argumento, y eso hay que corregirlo con
-un análisis que la respalde o la revierta.
-
-**Operadores independientes.** Nada de lo anterior importa sin relays en
-jurisdicciones distintas que no se conozcan entre sí. Es trabajo de comunidad,
-no de código, y es el cuello de botella real.
-
-### 15.2 Sitios: lo que la versión 1.2 dejó pendiente
-
-- **Firefox y Safari.** La extensión es MV3 con `declarativeNetRequest`. Firefox
-  necesita un puerto; Safari, otro.
-- **Sitios grandes.** Hoy el paquete se baja entero para no revelar qué página se
-  leyó. Un esquema que baje de a bloques de tamaño fijo y con relleno podría
-  mantener la propiedad y escalar; hace falta diseñarlo, no improvisarlo.
-- **Nombres legibles, sin registrador.** Un archivo de punteros firmado por
-  alguien en quien el visitante ya confía —como los `.onion` de una organización
-  publicados en su sitio— no reintroduce un registrador central. Es una
-  alternativa a explorar, con cuidado de no convertirla en uno.
-- **Un modo «sólo lectura» real.** Hoy los scripts se apagan por sitio. Falta
-  poder decir «nunca, en ningún sitio», y que sea el estado por omisión de la
-  extensión sin excepción posible.
-
-### 15.3 Lo que ampliaría el alcance
-
-- **Transporte P2P.** Que dos clientes que pueden verse se pasen una cápsula sin
-  relay, con el relay como respaldo.
-- **Transportes de proximidad.** Bluetooth o Wi-Fi Direct para el caso en que no
-  hay internet. Es lo único de la tabla comparativa que CAPSULE no cubre y
-  podría cubrir sin cambiar su naturaleza.
-- **Puentes y transportes conectables.** Resistencia a la censura. Es una línea
-  de trabajo entera, no una función, y conviene mirar lo que ya existe antes de
-  escribir nada.
-- **Mensajería.** El formato de cápsula asume contenido conocido de antemano.
-  Una conversación no lo es. Sería un formato distinto sobre la misma red, no
-  una extensión de este.
-
-### 15.4 Lo que no se va a hacer
-
-- **Token, blockchain o economía de relays.** Resuelve el incentivo creando un
-  problema peor: algo que capturar.
-- **Cuentas.** Un identificador persistente es exactamente lo que este proyecto
-  existe para no tener.
-- **Criptografía propia.** Las primitivas se toman de la literatura. Lo nuevo es
-  la composición, y ya es suficiente superficie sin auditar.
+- `create`, `download` and `delete` with stable exit codes.
+- Terminal progress and optional JSON output for scripting.
+- Protection against accidentally printing secrets in verbose mode.
+
+#### Operation and documentation
+
+- Reproducible local execution and example configuration.
+- An HTTPS deployment guide and log/proxy redaction.
+- The SRS, protocol, threat model and this roadmap kept in sync.
+- A vulnerability policy and security contact before any public instance.
+
+### 4.2 v0.1 exit gate
+
+v0.1 ships only if:
+
+- web, CLI and SDK exchange 0-byte files, chunk-boundary files and at least
+  10 MiB with an identical final hash;
+- altering the manifest, a chunk, a tag or an index always fails closed;
+- no keys or complete capabilities appear in logs, relay URLs, errors or test
+  artefacts;
+- an incomplete capsule is never readable;
+- expiry and DELETE have race and cleanup tests;
+- limits are applied before consuming unbounded memory or disk;
+- the web headers, CORS, CSP and redirects have been reviewed;
+- the UI never says "anonymous", "untraceable" or "self-destructing".
+
+## 5. v0.1.x — Hardening
+
+Goal: operate v0.1 honestly before distributing the architecture.
+
+- Resumable upload and download from a chunk inventory.
+- Defined idempotency for chunk/finalize retries, without permitting an
+  overwrite with different bytes.
+- Uniform external errors, to reduce enumeration of valid IDs.
+- Per-instance quotas and defence against abandoned reservations.
+- Aggregate metrics with no IDs, tokens, persistent IPs or high cardinality.
+- Interchangeable storage backends and crash/recovery tests.
+- Signed CLI builds, checksums and an SBOM.
+- Fuzzing of the fragment, the manifest, relay JSON and the state machines.
+- Cross-compatibility on Windows, macOS, Linux and the target browsers.
+- Review of dependencies, supply-chain surface and an upgrade policy.
+
+**Gate:** a test instance must run for a sustained period, with cleanup
+failures and disk usage observable, retaining no secrets in telemetry.
+
+## 6. v0.2 — Open network, partial anonymisation and optional permanence
+
+**Status: implemented.** Goal: that one relay going down or being blocked does
+not destroy the capsule, that the sender can decide how much is revealed, and
+that anyone wanting to contribute infrastructure can do so without asking.
+
+### 6.0 Delivered
+
+**Open relay network**
+
+- An Ed25519 identity per relay, generated at startup and persisted in
+  `identity.json`; `relayId` is the digest of the public key.
+- `GET /v1/info`, `GET /v1/peers` and `POST /v1/peers/announce` with signed
+  announcements and a ±5 minute window.
+- Periodic gossip: greeting configured and known peers, verifying every learned
+  address against `/v1/info`, eviction after repeated failures, and a
+  `CAPSULE_MAX_PEERS` cap.
+- SSRF defence: loopback, link-local, private ranges and CGNAT are refused
+  unless explicitly enabled for local networks.
+- Client-side discovery (`discoverRelays`, `selectRelays`), optional
+  replication with `mirrors` in the capability, read failover, and deletion
+  addressed to every relay with an honest report of the ones that did not
+  confirm.
+
+**Anonymisation**
+
+- Stripping the file's own metadata before encrypting: JPEG (APPn and
+  comments), PNG (`tEXt`/`zTXt`/`iTXt`/`eXIf`/`tIME`) and WebP (`EXIF`/`XMP`
+  plus the `VP8X` flags). Unsupported formats are reported as such.
+- A neutral name and mime type in the manifest.
+- Size-class padding in quarter-octave steps with a 64 KiB floor; every chunk
+  ends up the same size and the receiver downloads the padding too.
+- Optional jitter between chunks.
+- SOCKS5/Tor transport in the CLI (`--proxy`, `--tor`), with name resolution at
+  the proxy and `.onion` support.
+- A relay that retains no IPs by default: no addresses in logs, and rate
+  limiting by a hash with a rotating salt.
+
+**Capsules without expiry**
+
+- `expiresAt: null` in the v2 manifest and `expiresInSeconds: null` in the API.
+- Off by default; the operator enables it and sets a quota
+  (`CAPSULE_MAX_PERSISTENT_BYTES`), with `507` when it runs out.
+- Periodic cleanup never touches them; only the owner capability deletes them.
+
+### 6.1 Design still to be validated
+
+- A capability with an authenticated list of relays and independent tokens.
+- A configurable policy:
+  - **full replica** (implemented), simple but expensive and correlatable; or
+  - **`k`-of-`n` erasure coding** (implemented in 1.0), more efficient but more
+    complex.
+- Bounded concurrent download, fallback and deterministic reconstruction.
+- Client consensus on TTL and state; no relay extends the retention the others
+  promised.
+- Best-effort deletion addressed to every relay, with an honest report of the
+  ones that did not confirm.
+- Selecting independent operators, and signed, versioned discovery.
+
+### 6.2 New risks
+
+- More relays observe timing and size, widening the metadata surface.
+- A manifest carrying endpoints can make correlation easier.
+- Colluding operators can withhold shards or block reconstruction.
+- Erasure coding is not encryption; shards stay inside the encrypted envelope
+  and do not replace AES-GCM.
+
+**Permitted claim:** "it tolerates the configured unavailability of relays".
+**Not permitted:** "it is anonymous because it uses several servers".
+
+## 7. v0.3 — P2P transfer
+
+Goal: allow direct delivery when both devices are available, keeping the relay
+as a temporary fallback.
+
+- Session negotiation authenticated by an ephemeral capability.
+- Candidate initial transport: WebRTC DataChannel or QUIC/libp2p, evaluated on
+  portability and identification surface.
+- ICE/STUN/TURN documented; the user must know when their IP is revealed to a
+  peer or to signalling infrastructure.
+- Resumption, congestion control and per-chunk verification identical to the
+  relay flow.
+- "Direct only" and "relay fallback" modes clearly separated.
+- Minimal signalling, with no global user directory.
+
+**Gate:** web/desktop interoperability, correct behaviour behind NAT and across
+disconnections, and a screen explaining IP exposure before P2P begins.
+
+## 8. v0.4 — BLE and local Wi-Fi
+
+Goal: share nearby capsules without depending on the internet, especially on
+mobile and unstable networks.
+
+- Pairing via QR/NFC or a short authenticated code.
+- BLE discovery with ephemeral, rotating identifiers.
+- Data transport over local Wi-Fi / Wi-Fi Direct where available; BLE is
+  preferred for discovery and control, not for large files.
+- Optional store-and-forward with a local TTL and battery/space limits.
+- Protection against replay, the wrong device, and transport downgrade.
+- An explicit strategy for background restrictions on Android and iOS.
+
+**Non-guarantees:** nearby devices can observe radio, presence and patterns;
+operating-system permissions and APIs remain trust points.
+
+## 9. v0.5 — Opt-in recovery
+
+**Status: implemented in 1.0.** Two of the candidates below shipped: encrypted
+export under a passphrase (PBKDF2-SHA-256 + AES-GCM, with versioned parameters
+bound to the ciphertext) and `k`-of-`n` splitting of a capability between people
+or devices, with no digest of the secret in the shares. Central escrow and
+"reset by email" were not added and will not be. Argon2id is still pending, and
+is noted in §14.1.
+
+In v0.1 a lost key could not be recovered. Adding recovery always creates
+another access path; that is why it must be optional, visible and separate from
+the content relay.
+
+Candidates to prototype:
+
+- an offline recovery code generated by the client;
+- `k`-of-`n` secret splitting across chosen devices or contacts;
+- an encrypted export under a passphrase with a brute-force-resistant KDF, for
+  example Argon2id with versioned parameters;
+- E2EE synchronisation between already-authorised devices;
+- recovery of the `deleteToken` independently, without granting read access
+  where it is not needed.
+
+Central escrow by default will not be added, nor a "reset by email" that hands
+the server unilateral decryption power.
+
+**Gate:** a formal analysis of the trade-offs, a UI showing who can recover,
+loss/rotation tests, and cryptographic review of the chosen scheme.
+
+## 10. v0.6 — Experimental mix routing
+
+Goal: investigate metadata protection against a defined adversary, not add a
+cosmetic chain of proxies.
+
+Mandatory prior work:
+
+1. Decide whether the aim is to resist the relay, the local ISP, several
+   colluding relays, or a global passive observer.
+2. Measure acceptable latency, bandwidth and battery on real mobile networks.
+3. Select a published construction — for example Sphinx-style packets and a
+   mixnet with batching and delays — rather than designing ad hoc cryptography.
+4. Design the directory, rotation and node admission with Sybil defence.
+5. Evaluate size-class padding, fragmentation, delays, reordering and cover
+   traffic.
+6. Solve censorable bootstrap and list updates without a single silent
+   authority.
+7. Publish simulations and a testnet before integrating the mode into the
+   stable application.
+
+The client should be able to choose a fast path for ordinary transfers and a
+mix path for high risk, showing the cost and the guarantee. That choice must not
+hide the fact that a small anonymity set offers little protection.
+
+**Gate:** a specific threat model, public measurements, academic or external
+review, real operator diversity, and no anonymity claims based only on the
+number of hops.
+
+## 11. v1.0 — Stability and external audit
+
+v1.0 does not mean "no bugs"; it means a stable contract, reproducible evidence
+and a mature response process.
+
+### 11.1 Freeze beforehand
+
+- A byte-for-byte specification and API that are candidates for stability.
+- Official test vectors and a conformance suite for third parties.
+- A compatibility, migration and end-of-life policy for versions.
+- A threat model updated for every transport enabled by default.
+- Reproducible builds, signed artefacts, lockfiles and an SBOM.
+
+### 11.2 Independent reviews
+
+- A cryptographic audit of the protocol, nonces, capabilities and recovery.
+- A pentest of the web app, CLI, relay, CORS/CSP, storage and deployment.
+- A privacy/metadata review with traffic capture.
+- Continuous fuzzing and static/dynamic analysis.
+- A mobile review for keystore, background, BLE/Wi-Fi and OS backups.
+
+Critical and high findings must be fixed and revalidated before v1.0. The public
+report may redact exploitable detail during an embargo, but it must publish
+scope, methodology, date and remediation status.
+
+### 11.3 Operation afterwards
+
+- `security.txt`, a coordinated disclosure channel and a triage SLA.
+- A public incident history and advisories per version.
+- Rotation and revocation of distribution keys.
+- A bug bounty programme once there is capacity to respond.
+- Repeated audits after protocol changes, not a permanent seal.
+
+## 12. Decision metrics
+
+Metrics are for deciding architecture, not for claiming security by
+popularity.
+
+| Area                | Useful measure                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| Reliability         | Percentage of complete round trips by size/network, and the cause of failures                     |
+| Integrity           | Zero files published after a partial or failed authentication                                     |
+| Time bounds         | p50/p95 delay between expiry and primary deletion                                                 |
+| Operational privacy | Zero secrets in logs/telemetry; an inventory of retained metadata                                 |
+| Resources           | CPU, memory, extra bytes and battery per MiB                                                      |
+| Multi-relay         | Reconstruction success under `n-k` failures, and storage cost                                     |
+| P2P/local           | Success behind NAT, connection time, IP exposure and battery spend                                |
+| Mix                 | Latency, padding, cover traffic, effective anonymity set size and measured correlation resistance |
+| Recovery            | Legitimate recovery rate, user errors, and new compromise paths                                   |
+
+"Number of nodes" will not be used as a substitute for jurisdictional
+diversity, operational independence, real usage or Sybil resistance.
+
+## 13. Decisions that need evidence before adoption
+
+- A blockchain or network token.
+- A cryptographic algorithm of our own.
+- A public DHT that exposes IDs or eases enumeration.
+- Server-side preview of encrypted files.
+- Third-party CDN or analytics in the sensitive application.
+- Global identity, phone numbers or a centralised social graph.
+- Custodial recovery enabled by default.
+- Marketing labels like "anonymous", "traceless" or "self-destructing".
+
+The preferred route is to keep a small, composable core: a usable encrypted
+transport first; distribution and proximity next; anonymity only when its
+model, cost and evidence are honest.
+
+## 14. After 1.0: options and improvements for the next version
+
+v1.0 closed out the encrypted transport, content anonymisation and the open
+network. What remained fell into four classes, ordered by what they actually
+give somebody using CAPSULE today rather than by how impressive they sound.
+
+### 14.1 Finish what was half-done (v1.1)
+
+Bounded work with a clear definition of done and no protocol change.
+
+| Pending                                        | Why it matters                                                          | Definition of done                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Cleaning `/Info` in PDFs                       | The most common document format, and the one that leaks authorship most | Incremental rewriting verified against a real corpus, without corruption  |
+| TIFF, exotic HEIF, audio containers            | Today they are sent unchanged                                           | Support or explicit refusal per format, never silence                     |
+| Pinning the connection to the resolved address | Closes the DNS rebinding window described in the threat model           | A custom connector using the verified address, with a regression test     |
+| Argon2id as the recovery KDF                   | PBKDF2 protects a short passphrase poorly against GPUs                  | `kdf: "argon2id"` with versioned parameters, still reading the old form   |
+| Interchangeable storage backends               | A serious relay does not want everything on one local disk              | A storage interface and one non-local implementation, with crash tests    |
+| Aggregate metrics                              | An operator needs to see usage without retaining anything               | Counters with no IDs, no tokens, no IPs and no high cardinality           |
+| Reproducible and signed builds                 | Checksums and an SBOM are published today, but signing is manual        | A reproducible build a third party can verify, and signing in the process |
+
+### 14.2 New scope with new transport (v1.2 onwards)
+
+Each of these changes the threat model and needs its own section before a line
+of code is written.
+
+**P2P transfer.** Direct delivery when both devices are available, with the
+relay as backup. Entry gate: a screen explaining IP exposure **before**
+connecting, correct behaviour behind NAT, and "direct only" and "with fallback"
+modes separated without ambiguity. It does not start without deciding the
+transport (WebRTC or QUIC) by measuring its identification surface, not its
+convenience.
+
+**Proximity: BLE and local Wi-Fi.** Exchange with no internet. Entry gate:
+pairing authenticated by QR or a short code, ephemeral rotating identifiers in
+discovery, and an explicit strategy for Android and iOS background
+restrictions. BLE for discovery and control; files over Wi-Fi.
+
+**E2EE synchronisation between the sender's own devices.** Today a capability
+lives where it was created. Entry gate: a design where the second device is
+authorised without any server being able to decrypt.
+
+### 14.3 Metadata protection
+
+**Built in 1.1**, with points 1, 3 and 4 of the original list resolved: the
+adversary is defined (the storing relay, and to a degree the intermediate
+nodes), the construction is published (Sphinx and Loopix, used as specified),
+and there are delays and cover traffic. The design is in
+[MIXNET.md](./MIXNET.md) and the model in [THREAT_MODEL.md](./THREAT_MODEL.md).
+
+What is **missing**, in order of importance:
+
+1. **Independent operators and users.** This dominates everything else and is
+   the only one that is not solved by writing code. Without several operators
+   who do not know each other, the network is machinery around a single party
+   that sees both ends.
+2. **Published measurements**: real latency, the cost of cover traffic, the
+   effective anonymity set size and measured correlation resistance, on real
+   mobile networks.
+3. **A reasoned decision about guard nodes.** Today the first hop is re-chosen
+   on every request. Tor chose the other way after years of analysis; here the
+   decision was made by default, not by evidence.
+4. **Browser support**, once X25519 in Web Crypto is available everywhere.
+5. **External cryptographic review** of this composition.
+
+Point 6 of the original list — censorship resistance — was addressed in 1.3
+with bridges; see [CENSORSHIP.md](./CENSORSHIP.md) for what that does and does
+not cover.
+
+None of this is on by default, and no version will say "anonymous" for having
+more hops. A small anonymity set offers little protection however impressive
+the topology looks — which is why the CLI prints its real size before every
+send.
+
+### 14.4 Trust that third parties can verify
+
+- **An external cryptographic audit** of the protocol, the nonces, the
+  capabilities and recovery. The v1.0 review was internal and is labelled that
+  way; an independent audit is a different thing.
+- **A pentest** of the web app, CLI, relay, CORS/CSP, storage and deployment.
+- **A privacy review with traffic capture**, to compare what the threat model
+  claims with what is visible on the wire.
+- **Continuous fuzzing** in CI, not just the current suite.
+- **`security.txt`, a coordinated disclosure channel and a triage SLA** before
+  operating a public instance with real users.
+- **A public incident history** and advisories per version.
+
+Critical and high findings are fixed and revalidated before any audit is
+announced; the report may omit exploitable detail during an embargo, but must
+publish scope, method, date and remediation status.
+
+### 14.5 What still needs evidence before adoption
+
+Unchanged since v0.1, and for the same reasons:
+
+- a blockchain or network token;
+- a cryptographic algorithm of our own;
+- a public DHT that exposes identifiers or eases enumeration;
+- server-side preview of files;
+- third-party CDN or analytics in the sensitive application;
+- global identity, phone numbers or a centralised social graph;
+- custodial recovery enabled by default;
+- marketing labels like "anonymous", "traceless" or "self-destructing".
+
+## 15. After 1.2: sites and the mix network
+
+### 15.1 What has to be fixed before anything is added
+
+**Letting the extension use the mix network.** Today it queries relays directly
+and a relay sees an address asking about a name. That is the difference between
+"a site that cannot track you" and "a site that cannot track you but the relay
+can". It needs the mix client ported to WebCrypto and the problem of an MV3
+service worker going to sleep solved; neither is trivial and both are
+necessary.
+
+**An external audit.** Of the composition, not the primitives. With scope,
+method and date published, and the result published whatever it is. Until that
+exists, everything this repository says rests only on this repository.
+
+**A reasoned decision about guard nodes.** Today the first hop is re-chosen on
+every request. Tor chose the other way after years of analysis. CAPSULE's
+decision was made by default, not by argument, and that needs correcting with
+analysis that either supports or reverses it.
+
+**Independent operators.** None of the above matters without relays in
+different jurisdictions that do not know each other. That is community work,
+not code, and it is the real bottleneck.
+
+### 15.2 Sites: what 1.2 left open
+
+- **Firefox and Safari.** The extension is MV3 with `declarativeNetRequest`.
+  Firefox needs a port; Safari, another.
+- **Large sites.** Today the bundle is downloaded whole so that no page-read
+  pattern exists. A scheme that fetched fixed-size padded blocks could keep the
+  property and scale; it needs designing, not improvising.
+- **Readable names, with no registrar.** A signed pointer file published by
+  somebody the visitor already trusts — like an organisation publishing its
+  `.onion` on its own site — does not reintroduce a central registrar. It is
+  worth exploring, carefully enough not to become one.
+- **A real "reading only" mode.** Today scripts are turned off per site. There
+  is no way yet to say "never, on any site" and have that be the extension's
+  default with no exception possible.
+
+## 16. After 1.3: what is next
+
+### 16.1 A general-purpose TCP tunnel — _work in progress_
+
+Tor, I2P, Lokinet and Yggdrasil carry any TCP connection. CAPSULE carries files
+and static sites, and the comparison tables say so. This is the design intended
+to close that, written down here so the claim "in progress" means something
+more than an intention.
+
+**Why it is not an extension of the capsule format.** A capsule assumes the
+content is known in full before anything is sent: that is what makes size-class
+padding, chunk counts and `k`-of-`n` sharing possible. A stream is the opposite
+— unbounded, interactive, with timing that carries meaning. So this is a second
+format beside the existing one, not a change to it.
+
+**The shape it should take.**
+
+- A **stream frame** that fits exactly one mix packet payload, so a tunnel is
+  indistinguishable on the wire from a capsule transfer and from cover traffic.
+  The 64,512-byte plaintext budget is already the unit everything else uses.
+- **Constant-rate framing**, with padding frames sent when there is nothing to
+  send. Otherwise the shape of the stream is the shape of the conversation, and
+  a tunnel over a mix network would leak more than a capsule does.
+- A **SOCKS5 listener** on the client, because everything already speaks it —
+  including CAPSULE's own `--proxy`.
+- An **exit decision that is explicitly the operator's**, not a default. This is
+  the hard part and it is not technical: an exit node sees plaintext traffic to
+  the open internet, with the legal exposure Tor exit operators know well. It
+  must be off unless deliberately switched on, with the consequences stated in
+  the operator guide before the switch exists.
+
+**What has to be settled first.**
+
+1. Whether CAPSULE should have exit nodes at all. Everything in the design so
+   far has avoided them — the destination is always the relay itself, so no
+   party ever sees plaintext without being its recipient. A TCP tunnel breaks
+   that property, and it may be the wrong trade for this project.
+2. The latency budget. Per-hop delays that are reasonable for a file are
+   unusable for a shell session. Either the tunnel gets a shorter delay profile
+   — and says what that costs — or it is only useful for things that tolerate
+   seconds.
+3. Congestion and backpressure across a mix network that deliberately reorders
+   and delays, which is not a solved problem in the literature.
+
+**Definition of done.** A SOCKS5 endpoint carrying a real TCP session through
+at least three hops; constant-rate framing verified by capture; exits off by
+default with documented operator consequences; and an updated threat model
+section written **before** the feature is enabled anywhere.
+
+### 16.2 What would widen the scope
+
+- **P2P transport.** Two clients that can see each other passing a capsule with
+  no relay, with the relay as backup.
+- **Proximity transports.** Bluetooth or Wi-Fi Direct. Offline capsules and LAN
+  discovery cover the "no internet" case in 1.3; radio and mesh are still not
+  covered, and are what Briar and Meshtastic are for.
+- **Pluggable transports.** Bridges landed in 1.3, but there is no protocol
+  obfuscation and the TLS fingerprint is Node's. Worth looking hard at what
+  already exists before writing anything.
+- **Messaging.** The capsule format assumes content known in advance. A
+  conversation is not. It would be a different format over the same network, not
+  an extension of this one.
+
+### 16.3 What will not be done
+
+- **A token, blockchain or relay economy.** It solves the incentive by creating
+  a worse problem: something to capture.
+- **Accounts.** A persistent identifier is exactly what this project exists in
+  order not to have.
+- **Cryptography of our own.** The primitives come from the literature. What is
+  new is the composition, and that is already enough unaudited surface.

@@ -67,7 +67,7 @@ const program = new Command();
 program
   .name("capsule")
   .description("Send and receive private, temporary CAPSULE payloads")
-  .version("1.2.0")
+  .version("1.3.0")
   .option("--json", "print machine-readable JSON")
   .option(
     "--proxy <url>",

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CAPSULE",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Opens .capsule sites: names that are their own key, pages no relay can read or forge.",
   "minimum_chrome_version": "137",
   "permissions": ["declarativeNetRequest", "storage"],

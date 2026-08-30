@@ -1,668 +1,767 @@
-# CAPSULE — Modelo de amenazas
+# CAPSULE — threat model
 
-**Estado:** vigente para CAPSULE 1.1  
-**Fecha:** 2026-08-29  
-**Alcance:** protocolo v1, v2 y v3; aplicación web, CLI, SDK y relay de referencia
+**Status:** current for CAPSULE 1.3
+**Date:** 2026-08-30
+**Scope:** protocol v1, v2 and v3; the web app, CLI, SDK, browser extension and
+reference relay
 
-Las secciones 1 a 11 describen el modelo de v0.1 y siguen siendo la base. La
-sección 12 cubre lo que cambió en v0.2 (anonimización parcial, cápsulas sin
-vencimiento, red abierta), la 13 lo de v1.0 (reparto `k de n`, recuperación,
-y los hallazgos de la revisión de seguridad con sus correcciones) y la 14 la
-red de mezcla de 1.1.
+Sections 1 to 11 describe the v0.1 model and remain the foundation. Section 12
+covers what changed in v0.2 (partial anonymisation, capsules without expiry, an
+open network), 13 covers v1.0 (`k`-of-`n` sharing, recovery, and the findings of
+the security review with their fixes), 14 the mix network of 1.1, 15 the
+`.capsule` sites of 1.2, and 16 the bridges, offline capsules and uniform
+manifests of 1.3.
 
-## 1. Resumen ejecutivo
+## 1. Executive summary
 
-CAPSULE v0.1 está diseñado para que un relay pueda almacenar y entregar un
-archivo temporal **sin conocer su contenido ni sus metadatos privados**. El
-archivo se cifra en el cliente y la clave viaja en el fragmento del enlace, no
-en las solicitudes HTTP al relay.
+CAPSULE is designed so that a relay can store and deliver a temporary file
+**without knowing its content or its private metadata**. The file is encrypted
+on the client and the key travels in the link's fragment, not in the HTTP
+requests to the relay.
 
-La promesa termina ahí: v0.1 **no es una red de anonimato**. El relay, proveedor
-de Internet, CDN o un observador de red pueden inferir quién se conecta, cuándo,
-cuánto transfiere y qué relay utiliza. Tampoco existe una forma técnica de
-impedir que un destinatario copie el archivo ni de demostrar que un relay
-malicioso borró todos sus backups.
+The promise ends there. CAPSULE **is not an anonymity network**. The relay, the
+internet provider, a CDN or a network observer can infer who connects, when, how
+much they transfer and which relay they use. There is also no technical way to
+stop a recipient copying the file, or to prove that a malicious relay deleted
+all of its backups.
 
-Declaración segura para el producto:
+A safe statement for the product:
 
-> CAPSULE protege el contenido y detecta alteraciones mientras la clave permanezca
-> secreta. El enlace concede acceso. La versión 0.1 no oculta identidades de red
-> ni garantiza la desaparición de copias.
+> CAPSULE protects the content and detects tampering for as long as the key
+> stays secret. The link grants access. It does not hide network identities and
+> does not guarantee that copies disappear.
 
-## 2. Sistema y límites de confianza
+## 2. System and trust boundaries
 
 ```text
-              canal externo que transporta la capability URL
-   Remitente ------------------------------------------------> Destinatario
+              external channel carrying the capability URL
+   Sender ---------------------------------------------------> Recipient
       |                                                             |
-      | cliente cifra localmente                         cliente descifra
+      | client encrypts locally                         client decrypts
       |                                                             |
       +---------------- HTTPS ------------+------------- HTTPS -----+
                                            |
-                                      Relay no confiable
-                                 ciphertext, TTL y capacidades
+                                     Untrusted relay
+                                ciphertext, TTL and capabilities
                                            |
-                                  almacenamiento / backups / logs
+                                  storage / backups / logs
 ```
 
-Límites relevantes:
+Relevant boundaries:
 
-1. **Dispositivo del remitente.** Ve plaintext, nombre, nota, claves y todas las
-   capacidades.
-2. **Origen de la aplicación web.** Entrega JavaScript que luego puede leer el
-   fragmento. Es parte de la base de confianza; un origen comprometido puede
-   robar la capability aunque el relay nunca la reciba como URL.
-3. **Canal remitente–relay.** Debe usar TLS en producción. El archivo conserva
-   además cifrado de extremo a extremo.
-4. **Relay y almacenamiento.** Se consideran honestos o maliciosos según la
-   amenaza. Nunca se confían para confidencialidad o integridad; sí se depende de
-   ellos para disponibilidad, aplicación del TTL y borrado.
-5. **Canal usado para compartir el enlace.** Ve la capability completa. Si no es
-   confidencial, cualquier observador de ese canal puede leer la cápsula.
-6. **Dispositivo del destinatario.** Ve capability y plaintext. Después de la
-   descarga queda fuera del control de CAPSULE.
+1. **The sender's device.** Sees plaintext, the name, the note, the keys and
+   every capability.
+2. **The web application's origin.** Serves the JavaScript that later reads the
+   fragment. It is part of the trust base; a compromised origin can steal the
+   capability even though the relay never receives it as a URL.
+3. **The sender–relay channel.** Must use TLS in production. The file keeps its
+   end-to-end encryption as well.
+4. **The relay and its storage.** Treated as honest or malicious depending on
+   the threat. Never trusted for confidentiality or integrity; depended on for
+   availability, TTL enforcement and deletion.
+5. **The channel used to share the link.** Sees the complete capability. If it
+   is not confidential, any observer of it can read the capsule.
+6. **The recipient's device.** Sees the capability and the plaintext. After
+   download it is outside CAPSULE's control.
 
-La CLI reduce la dependencia de JavaScript servido dinámicamente, pero sigue
-confiando en el binario, sus dependencias, el sistema operativo y su mecanismo
-de distribución.
+The CLI reduces the dependence on dynamically served JavaScript, but still
+trusts the binary, its dependencies, the operating system and its distribution
+mechanism.
 
-## 3. Activos
+## 3. Assets
 
-| Activo                               | Confidencialidad                             | Integridad                           | Disponibilidad/retención                 |
-| ------------------------------------ | -------------------------------------------- | ------------------------------------ | ---------------------------------------- |
-| Contenido del archivo                | Alta                                         | Alta                                 | Hasta el TTL, sin garantía fuerte        |
-| Nombre, MIME, nota y tamaño original | Nombre/MIME/nota: alta; tamaño: sólo parcial | Alta mediante manifiesto autenticado | Igual que la cápsula                     |
-| `key` y `noncePrefix`                | Crítica                                      | Alta                                 | No recuperables                          |
-| Capability URL y `readToken`         | Crítica                                      | Alta                                 | Válidos hasta borrar/vencer              |
-| `writeToken`                         | Crítica durante la carga                     | Alta                                 | Puede desecharse al finalizar            |
-| `deleteToken`                        | Crítica para el propietario                  | Alta                                 | No recuperable                           |
-| Dirección IP y patrón de acceso      | Deseable, pero no protegido en v0.1          | No aplica                            | Puede aparecer en infraestructura y logs |
-| Estado/TTL de la cápsula             | Parcialmente visible al relay                | Importante                           | Aplicado por el relay                    |
-| Disponibilidad del relay             | No aplica                                    | Alta                                 | No garantizada en v0.1                   |
+| Asset                              | Confidentiality                          | Integrity                            | Availability/retention                  |
+| ---------------------------------- | ---------------------------------------- | ------------------------------------ | --------------------------------------- |
+| File content                       | High                                     | High                                 | Until the TTL, with no strong guarantee |
+| Name, MIME, note and original size | Name/MIME/note: high; size: partial only | High, via the authenticated manifest | Same as the capsule                     |
+| `key` and `noncePrefix`            | Critical                                 | High                                 | Not recoverable                         |
+| Capability URL and `readToken`     | Critical                                 | High                                 | Valid until deleted or expired          |
+| `writeToken`                       | Critical during upload                   | High                                 | Can be discarded after finalising       |
+| `deleteToken`                      | Critical to the owner                    | High                                 | Not recoverable                         |
+| IP address and access pattern      | Desirable, but not protected by default  | Not applicable                       | May appear in infrastructure and logs   |
+| Capsule state/TTL                  | Partly visible to the relay              | Important                            | Enforced by the relay                   |
+| Relay availability                 | Not applicable                           | High                                 | Not guaranteed                          |
 
-## 4. Información observable
+## 4. Observable information
 
-### 4.1 El relay puede observar
+### 4.1 What the relay can observe
 
-- IP y características de conexión del cliente, salvo que éste use por su cuenta
-  una red de privacidad compatible.
-- Hora de creación, uploads, lecturas, borrado y vencimiento.
-- Identificador, estado, número de chunks y bytes cifrados.
-- TTL solicitado/efectivo y frecuencia de reintentos.
-- Tokens bearer mientras procesa la solicitud. Debe conservar sólo sus hashes,
-  pero un relay malicioso puede registrar los valores.
-- Correlación probable entre una carga y lecturas posteriores por tamaño y tiempo.
+- The client's IP and connection characteristics, unless the client uses a
+  compatible privacy network of its own.
+- The time of creation, uploads, reads, deletion and expiry.
+- The identifier, state, chunk count and encrypted byte count.
+- The requested and effective TTL, and the frequency of retries.
+- Bearer tokens while it processes a request. It should keep only their hashes,
+  but a malicious relay can record the values.
+- A probable correlation between an upload and later reads, by size and time.
 
-### 4.2 El relay no debería poder observar
+### 4.2 What the relay should not be able to observe
 
-- Clave AES ni prefijo de nonce.
-- Plaintext del archivo.
-- Nombre, MIME, nota y tamaño exacto original dentro del manifiesto, aunque puede
-  aproximar el tamaño por ciphertext y overhead.
-- Canal o identidad humana mediante la cual se compartió el enlace.
+- The AES key or the nonce prefix.
+- The file's plaintext.
+- The name, MIME type, note and exact original size inside the manifest, though
+  it can approximate the size from the ciphertext and overhead.
+- The channel or human identity through which the link was shared.
 
-### 4.3 Otros observadores
+### 4.3 Other observers
 
-- ISP, DNS, CDN y observadores de red pueden ver IPs, dominios, tiempos y
-  volúmenes. TLS oculta paths, headers y cuerpos frente a observadores pasivos,
-  pero no frente al endpoint TLS.
-- El servicio de mensajería usado para compartir el enlace puede ver la
-  capability completa y descifrar la cápsula.
-- Historial/sincronización del navegador, portapapeles, extensiones, capturas,
-  antivirus y malware local pueden capturar el enlace o plaintext.
+- ISPs, DNS, CDNs and network observers can see IPs, domains, times and
+  volumes. TLS hides paths, headers and bodies from passive observers, but not
+  from the TLS endpoint.
+- The messaging service used to share the link can see the complete capability
+  and decrypt the capsule.
+- Browser history and sync, the clipboard, extensions, screenshots, antivirus
+  and local malware can capture the link or the plaintext.
 
-## 5. Adversarios contemplados
+## 5. Adversaries considered
 
-| ID  | Adversario                           | Capacidades                                                                             |
-| --- | ------------------------------------ | --------------------------------------------------------------------------------------- |
-| A1  | Relay curioso                        | Lee almacenamiento, metadatos operativos y requests; sigue el protocolo                 |
-| A2  | Relay malicioso o comprometido       | Omite, reemplaza, reordena o conserva datos; registra tokens; miente sobre TTL y estado |
-| A3  | Observador pasivo local o de red     | Observa conexiones, tiempos, volumen, DNS/IP y potencialmente tráfico sin TLS           |
-| A4  | Atacante activo de red               | Bloquea, redirige o altera tráfico; no rompe TLS correctamente validado                 |
-| A5  | Lector no autorizado                 | Obtiene ID, adivina tokens, enumera endpoints o encuentra un enlace filtrado            |
-| A6  | Destinatario malicioso               | Posee la capability legítima, descarga, copia y redistribuye plaintext                  |
-| A7  | Origen web/supply chain comprometido | Modifica JavaScript o binarios para extraer fragmentos, archivos o claves               |
-| A8  | Dispositivo comprometido             | Lee memoria, disco, teclado, pantalla, portapapeles y archivos                          |
-| A9  | Atacante de disponibilidad/abuso     | Agota ancho de banda, disco, CPU, descriptores o IDs mediante cargas/lecturas           |
-| A10 | Observador global                    | Correlaciona ingreso y egreso a escala de red mediante tiempo y tamaño                  |
+| ID  | Adversary                             | Capabilities                                                                        |
+| --- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| A1  | Curious relay                         | Reads storage, operational metadata and requests; follows the protocol              |
+| A2  | Malicious or compromised relay        | Omits, replaces, reorders or retains data; records tokens; lies about TTL and state |
+| A3  | Passive local or network observer     | Observes connections, timing, volume, DNS/IP and potentially traffic without TLS    |
+| A4  | Active network attacker               | Blocks, redirects or alters traffic; does not break correctly validated TLS         |
+| A5  | Unauthorised reader                   | Obtains an ID, guesses tokens, enumerates endpoints or finds a leaked link          |
+| A6  | Malicious recipient                   | Holds a legitimate capability, downloads, copies and redistributes plaintext        |
+| A7  | Compromised web origin / supply chain | Modifies JavaScript or binaries to extract fragments, files or keys                 |
+| A8  | Compromised device                    | Reads memory, disk, keyboard, screen, clipboard and files                           |
+| A9  | Availability/abuse attacker           | Exhausts bandwidth, disk, CPU, descriptors or IDs through uploads and reads         |
+| A10 | Global observer                       | Correlates ingress and egress at network scale, by time and size                    |
+| A11 | Censor                                | Enumerates and blocks relay addresses, probes suspected ones, fingerprints traffic  |
 
-No se asume que un atacante pueda romper AES-256-GCM, SHA-256, un CSPRNG sano o
-TLS moderno correctamente implementado. Si esa hipótesis cambia, la versión de
-protocolo debe revisarse.
+It is not assumed that an attacker can break AES-256-GCM, SHA-256, a healthy
+CSPRNG or correctly implemented modern TLS. If that assumption changes, the
+protocol version has to be revisited.
 
-## 6. Garantías de v0.1
+## 6. Guarantees
 
-Estas garantías son condicionales a clientes correctos, entropía segura y secreto
-de la capability:
+These are conditional on correct clients, safe entropy and the capability
+staying secret:
 
-1. **Confidencialidad del contenido en el relay.** Ciphertext almacenado sin
-   `key` no revela de forma práctica plaintext, nombre, MIME ni nota.
-2. **Integridad y autenticidad criptográfica.** Alterar un bit de manifiesto,
-   chunk o tag provoca fallo de AES-GCM.
-3. **Posición autenticada.** El nonce y AAD dependientes del índice detectan
-   reordenamiento o sustitución entre posiciones.
-4. **Aislamiento entre cápsulas.** Claves y prefijos independientes evitan que
-   comprometer una cápsula descifre las demás.
-5. **Acceso por capacidad no enumerable.** Con IDs/tokens aleatorios y límites de
-   tasa, adivinar una capacidad de 256 bits no es viable.
-6. **Clave ausente de la API normal del relay.** El formato usa fragmento URL, que
-   el navegador no envía en requests HTTP estándar.
-7. **Temporalidad con relay conforme.** Un relay honesto niega lecturas después
-   del TTL y elimina su copia primaria según la política documentada.
-8. **Revocación operativa.** El propietario puede pedir eliminación anticipada
-   mediante una capability diferente de la de lectura.
+1. **Content confidentiality at the relay.** Stored ciphertext without the
+   `key` does not practically reveal plaintext, name, MIME type or note.
+2. **Cryptographic integrity and authenticity.** Altering one bit of the
+   manifest, a chunk or a tag makes AES-GCM fail.
+3. **Authenticated position.** The index-dependent nonce and AAD detect
+   reordering or substitution between positions.
+4. **Isolation between capsules.** Independent keys and prefixes stop the
+   compromise of one capsule decrypting the others.
+5. **Non-enumerable capability access.** With random IDs and tokens plus rate
+   limits, guessing a 256-bit capability is not feasible.
+6. **The key is absent from the relay's normal API.** The format uses the URL
+   fragment, which the browser does not send in standard HTTP requests.
+7. **Time bounds with a conforming relay.** An honest relay refuses reads after
+   the TTL and deletes its primary copy per the documented policy.
+8. **Operational revocation.** The owner can request early deletion through a
+   capability distinct from the read one.
 
-La autenticación del contenido significa “producido por alguien que tenía la
-clave”, no identifica civilmente al remitente ni proporciona firma o no repudio.
+Content authentication means "produced by somebody who had the key". It does
+not identify the sender legally and provides neither a signature nor
+non-repudiation.
 
-## 7. No-garantías explícitas
+## 7. Explicit non-guarantees
 
-CAPSULE v0.1 no garantiza:
+CAPSULE does not guarantee:
 
-- **Anonimato, unlinkability o protección de metadata de red.** No hay onion
-  routing, mixnet, padding ni tráfico de cobertura.
-- **Resistencia a correlación.** Un observador puede vincular una carga de tamaño
-  X con una descarga similar poco después.
-- **Disponibilidad o resistencia a censura.** El relay puede caer, bloquear un
-  país, eliminar datos o ser bloqueado.
-- **Borrado verificable.** TTL y DELETE no prueban que desaparecieron backups,
-  snapshots, logs, ciphertext retenido o copias del destinatario.
-- **Control posterior a la descarga.** No existe DRM; el destinatario puede
-  guardar, fotografiar o redistribuir.
-- **Seguridad del endpoint.** Malware, extensiones, navegador, sistema operativo,
-  JavaScript malicioso o una supply chain comprometida pueden robar plaintext y
-  secretos.
-- **Secreto del canal de compartición.** El enlace es la credencial. Un preview
-  bot, historial de chat o tercero que lo vea puede abrirlo.
-- **Forward secrecy dentro de una cápsula.** Si la clave se filtra en el futuro,
-  ciphertext grabado anteriormente puede descifrarse. La separación de claves
-  sí limita el incidente a esa cápsula.
-- **Negación plausible, firma, autoría o no repudio.** v1 no firma identidades.
-- **Protección contra archivos maliciosos.** Cifrar y autenticar no vuelve seguro
-  un ejecutable, documento activo o payload.
-- **Recuperación.** Perder el enlace, la clave o `deleteToken` es irreversible.
-- **Privacidad poscuántica integral.** v1 no formula esa promesa ni protege los
-  endpoints y canales externos frente a ese adversario.
-- **Cumplimiento legal automático.** El cifrado no sustituye políticas, contratos
-  ni obligaciones aplicables al operador.
+- **Anonymity, unlinkability or network metadata protection by default.**
+  Without `--mix`, there is no mixing, padding of the connection, or cover
+  traffic.
+- **Correlation resistance.** An observer can link an upload of size X with a
+  similar download shortly afterwards.
+- **Availability or censorship resistance in general.** A relay can go down,
+  block a country, delete data or be blocked. Bridges (§16) address enumeration
+  and probing, not traffic analysis.
+- **Verifiable deletion.** TTL and DELETE do not prove that backups, snapshots,
+  logs, retained ciphertext or the recipient's copies are gone.
+- **Control after download.** There is no DRM; the recipient can save,
+  photograph or redistribute.
+- **Endpoint security.** Malware, extensions, the browser, the operating
+  system, malicious JavaScript or a compromised supply chain can steal
+  plaintext and secrets.
+- **Secrecy of the sharing channel.** The link is the credential. A preview
+  bot, a chat history or any third party that sees it can open it.
+- **Forward secrecy within a capsule.** If the key leaks in the future,
+  previously recorded ciphertext can be decrypted. Key separation does limit
+  the incident to that capsule.
+- **Plausible deniability, signature, authorship or non-repudiation.** The
+  format signs no identities.
+- **Protection against malicious files.** Encrypting and authenticating does not
+  make an executable, active document or payload safe.
+- **Recovery.** Losing the link, the key or the `deleteToken` is irreversible
+  unless recovery was set up in advance.
+- **Comprehensive post-quantum privacy.** No such promise is made, and the
+  endpoints and external channels are not protected against that adversary.
+- **Automatic legal compliance.** Encryption does not replace policies,
+  contracts or obligations applying to the operator.
 
-## 8. Análisis de amenazas y controles
+## 8. Threat analysis and controls
 
-| Amenaza                              | Control v0.1                                                                                | Riesgo residual                                                                          |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Relay o ladrón de disco lee archivos | AES-256-GCM en cliente; clave fuera del relay                                               | Tamaño, tiempo y patrón siguen visibles; una capability filtrada descifra                |
-| Relay altera o reordena ciphertext   | Tags GCM, nonce y AAD por índice; tamaño/recuento autenticados en manifiesto                | Puede omitir todo o negar servicio                                                       |
-| Reutilización de nonce GCM           | CSPRNG; prefijo nuevo por cápsula; índice 0 exclusivo de manifiesto; no sobrescribir chunks | Un bug de cliente puede destruir la seguridad; requiere tests y revisión                 |
-| Enumeración y fuerza bruta           | IDs ≥128 bits, tokens de 256 bits, errores uniformes y rate limiting                        | El relay conoce todos sus IDs; enlaces filtrados evitan la fuerza bruta                  |
-| Intercepción de red                  | HTTPS obligatorio en producción más cifrado de contenido                                    | TLS no oculta IP/dominio/volumen; el endpoint TLS ve bearer tokens                       |
-| Redirect roba bearer token           | Endpoints sin redirects; cliente debe rechazarlos                                           | Proxy/origen comprometido aún puede capturar requests                                    |
-| Filtración por fragmento             | Fragmento no enviado por HTTP, CSP, sin terceros, `no-referrer`, limpiar barra              | Historial, clipboard, extensiones, preview bots y canal externo permanecen               |
-| Código web malicioso                 | CSP, build fijado, dependencia mínima, auditoría futura; CLI como alternativa               | La web servida dinámicamente sigue siendo un punto de confianza fuerte                   |
-| Token en logs                        | Redacción en aplicación, reverse proxy y errores; hashes en reposo                          | Un operador malicioso o configuración externa puede registrarlo                          |
-| Path traversal/XSS por nombre o MIME | Metadatos autenticados pero tratados como no confiables; sanitizar nombre y forzar descarga | El usuario aún puede abrir un archivo peligroso localmente                               |
-| Uso después del TTL                  | Validación antes de cada lectura y limpiador automático                                     | Reloj/relay malicioso, backups o descarga previa hacen imposible garantizar desaparición |
-| Abuso de almacenamiento              | Tamaño/TTL máximos, reserva, cuotas, rate limiting y limpieza de incompletas                | Botnets y DDoS distribuido pueden superar una instancia única                            |
-| Correlación de remitente y receptor  | Ningún control fuerte en v0.1; sólo puede usarse Tor/VPN externamente                       | Alto; es una no-garantía deliberada                                                      |
-| Relay indisponible o censurado       | Errores claros y descarga por chunks                                                        | No hay replicación, P2P ni multi-relay en v0.1                                           |
+| Threat                                | Control                                                                                       | Residual risk                                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Relay or disk thief reads files       | AES-256-GCM on the client; the key never reaches the relay                                    | Size, time and pattern stay visible; a leaked capability decrypts                                      |
+| Relay alters or reorders ciphertext   | GCM tags, per-index nonce and AAD; size and count authenticated in the manifest               | It can omit everything or deny service                                                                 |
+| GCM nonce reuse                       | CSPRNG; a new prefix per capsule; index 0 exclusive to the manifest; chunks never overwritten | A client bug can destroy the security; needs tests and review                                          |
+| Enumeration and brute force           | IDs ≥128 bits, 256-bit tokens, uniform errors and rate limiting                               | The relay knows all of its own IDs; leaked links bypass brute force                                    |
+| Network interception                  | HTTPS required in production, plus content encryption                                         | TLS does not hide IP/domain/volume; the TLS endpoint sees bearer tokens                                |
+| Redirect steals a bearer token        | Endpoints with no redirects; clients must refuse them                                         | A compromised proxy or origin can still capture requests                                               |
+| Leak through the fragment             | The fragment is not sent over HTTP; CSP, no third parties, `no-referrer`, address bar cleared | History, clipboard, extensions, preview bots and the external channel remain                           |
+| Malicious web code                    | CSP, pinned build, minimal dependencies, future audit; the CLI as an alternative              | Dynamically served web code remains a strong trust point                                               |
+| Token in logs                         | Redaction in the application, reverse proxy and errors; hashes at rest                        | A malicious operator or external configuration can still record it                                     |
+| Path traversal / XSS via name or MIME | Metadata authenticated but treated as untrusted; name sanitised and download forced           | The user can still open a dangerous file locally                                                       |
+| Use after the TTL                     | Validation before every read and an automatic cleaner                                         | A malicious clock or relay, backups, or an earlier download make disappearance impossible to guarantee |
+| Storage abuse                         | Maximum size and TTL, reservations, quotas, rate limiting and cleanup of incomplete uploads   | Botnets and distributed DDoS can overwhelm a single instance                                           |
+| Sender/receiver correlation           | `--mix` where the network is large enough; otherwise Tor or a VPN externally                  | High; deliberately a non-guarantee at small network sizes                                              |
+| Relay unavailable or censored         | Mirrors, `k`-of-`n` sharing, clear errors and chunked download                                | No P2P; a censor who blocks every known relay blocks the network                                       |
 
-## 9. Requisitos operativos de seguridad
+## 9. Operational security requirements
 
-Un despliegue de producción conforme debe:
+A conforming production deployment must:
 
-- terminar TLS con configuración moderna y deshabilitar HTTP público;
-- redactar `Authorization`, fragmentos y query strings en app, proxy, WAF,
-  observabilidad y reportes de errores;
-- no desplegar analytics ni scripts de terceros en la aplicación que procesa
+- terminate TLS with a modern configuration and disable public HTTP;
+- redact `Authorization`, fragments and query strings in the app, proxy, WAF,
+  observability and error reports;
+- deploy no analytics or third-party scripts in the application that processes
   capabilities;
-- enviar `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, CSP
-  restrictiva y headers anti-sniffing apropiados;
-- limitar tamaño de request antes de bufferizar, así como tasa, conexiones,
-  reservas incompletas, bytes por cápsula y TTL;
-- ejecutar el relay con usuario sin privilegios y acceso sólo a su directorio;
-- separar backups de configuración de los datos efímeros y documentar si existen;
-- sincronizar el reloj y monitorear fallos del proceso de expiración;
-- evitar que métricas incluyan IDs completos o cardinalidad por capability;
-- rotar credenciales de infraestructura sin pretender rotar las capabilities de
-  usuario ya emitidas;
-- disponer de un mecanismo administrativo para retirar ciphertext abusivo sin
-  descifrarlo.
+- send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, a restrictive
+  CSP and appropriate anti-sniffing headers;
+- bound request size before buffering, as well as rate, connections, incomplete
+  reservations, bytes per capsule and TTL;
+- run the relay as an unprivileged user with access only to its own directory;
+- separate configuration backups from ephemeral data and document whether they
+  exist;
+- keep the clock synchronised and monitor failures of the expiry process;
+- keep metrics free of complete IDs or per-capability cardinality;
+- rotate infrastructure credentials without pretending to rotate user
+  capabilities already issued;
+- have an administrative mechanism to withdraw abusive ciphertext without
+  decrypting it.
 
-## 10. Abuso y contenido ilícito
+## 10. Abuse and illegal content
 
-El cifrado impide moderación basada en contenido dentro del relay. Esto protege
-privacidad legítima y también puede ser abusado. v0.1 adopta controles sobre el
-comportamiento observable, no inspección de plaintext:
+Encryption prevents content-based moderation inside the relay. That protects
+legitimate privacy and can also be abused. The controls are over observable
+behaviour, not inspection of plaintext:
 
-- TTL y tamaño máximo pequeños;
-- rate limiting y cuotas por origen, con política documentada;
-- limpieza de reservas incompletas;
-- canal de reporte que acepte `capsuleId` sin solicitar públicamente la clave;
-- facultad del operador de retirar una cápsula identificada;
-- retención mínima de logs, con excepción explícita y proporcional ante abuso;
-- términos claros sin afirmar que la criptografía evita responsabilidad.
+- small maximum TTL and size;
+- rate limiting and quotas per origin, with a documented policy;
+- cleanup of incomplete reservations;
+- a reporting channel that accepts a `capsuleId` without publicly requesting the
+  key;
+- the operator's ability to withdraw an identified capsule;
+- minimal log retention, with an explicit and proportionate exception in cases
+  of abuse;
+- clear terms that do not claim cryptography avoids liability.
 
-Bloquear por IP puede afectar a NAT, proxies y redes de privacidad. Cada control
-antiabuso debe evaluar falsos positivos y no debe convertirse silenciosamente en
-un mecanismo de tracking persistente.
+Blocking by IP can affect NAT, proxies and privacy networks. Every anti-abuse
+control must weigh false positives and must not quietly become a persistent
+tracking mechanism.
 
-## 11. Validación antes de publicar
+## 11. Validation before publishing
 
-### 11.1 Pruebas automáticas mínimas
+### 11.1 Minimum automated tests
 
-- Round-trip cruzado entre web/SDK/CLI para límites de chunk.
-- Alteración de ciphertext, tag, AAD e índice.
-- Clave, prefijo y token incorrectos.
-- Duplicación de índice con bytes distintos.
-- Reserva incompleta y finalización prematura.
-- TTL, carrera entre lectura y vencimiento, DELETE repetido.
-- Igualdad externa de errores para ID inexistente, token inválido y vencida.
-- Límites de cuerpo antes de asignar memoria significativa.
-- Comprobación de que logs, URLs y fixtures no contienen secretos.
-- Redirección autenticada rechazada.
+- Cross round trip between web/SDK/CLI at chunk boundaries.
+- Alteration of ciphertext, tag, AAD and index.
+- Wrong key, prefix and token.
+- A duplicated index with different bytes.
+- An incomplete reservation and premature finalisation.
+- TTL, a race between reading and expiry, repeated DELETE.
+- External equality of errors for a non-existent ID, an invalid token and an
+  expired capsule.
+- Body limits before allocating significant memory.
+- A check that logs, URLs and fixtures contain no secrets.
+- Authenticated redirects refused.
 
-### 11.2 Revisión humana mínima
+### 11.2 Minimum human review
 
-- Flujo exacto de entropía y unicidad de nonce.
-- Uso de Web Crypto y longitudes de tag.
-- Configuración CORS/CSP/headers y ausencia de terceros.
-- Sanitización de nombre, MIME y mensajes de error.
-- Manejo de archivos, permisos, enlaces simbólicos y operaciones atómicas del
-  almacenamiento del relay.
-- Dependencias, lockfile, SBOM y alertas de vulnerabilidad.
+- The exact entropy flow and nonce uniqueness.
+- Web Crypto usage and tag lengths.
+- CORS/CSP/header configuration and the absence of third parties.
+- Sanitisation of name, MIME type and error messages.
+- File handling, permissions, symlinks and atomic operations in the relay's
+  storage.
+- Dependencies, lockfile, SBOM and vulnerability alerts.
 
-### 11.3 Condición para cambiar las afirmaciones
+### 11.3 The condition for changing the claims
 
-No se debe describir CAPSULE como “anónimo”, “imposible de rastrear”,
-“autodestructivo” o “sin confianza” hasta que una versión futura defina un
-adversario concreto, implemente los controles necesarios y supere revisión
-externa. Añadir P2P o varios relays por sí solo tampoco crea anonimato.
+CAPSULE must not be described as "anonymous", "untraceable",
+"self-destructing" or "trustless" until a future version defines a concrete
+adversary, implements the necessary controls and passes external review. Adding
+P2P or several relays does not on its own create anonymity.
 
-## 12. Cambios introducidos en v0.2
+## 12. Changes introduced in v0.2
 
-v0.2 agrega tres capacidades que modifican el modelo: anonimización parcial,
-cápsulas sin vencimiento y una red abierta de relays. Ninguna convierte a
-CAPSULE en una red anónima.
+v0.2 adds three capabilities that change the model: partial anonymisation,
+capsules without expiry, and an open relay network. None of them makes CAPSULE
+an anonymity network.
 
-### 12.1 Anonimización: qué cubre y qué no
+### 12.1 Anonymisation: what it covers and what it does not
 
-| Mecanismo                         | Qué deja de ver un observador                         | Qué sigue viendo                                              |
-| --------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
-| Limpieza de metadatos del archivo | EXIF/GPS/serie de cámara, XMP, chunks de texto en PNG | El contenido del archivo para quien lo recibe; marcas de agua |
-| Nombre y mime neutros             | El nombre real dentro del manifiesto cifrado          | Nada nuevo: el manifiesto ya iba cifrado                      |
-| Relleno por clases de tamaño      | El tamaño exacto de la cápsula                        | La clase de tamaño y la cantidad de chunks                    |
-| Jitter entre chunks               | El patrón exacto de subida                            | El inicio, el fin y el volumen total                          |
-| SOCKS5/Tor en la CLI              | La IP del cliente, para el relay                      | La existencia de la conexión, para el proxy y el ISP local    |
-| Relay sin IP (`CAPSULE_IP_BLIND`) | La IP en logs y en el estado de rate limiting         | La IP en el socket mientras dura la conexión, y en el proxy   |
+| Mechanism                              | What an observer stops seeing                | What they still see                                               |
+| -------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------- |
+| Stripping the file's metadata          | EXIF/GPS/camera serial, XMP, PNG text chunks | The content itself, to whoever receives it; watermarks            |
+| Neutral name and mime type             | The real name inside the encrypted manifest  | Nothing new: the manifest was already encrypted                   |
+| Size-class padding                     | The exact size of the capsule                | The size class and the number of chunks                           |
+| Jitter between chunks                  | The exact upload pattern                     | The start, the end and the total volume                           |
+| SOCKS5/Tor in the CLI                  | The client's IP, from the relay              | That the connection exists, to the proxy and the local ISP        |
+| Relay without IPs (`CAPSULE_IP_BLIND`) | The IP in logs and rate-limit state          | The IP on the socket while the connection lasts, and at the proxy |
 
-Límites que deben decirse en voz alta:
+Limits that have to be said out loud:
 
-- La limpieza de metadatos sólo entiende JPEG, PNG y WebP. Para PDF, Office,
-  HEIC o video el archivo se envía **sin cambios** y el SDK lo reporta como no
-  soportado. No debe presentarse como “limpio”.
-- El relleno protege el tamaño, no el momento ni la frecuencia. Un observador
-  que ve “una cápsula de clase 8 MiB a las 03:14” sigue teniendo un evento.
-- `CAPSULE_IP_BLIND` reduce retención, no observación. El sistema operativo, el
-  balanceador y el proveedor de red siguen viendo la conexión.
-- Tor en la CLI protege frente al relay, no frente a un adversario que observe
-  ambos extremos.
-- La aplicación web no enruta por Tor. Decir lo contrario sería falso: el
-  navegador usa la red del usuario.
+- Metadata stripping understands JPEG, PNG, WebP, ISO-BMFF containers, Office
+  and ODF, and PDF XMP packets. For anything else the file is sent
+  **unchanged** and the SDK reports it as unsupported. It must not be presented
+  as "clean".
+- Padding protects the size, not the moment or the frequency. An observer who
+  sees "an 8 MiB-class capsule at 03:14" still has an event.
+- `CAPSULE_IP_BLIND` reduces retention, not observation. The operating system,
+  the load balancer and the network provider still see the connection.
+- Tor in the CLI protects against the relay, not against an adversary watching
+  both ends.
+- The web application does not route through Tor. Saying otherwise would be
+  false: the browser uses the user's own network.
 
-### 12.2 Cápsulas sin vencimiento
+### 12.2 Capsules without expiry
 
-El TTL era el principal control de retención. Al desactivarlo, cambian dos
-cosas:
+The TTL was the main retention control. Turning it off changes two things:
 
-- **Exposición sostenida.** Un enlace filtrado ya no deja de funcionar solo.
-  Quien tenga el enlace lee hasta que alguien use la `deleteToken`.
-- **Pérdida irreversible de control.** Si se pierde la capability de retiro, no
-  hay forma de borrar la cápsula: no hay cuentas ni soporte que pueda hacerlo.
+- **Sustained exposure.** A leaked link no longer stops working on its own.
+  Whoever holds it reads until somebody uses the `deleteToken`.
+- **Irreversible loss of control.** If the owner capability is lost there is no
+  way to delete the capsule: there are no accounts and no support desk that can
+  do it.
 
-Controles vigentes:
+Controls in place:
 
-- Está desactivado por defecto. El operador debe habilitarlo con
+- It is off by default. The operator must enable it with
   `CAPSULE_ALLOW_PERSISTENT_CAPSULES=true`.
-- `CAPSULE_MAX_PERSISTENT_BYTES` acota cuánto puede ocupar el almacenamiento sin
-  vencimiento; el relay responde `507 insufficient_storage` al llegar al tope.
-- La limpieza periódica nunca toca una cápsula sin vencimiento.
-- La interfaz lo dice explícitamente antes de crear la cápsula, y el relay lo
-  publica en `/v1/config` para que el cliente no lo descubra al fallar.
-
-Un relay que promete “para siempre” está prometiendo algo que no controla:
-puede apagarse, perder el disco o ser incautado. La documentación y la UI dicen
-“hasta que la borres”, no “permanente”.
-
-### 12.3 Red abierta de relays
-
-Que cualquiera pueda levantar un relay elimina un punto único de censura y
-agrega superficie:
-
-| Riesgo nuevo                                    | Control aplicado                                                                                        |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Un peer inventa relays que no existen           | Toda dirección aprendida se prueba contra `GET /v1/info` y sólo se guarda si la identidad coincide      |
-| Un atacante suplanta la identidad de un relay   | `relayId` es el digest de la clave pública; el anuncio va firmado con Ed25519 y con ventana ±5 min      |
-| Envenenamiento del directorio (Sybil)           | Límite `CAPSULE_MAX_PEERS`, expulsión tras fallos repetidos, y ninguna decisión automática de confianza |
-| SSRF desde el propio relay al probar peers      | Se rechazan loopback, enlaces locales, rangos privados y CGNAT salvo `CAPSULE_ALLOW_PRIVATE_PEERS`      |
-| Réplica que amplía la superficie de observación | El espejo es explícito y opcional; cada copia adicional es un operador más que ve tamaño y horario      |
-| Un relay retiene una copia tras el borrado      | El borrado es best-effort y se reporta relay por relay; nunca se afirma que la copia desapareció        |
-
-Lo que la red **no** resuelve: correlación entre relays, diversidad
-jurisdiccional real, ni la reputación de un operador. Un directorio grande no es
-evidencia de independencia. Elegir un espejo sigue siendo confiar en un tercero
-con el tamaño y el horario de la transferencia.
-
-## 13. Cambios introducidos en v1.0
-
-v1.0 congela el protocolo y agrega tres capacidades sobre v0.2: reparto por
-erasure coding, recuperación opcional de capabilities, y un endurecimiento de
-la red que salió de una revisión de seguridad del propio código.
-
-### 13.1 Reparto `k de n`: qué cambia en el modelo
-
-Con réplica completa, **cada** relay tiene la cápsula entera: quien logre
-comprometer o presionar a uno solo tiene todo el ciphertext, y sólo le falta la
-llave del enlace. Con reparto `k de n`, un relay tiene un shard que por sí solo
-no permite reconstruir un byte, y hacen falta `k` operadores distintos.
-
-| Situación                           | Réplica completa           | Reparto `k de n`               |
-| ----------------------------------- | -------------------------- | ------------------------------ |
-| Un relay incautado                  | Tiene todo el ciphertext   | Tiene un shard inservible solo |
-| `k - 1` relays coludidos            | Tienen todo                | No reconstruyen nada           |
-| `n - k + 1` relays caídos           | Sirve cualquiera que quede | La cápsula no se puede leer    |
-| Costo de almacenamiento             | `n` veces                  | `n/k` veces                    |
-| Operadores que ven tamaño y horario | `n`                        | `n` (igual)                    |
-
-Lo que **no** cambia: los `n` relays siguen viendo que hubo una transferencia,
-cuándo y de qué clase de tamaño. Repartir protege el contenido frente a un
-subconjunto de operadores, no protege la metadata frente a ninguno.
-
-Un relay que entrega shards alterados no puede corromper la cápsula: la
-reconstrucción produce ruido y el tag AES-GCM lo rechaza, y el lector prueba
-otra combinación de `k` shards. Sí puede negar el servicio, que es la
-contrapartida honesta de exigir `k` de `n`.
-
-### 13.2 Recuperación: una puerta más, por elección
-
-Proteger una capability con una frase de acceso, o repartirla en partes,
-**agrega un camino al secreto**. Eso es deseable cuando la alternativa es
-perder una cápsula sin vencimiento para siempre, y es un riesgo cuando la frase
-es débil o las partes terminan todas en el mismo cajón.
-
-- La frase se deriva con PBKDF2-HMAC-SHA-256 a 600 000 iteraciones. Es el único
-  KDF de contraseñas disponible en Web Crypto en todas las plataformas donde
-  corre CAPSULE. **Frente a un atacante con GPU es más débil que Argon2id**: una
-  frase corta se rompe. El formato lleva un identificador de KDF para poder
-  agregar una función memory-hard después sin romper lo ya guardado.
-- Las partes Shamir no llevan ningún digest del secreto, precisamente para que
-  tener una parte no permita verificar conjeturas offline. Menos de `k` partes
-  no revelan nada, y eso es una propiedad de la construcción, no una suposición
-  sobre el atacante.
-- El relay no participa en ninguna de las dos formas y no se entera de que
-  existen.
-
-### 13.3 Hallazgos de la revisión de seguridad de v1.0
-
-Se revisó el código nuevo con foco en criptografía, autorización, parsers
-binarios y superficie de red. Se encontraron dos problemas explotables y tres
-apuntes menores. Todos están corregidos; se documentan porque el hallazgo y la
-corrección son parte del historial de seguridad.
-
-**1. El filtro de direcciones del relay era esquivable (medio).** La lista
-negra comparaba cadenas, así que `127.0.0.1` quedaba bloqueado pero
-`[::ffff:7f00:1]` —la misma dirección escrita en IPv6— pasaba y alcanzaba el
-mismo socket. Verificado en ejecución. Como anunciarse no requiere permiso,
-cualquiera podía hacer que un relay público consultara servicios internos de su
-operador, y que republicara esa dirección a toda la red.
-
-_Corrección:_ se reemplazó por un analizador de direcciones que normaliza toda
-forma equivalente (IPv4 en decimal, IPv6 comprimido, IPv4 embebida en IPv6,
-NAT64) y bloquea los rangos privados, de loopback, link-local, CGNAT,
-multicast, reservados y de documentación, más los nombres locales. El relay
-además **resuelve** los nombres y rechaza los que apuntan a esas direcciones.
-
-**2. El descubrimiento del cliente no tenía ese filtro, y la CSP lo permitía
-(medio).** La lista de peers de un relay la escribe ese relay. Un relay hostil
-podía devolver direcciones de loopback y el navegador de quien abriera la
-aplicación las consultaba, convirtiéndolo en un escáner de puertos de su propia
-máquina. La CSP de v0.2 había sido ampliada a `http://localhost:*` y
-`http://127.0.0.1:*`, que es exactamente lo que hacía falta para lograrlo.
-
-_Corrección:_ el SDK aplica el mismo filtro de direcciones a los peers
-descubiertos y a la dirección que un relay declara para sí mismo; seguir
-direcciones privadas es ahora una opción explícita (`allowPrivateRelays`) que
-la aplicación sólo activa cuando su propio relay ya es local. La CSP de
-producción volvió a `connect-src 'self' https:`; el servidor de desarrollo
-agrega loopback y el build no.
-
-**3. La firma del anuncio no cubría el nombre del relay (bajo).** Se resolvió
-sacando el nombre del anuncio: el anuncio afirma sólo "soy `relayId` en `url`",
-y todo lo demás se lee de esa dirección.
-
-**4. Un anuncio válido no probaba el control de la dirección anunciada
-(bajo).** Una firma prueba quién escribió el mensaje, no quién controla la
-dirección que contiene, así que un directorio podía llenarse de direcciones
-ajenas. Ahora el receptor consulta la dirección antes de creerle y sólo la
-guarda si responde con la misma identidad.
-
-**5. Reanudar con otro archivo del mismo tamaño podía reutilizar un nonce
-(bajo en la revisión, corregido igual).** Con varios relays en distinto punto
-de avance, dos textos claros distintos podían quedar cifrados bajo la misma
-pareja `(clave, nonce)`, lo que rompe AES-GCM. Ahora el ticket de reanudación
-lleva un compromiso con el contenido del archivo y se rechaza cualquier otro
-antes de enviar un solo byte; además, un chunk se reenvía a **todos** los
-relays en cuanto a alguno le falta, de modo que quien ya lo tenía verifica que
-los bytes coinciden.
-
-**Revisado y sin hallazgos:** la aritmética GF(256), Reed-Solomon y Shamir
-(verificados exhaustivamente por ejecución), el espacio de nonces AES-GCM, el
-ligado del AAD a la versión, los parámetros de PBKDF2, la validación de TLS a
-través del proxy SOCKS5, la autorización y el manejo de rutas en el relay, los
-siete parsers binarios (28 000 entradas de fuzzing sin excepciones ni cuelgues)
-y la ausencia de secretos en logs.
-
-### 13.4 Riesgos residuales conocidos
-
-Se listan porque siguen ahí, no porque sean aceptables para siempre.
-
-- **Reasignación de DNS.** El relay resuelve un nombre y verifica las
-  direcciones antes de conectarse, pero la plataforma no permite fijar la
-  conexión a la dirección verificada. Entre la comprobación y la petición, un
-  nombre puede pasar a resolver a otra dirección. Cerrarlo requiere un
-  conector propio; hasta entonces, un operador que aloje servicios internos
-  sensibles debería aislar el relay en red.
-- **PDF `/Info`.** Se blanquean los paquetes XMP sin mover un byte, pero el
-  diccionario `/Info` puede vivir dentro de un flujo de objetos comprimido y no
-  se toca. La interfaz lo dice explícitamente en vez de dar el archivo por
-  limpio.
-- **Formatos no soportados.** TIFF, HEIF exóticos y contenedores propietarios
-  se envían sin cambios, y así se reporta.
-- **La aplicación web no enruta por Tor.** Sólo la CLI puede. Decir lo
-  contrario sería falso: el navegador usa la red de quien lo abre.
-- **Horario y volumen.** Siguen siendo observables por cada relay involucrado.
-  El relleno protege el tamaño; nada protege todavía el momento.
-- **Diversidad de operadores.** El tope por operador aparente y la prueba de
-  trabajo encarecen el Sybil, no lo impiden. Un directorio grande no es
-  evidencia de independencia jurisdiccional ni operativa.
-
-## 14. La red de mezcla (1.1)
-
-CAPSULE tiene su propia red de mezcla. Esta sección dice qué cambia en el
-modelo de amenazas; el diseño está en [MIXNET.md](./MIXNET.md).
-
-### 14.1 Lo que cambia
-
-Hasta 1.0, el relay que guardaba una cápsula veía la dirección de quien la
-subía y de quien la bajaba. En la CLI se podía tapar con Tor. Ahora el tráfico
-puede ir por una red de nodos que son los propios relays.
-
-| Observador             | Sin la red                      | Con la red                                     |
-| ---------------------- | ------------------------------- | ---------------------------------------------- |
-| Relay que almacena     | IP del cliente, horario, tamaño | Sólo la operación y el nodo anterior           |
-| Primer nodo del camino | —                               | IP del cliente, y nada más                     |
-| Nodos intermedios      | —                               | Dos direcciones de nodos; ni origen ni destino |
-| Proveedor del buzón    | —                               | Que una dirección consulta un buzón            |
-| Proveedor de Internet  | Que hablás con un relay         | Que hablás con un relay                        |
-| Observador global      | Todo lo anterior                | Análisis estadístico, mucho más caro           |
-
-Lo que **no** cambia: quien tenga el enlace sigue pudiendo leer la cápsula, el
-contenido sigue estando cifrado extremo a extremo con la llave del fragmento, y
-el proveedor de Internet sigue viendo que hay una conexión.
-
-### 14.2 Garantías nuevas, y de dónde salen
-
-- **Ningún nodo intermedio sabe dónde está en el camino.** La cabecera mide
-  siempre lo mismo y el bloque consumido se reemplaza por relleno
-  pseudoaleatorio que el remitente calculó. Es una propiedad del formato.
-- **Un paquete no se puede seguir de un enlace al siguiente.** El punto efímero
-  se transforma en cada salto y el cuerpo se descifra una capa, así que los
-  bytes cambian por completo. Verificado en las pruebas.
-- **Un nodo no puede marcar un paquete.** El cuerpo es una permutación de
-  bloque ancho: un bit cambiado aleatoriza los 64 KiB y el destino lo rechaza.
-  Verificado en las pruebas.
-- **Un paquete repetido se descarta.** Cada salto guarda una etiqueta derivada
-  del secreto compartido durante una ventana. Sin esto, reenviar un paquete y
-  mirar qué sale dos veces enlaza las dos puntas.
-- **Un nodo no revela por qué descartó.** Toda respuesta es `202`.
-- **No hay nodo de salida.** El destino es el relay que guarda la cápsula, así
-  que ninguna parte ve la petición en claro sin ser además su destinatario.
-
-### 14.3 Riesgos nuevos
-
-**El proveedor del buzón sabe que existís.** Ve una dirección consultando un
-buzón. No ve qué pediste ni a quién. Es inherente a un cliente que no puede
-recibir conexiones. Mitigación: elegir el proveedor a conciencia, o poner Tor
-por debajo con `--tor --mix`.
-
-**El primer nodo ve tu dirección.** Como el guardián en Tor, y por la misma
-razón. A diferencia de Tor, acá **no hay nodos guardián**: el primer salto se
-elige de nuevo en cada petición, lo que reparte la exposición entre más nodos
-pero también aumenta la probabilidad de tocar uno hostil alguna vez. Es un
-compromiso conocido y está sin resolver; Tor eligió al revés después de años de
-análisis, y esa decisión merece revisarse acá.
-
-**Retener paquetes es un arma.** Un nodo puede demorar u omitir el reenvío. El
-cliente lo ve como un tiempo de espera agotado, no como un ataque, y reintenta
-por otro camino. Un nodo que lo hace selectivamente puede sesgar qué caminos
-funcionan.
-
-**El tráfico de cobertura cuesta.** Un bucle es un paquete de 65 920 bytes por
-cada salto que atraviesa. Un operador que lo apague ahorra tráfico y deja su
-enlace legible; un operador que lo suba paga ancho de banda por todos.
-
-**Un ataque n−1 sigue abierto.** Un adversario que controle los nodos vecinos y
-pueda suprimir el tráfico ajeno aísla un paquete y lo sigue. Los bucles y la
-elección aleatoria de camino lo encarecen; no lo resuelven, y es un problema
-abierto en la literatura, no una omisión de esta implementación.
-
-**El conjunto de anonimato es el que sea.** Repetido acá porque es el riesgo
-que domina a todos los demás. Con pocos nodos y un solo operador, todo lo
-anterior es maquinaria alrededor de una sola parte que ve las dos puntas. La
-CLI lo dice antes de cada envío y el documento de diseño lo dice primero.
-
-### 14.4 Fuera del modelo
-
-- **Observador global pasivo.** Con suficiente tráfico y tiempo, el análisis
-  estadístico de flujos funciona contra cualquier red de este tamaño.
-- **Confirmación con tráfico activo.** Un adversario que pueda inyectar y
-  bloquear a voluntad en varios enlaces.
-- **Compromiso del extremo.** Si el dispositivo está comprometido, nada de esto
-  importa.
-- **Censura.** No hay puentes ni transportes conectables. Bloquear los relays
-  conocidos bloquea la red.
-
-### 14.5 Lo que hace falta antes de llamarla anónima
-
-En orden, y ninguno es opcional:
-
-1. **Operadores independientes**, en jurisdicciones distintas, que no se
-   conozcan entre sí. Sin esto lo demás es decoración.
-2. **Usuarios suficientes** para que un mensaje se esconda entre otros. Un
-   conjunto de anonimato chico es un conjunto de sospechosos chico.
-3. **Mediciones publicadas**: latencia real, volumen de cobertura, tamaño
-   efectivo del conjunto, resistencia medida a correlación.
-4. **Revisión criptográfica externa** de esta composición, no sólo de las
-   construcciones que la componen.
-5. **Una decisión fundada sobre nodos guardián**, con el análisis que la
-   respalde.
-
-Hasta que esos cinco puntos existan, la palabra correcta es "red de mezcla", no
-"red anónima", y la interfaz lo dice así.
-
-## 15. Sitios `.capsule` (1.2)
-
-El diseño está en [SITES.md](./SITES.md). Acá va sólo lo que cambia en el modelo
-de amenazas.
-
-### 15.1 Lo primero: qué es público
-
-Un sitio `.capsule` **es contenido público**. La capacidad de lectura está
-adentro del registro y el registro se reparte entre relays a propósito. No es
-una filtración: es lo que significa publicar. Un relay, un visitante y
-cualquiera que pase por ahí pueden leer el sitio.
-
-Lo que la capa de nombres protege no es la confidencialidad sino la
-**integridad y la continuidad**: que las páginas sean las que su autor firmó y
-que nadie pueda entregar una versión anterior sin que se note.
-
-### 15.2 Garantías nuevas, y de dónde salen
-
-- **Sólo el titular de la clave puede publicar bajo un nombre.** El nombre _es_
-  la clave pública, así que verificar no requiere confiar en quien entregó el
-  registro. Propiedad del formato.
-- **Un relay no puede modificar un registro.** Cambiar cualquier campo invalida
-  la firma. Verificado en las pruebas.
-- **Un relay no puede revertir un sitio a una versión anterior sin que se note.**
-  El cliente guarda la secuencia más alta que aceptó por nombre y rechaza una
-  menor. Verificado en las pruebas.
-- **Callar tiene poco valor.** El cliente pregunta a varios relays y se queda con
-  la secuencia más alta que verifique; suprimir una actualización requiere que
-  callen todos los relays a los que el visitante pregunta.
-- **El relay no sabe qué guarda.** El sitio va como cápsula cifrada, con relleno
-  a clase de tamaño y nombre de archivo neutro. El registro no dice qué hay
-  adentro más allá de un título opcional que el autor eligió.
-- **El relay no sabe qué página se leyó.** El paquete se baja entero. No hay
-  petición por archivo que revelar.
-- **La página no puede contactar a nadie.** Con los scripts apagados —el modo
-  por omisión— la política del documento y el aislamiento del marco impiden toda
-  petición de red. Verificado en las pruebas.
-
-### 15.3 Riesgos nuevos
-
-**La clave del sitio es un punto único de falla.** Quien la copie puede
-reemplazar las páginas; quien la pierda pierde el nombre. No hay recuperación
-porque no hay a quién pedírsela. Es la misma propiedad que una dirección onion y
-tiene el mismo costo.
-
-**El relay ve quién pregunta.** La extensión consulta relays directamente desde
-el navegador, así que un relay ve una dirección IP preguntando por un nombre —y,
-si es el que guarda la cápsula, bajándola. Es la carencia más importante de esta
-versión. La CLI puede ir por la red de mezcla; la extensión todavía no.
-
-**El registro es un anuncio.** Publicar un sitio le dice a los relays que ese
-nombre existe y cuándo se actualizó. El patrón de actualizaciones de un nombre
-es observable por cualquiera que consulte `GET /v1/sites`.
-
-**Los scripts, si se habilitan, pueden sacar al visitante.** Un script puede
-navegar el marco a una dirección externa, lo que revelaría la IP del visitante a
-esa dirección. La política sigue bloqueando `fetch`, imágenes y fuentes
-externas, pero una navegación no es una petición sujeta a CSP y no hay directiva
-que la cubra desde que `navigate-to` quedó fuera del estándar. Por eso están
-apagados por omisión y la advertencia es visible al encenderlos.
-
-**Un sitio que vence desaparece.** Si la cápsula vence o los relays que la
-guardan se van, el nombre resuelve a un registro que apunta a nada. El registro
-sigue verificando; el contenido no está.
-
-**El reconstructor de páginas es un límite de seguridad escrito a mano.** Está
-probado con los casos que se nos ocurrieron —`<base>`, `meta refresh`, `srcset`,
-`url()` anidado, rutas que suben de directorio— y no está auditado. Un error ahí
-es un escape del aislamiento.
-
-### 15.4 Fuera del modelo
-
-- **Disponibilidad.** Nadie garantiza que un sitio siga arriba.
-- **Censura de un nombre.** Los relays pueden negarse a guardar un registro. Con
-  suficientes relays cooperando, un nombre deja de resolver.
-- **Reputación.** Un nombre no dice nada sobre quién está atrás. Verificar que
-  una página no cambió no es verificar que sea de quien creés.
-- **Anonimato del publicador.** El relay ve quién sube, salvo `--mix` o `--tor`.
+- `CAPSULE_MAX_PERSISTENT_BYTES` bounds how much storage without expiry can
+  occupy; the relay answers `507 insufficient_storage` at the cap.
+- Periodic cleanup never touches a capsule without expiry.
+- The interface says so explicitly before the capsule is created, and the relay
+  publishes it in `/v1/config` so the client does not discover it by failing.
+
+A relay promising "forever" is promising something it does not control: it can
+be switched off, lose its disk, or be seized. The documentation and the UI say
+"until you delete it", not "permanent".
+
+### 12.3 An open relay network
+
+Letting anyone run a relay removes a single point of censorship and adds
+surface:
+
+| New risk                                       | Control applied                                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| A peer invents relays that do not exist        | Every learned address is probed against `GET /v1/info` and kept only if the identity matches       |
+| An attacker impersonates a relay's identity    | `relayId` is the digest of the public key; the announcement is Ed25519-signed with a ±5 min window |
+| Directory poisoning (Sybil)                    | A `CAPSULE_MAX_PEERS` limit, eviction after repeated failures, and no automatic trust decisions    |
+| SSRF from the relay itself while probing peers | Loopback, link-local, private ranges and CGNAT are refused unless `CAPSULE_ALLOW_PRIVATE_PEERS`    |
+| A mirror widening the observation surface      | Mirroring is explicit and optional; each extra copy is one more operator seeing size and time      |
+| A relay keeps a copy after deletion            | Deletion is best-effort and reported relay by relay; it is never claimed that the copy is gone     |
+
+What the network does **not** solve: correlation between relays, real
+jurisdictional diversity, or an operator's reputation. A large directory is not
+evidence of independence. Choosing a mirror is still trusting a third party
+with the size and timing of the transfer.
+
+## 13. Changes introduced in v1.0
+
+v1.0 froze the protocol and added three capabilities on top of v0.2: erasure
+coded sharing, optional recovery of capabilities, and a hardening of the
+network that came out of a security review of the code itself.
+
+### 13.1 `k`-of-`n` sharing: what changes in the model
+
+With full replication, **every** relay has the whole capsule: anyone who
+compromises or pressures a single one has all the ciphertext and is only
+missing the key from the link. With `k`-of-`n` sharing, a relay holds a shard
+that on its own reconstructs not one byte, and `k` separate operators are
+needed.
+
+| Situation                      | Full replica           | `k`-of-`n` sharing                |
+| ------------------------------ | ---------------------- | --------------------------------- |
+| One relay seized               | Has all the ciphertext | Has a shard that is useless alone |
+| `k - 1` relays colluding       | Have everything        | Reconstruct nothing               |
+| `n - k + 1` relays down        | Any survivor serves it | The capsule cannot be read        |
+| Storage cost                   | `n` times              | `n/k` times                       |
+| Operators seeing size and time | `n`                    | `n` (the same)                    |
+
+What does **not** change: the `n` relays still see that a transfer happened,
+when, and of what size class. Sharing protects the content against a subset of
+operators; it protects the metadata against none of them.
+
+A relay that serves altered shards cannot corrupt the capsule: reconstruction
+produces noise, the AES-GCM tag rejects it, and the reader tries another
+combination of `k` shards. It can deny service, which is the honest counterpart
+of requiring `k` of `n`.
+
+### 13.2 Recovery: one more door, by choice
+
+Protecting a capability with a passphrase, or splitting it into shares, **adds
+a path to the secret**. That is desirable when the alternative is losing a
+capsule without expiry forever, and it is a risk when the passphrase is weak or
+the shares all end up in the same drawer.
+
+- The passphrase is derived with PBKDF2-HMAC-SHA-256 at 600,000 iterations. It
+  is the only password KDF available in Web Crypto on every platform CAPSULE
+  runs on. **Against an attacker with a GPU it is weaker than Argon2id**: a
+  short passphrase breaks. The format carries a KDF identifier so that a
+  memory-hard function can be added later without breaking what is stored.
+- Shamir shares carry no digest of the secret, precisely so that holding one
+  share does not allow verifying guesses offline. Fewer than `k` shares reveal
+  nothing, and that is a property of the construction rather than an assumption
+  about the attacker.
+- The relay takes part in neither and does not learn that they exist.
+
+### 13.3 Findings of the v1.0 security review
+
+The new code was reviewed with a focus on cryptography, authorisation, binary
+parsers and network surface. Two exploitable problems and three smaller notes
+were found. All are fixed; they are documented because the finding and the fix
+are both part of the security history.
+
+**1. The relay's address filter could be bypassed (medium).** The blocklist
+compared strings, so `127.0.0.1` was blocked but `[::ffff:7f00:1]` — the same
+address written in IPv6 — passed and reached the same socket. Verified by
+execution. Since announcing requires no permission, anyone could make a public
+relay query its operator's internal services, and republish that address to the
+whole network.
+
+_Fix:_ replaced with an address parser that normalises every equivalent form
+(decimal IPv4, compressed IPv6, IPv4 embedded in IPv6, NAT64) and blocks
+private, loopback, link-local, CGNAT, multicast, reserved and documentation
+ranges, plus local names. The relay also **resolves** names and rejects those
+pointing at such addresses.
+
+**2. Client-side discovery had no such filter, and the CSP allowed it
+(medium).** A relay's peer list is written by that relay. A hostile relay could
+return loopback addresses, and the browser of whoever opened the application
+would query them, turning it into a port scanner of its own machine. The v0.2
+CSP had been widened to `http://localhost:*` and `http://127.0.0.1:*`, which is
+exactly what was needed to achieve it.
+
+_Fix:_ the SDK applies the same address filter to discovered peers and to the
+address a relay declares for itself; following private addresses is now an
+explicit option (`allowPrivateRelays`) that the application enables only when
+its own relay is already local. The production CSP went back to
+`connect-src 'self' https:`; the development server adds loopback and the build
+does not.
+
+**3. The announcement signature did not cover the relay's name (low).**
+Resolved by removing the name from the announcement: an announcement now claims
+only "I am `relayId` at `url`", and everything else is read from that address.
+
+**4. A valid announcement did not prove control of the announced address
+(low).** A signature proves who wrote the message, not who controls the address
+inside it, so a directory could fill with other people's addresses. The
+receiver now queries the address before believing it and stores it only if it
+answers with the same identity.
+
+**5. Resuming with a different file of the same size could reuse a nonce (low
+in the review, fixed anyway).** With several relays at different points of
+progress, two different plaintexts could end up encrypted under the same
+`(key, nonce)` pair, which breaks AES-GCM. The resume ticket now carries a
+commitment to the file's content and any other file is refused before a single
+byte is sent; in addition, a chunk is re-sent to **every** relay as soon as one
+is missing it, so a relay that already had it verifies that the bytes match.
+
+**Reviewed with no findings:** the GF(256) arithmetic, Reed-Solomon and Shamir
+(verified exhaustively by execution), the AES-GCM nonce space, the binding of
+the AAD to the version, the PBKDF2 parameters, TLS validation through the
+SOCKS5 proxy, authorisation and path handling in the relay, the seven binary
+parsers (28,000 fuzzing inputs with no exceptions or hangs), and the absence of
+secrets in logs.
+
+### 13.4 Known residual risks
+
+Listed because they are still there, not because they are acceptable forever.
+
+- **DNS rebinding.** The relay resolves a name and verifies the addresses
+  before connecting, but the platform does not allow pinning the connection to
+  the verified address. Between the check and the request, a name can start
+  resolving elsewhere. Closing it requires a custom connector; until then, an
+  operator hosting sensitive internal services should isolate the relay on the
+  network.
+- **PDF `/Info`.** XMP packets are blanked without moving a byte, but the
+  `/Info` dictionary can live inside a compressed object stream and is not
+  touched. The interface says so explicitly rather than calling the file clean.
+- **Unsupported formats.** TIFF, exotic HEIF and proprietary containers are
+  sent unchanged, and that is reported.
+- **The web application does not route through Tor.** Only the CLI can. Saying
+  otherwise would be false: the browser uses the network of whoever opens it.
+- **Timing and volume.** Still observable by every relay involved. Padding
+  protects the size; nothing yet protects the moment.
+- **Operator diversity.** The cap per apparent operator and the proof of work
+  make Sybil expensive, not impossible. A large directory is not evidence of
+  jurisdictional or operational independence.
+
+## 14. The mix network (1.1)
+
+CAPSULE has its own mix network. This section says what changes in the threat
+model; the design is in [MIXNET.md](./MIXNET.md).
+
+### 14.1 What changes
+
+Up to 1.0, the relay storing a capsule saw the address of whoever uploaded and
+whoever downloaded it. In the CLI that could be covered with Tor. Now the
+traffic can travel through a network of nodes that are the relays themselves.
+
+| Observer              | Without the network      | With the network                         |
+| --------------------- | ------------------------ | ---------------------------------------- |
+| Storing relay         | Client IP, timing, size  | Only the operation and the previous node |
+| First hop on the path | —                        | The client's IP, and nothing else        |
+| Intermediate nodes    | —                        | Two node addresses; neither end          |
+| Mailbox provider      | —                        | That an address polls a mailbox          |
+| Internet provider     | That you talk to a relay | That you talk to a relay                 |
+| Global observer       | All of the above         | Statistical analysis, far more expensive |
+
+What does **not** change: whoever holds the link can still read the capsule, the
+content is still end-to-end encrypted with the fragment's key, and the internet
+provider still sees that there is a connection.
+
+### 14.2 New guarantees, and where they come from
+
+- **No intermediate node knows where it is in the path.** The header is always
+  the same length and the consumed block is replaced by pseudorandom filler the
+  sender computed. It is a property of the format.
+- **A packet cannot be followed from one link to the next.** The ephemeral
+  point is transformed at each hop and the body is decrypted one layer, so the
+  bytes change completely. Verified in the tests.
+- **A node cannot tag a packet.** The body is a wide-block permutation: one
+  changed bit randomises all 64 KiB and the destination rejects it. Verified in
+  the tests.
+- **A repeated packet is discarded.** Each hop stores a tag derived from the
+  shared secret for a window. Without it, resending a packet and watching which
+  one comes out twice links the two ends.
+- **A node does not reveal why it dropped something.** Every response is `202`.
+- **There is no exit node.** The destination is the relay storing the capsule,
+  so no party sees the request in the clear without also being its recipient.
+
+### 14.3 New risks
+
+**The mailbox provider knows you exist.** It sees an address polling a mailbox.
+It does not see what you asked or of whom. That is inherent to a client that
+cannot receive connections. Mitigation: choose the provider deliberately, or
+put Tor underneath with `--tor --mix`.
+
+**The first hop sees your address.** Like a guard in Tor, and for the same
+reason. Unlike Tor, there are **no guard nodes** here: the first hop is chosen
+afresh on every request, which spreads the exposure across more nodes but also
+raises the probability of eventually touching a hostile one. It is a known
+trade-off and it is unresolved; Tor chose the other way after years of
+analysis, and that decision deserves revisiting here.
+
+**Withholding packets is a weapon.** A node can delay or omit forwarding. The
+client sees a timeout, not an attack, and retries by another path. A node doing
+this selectively can bias which paths work.
+
+**Cover traffic costs.** One loop is a 65,920-byte packet for every hop it
+crosses. An operator who turns it off saves traffic and leaves their link
+legible; one who raises it pays bandwidth for everyone.
+
+**An n−1 attack is still open.** An adversary controlling the neighbouring
+nodes and able to suppress everyone else's traffic isolates a packet and
+follows it. Loops and random path selection make it expensive; they do not
+solve it, and it is an open problem in the literature, not an omission of this
+implementation.
+
+**The anonymity set is whatever it is.** Repeated here because it is the risk
+that dominates all the others. With few nodes and one operator, everything
+above is machinery around a single party that sees both ends. The CLI says so
+before every send and the design document says it first.
+
+### 14.4 Outside the model
+
+- **A global passive observer.** With enough traffic and time, statistical flow
+  analysis works against any network of this size.
+- **Active traffic confirmation.** An adversary who can inject and block at
+  will on several links.
+- **Endpoint compromise.** If the device is compromised, none of this matters.
+
+### 14.5 What is needed before calling it anonymous
+
+In order, and none of them optional:
+
+1. **Independent operators**, in different jurisdictions, who do not know each
+   other. Without this the rest is decoration.
+2. **Enough users** for a message to hide among others. A small anonymity set
+   is a small suspect list.
+3. **Published measurements**: real latency, cover volume, effective set size,
+   measured correlation resistance.
+4. **External cryptographic review** of this composition, not only of the
+   constructions it is made of.
+5. **A reasoned decision about guard nodes**, with the analysis behind it.
+
+Until those five exist, the correct phrase is "mix network", not "anonymity
+network", and the interface says it that way.
+
+## 15. `.capsule` sites (1.2)
+
+The design is in [SITES.md](./SITES.md). This section covers only what changes
+in the threat model.
+
+### 15.1 First: what is public
+
+A `.capsule` site **is public content**. The read capability is inside the
+record and the record is spread between relays on purpose. That is not a leak:
+it is what publishing means. A relay, a visitor, and anyone passing by can read
+the site.
+
+What the naming layer protects is not confidentiality but **integrity and
+continuity**: that the pages are the ones their author signed, and that nobody
+can serve an earlier version without it being noticed.
+
+### 15.2 New guarantees, and where they come from
+
+- **Only the key holder can publish under a name.** The name _is_ the public
+  key, so verifying requires no trust in whoever delivered the record. A
+  property of the format.
+- **A relay cannot modify a record.** Changing any field invalidates the
+  signature. Verified in the tests.
+- **A relay cannot roll a site back without it being noticed.** The client
+  stores the highest sequence it accepted per name and refuses a lower one.
+  Verified in the tests.
+- **Silence is worth little.** The client asks several relays and keeps the
+  highest sequence that verifies; suppressing an update requires every relay the
+  visitor asks to be silent.
+- **The relay does not know what it is storing.** The site travels as an
+  encrypted capsule, padded to a size class, under a neutral filename. The
+  record says nothing about the content beyond an optional title the author
+  chose.
+- **The relay does not know which page was read.** The bundle is downloaded
+  whole. There is no per-file request to reveal.
+- **The page cannot contact anybody.** With scripts off — the default mode —
+  the document's policy and the frame's isolation prevent every network
+  request. Verified in the tests.
+
+### 15.3 New risks
+
+**The site key is a single point of failure.** Whoever copies it can replace
+the pages; whoever loses it loses the name. There is no recovery because there
+is nobody to ask. It is the same property as an onion address and it has the
+same cost.
+
+**The relay sees who is asking.** The extension queries relays directly from
+the browser, so a relay sees an IP address asking about a name — and, if it is
+the one storing the capsule, downloading it. This is the most important gap in
+this version. The CLI can go through the mix network; the extension cannot yet.
+
+**A record is an announcement.** Publishing a site tells relays that the name
+exists and when it was updated. A name's update pattern is observable by
+anybody who queries `GET /v1/sites`.
+
+**Scripts, if enabled, can take the visitor out.** A script can navigate the
+frame to an external address, which would reveal the visitor's IP to it. The
+policy still blocks `fetch`, external images and external fonts, but a
+navigation is not a request subject to CSP and no directive covers it since
+`navigate-to` left the standard. That is why they are off by default and the
+warning is visible when they are turned on.
+
+**A site that expires disappears.** If the capsule expires or the relays
+holding it leave, the name resolves to a record pointing at nothing. The record
+still verifies; the content is not there.
+
+**The page rebuilder is a hand-written security boundary.** It is tested
+against the cases we thought of — `<base>`, `meta refresh`, `srcset`, nested
+`url()`, paths that climb out of a directory, `<object data>`, `xlink:href`,
+bare `@import` — and it is not audited. A mistake there is an escape from the
+isolation.
+
+### 15.4 Outside the model
+
+- **Availability.** Nobody guarantees a site stays up.
+- **Censorship of a name.** Relays can refuse to store a record. With enough
+  relays cooperating, a name stops resolving.
+- **Reputation.** A name says nothing about who is behind it. Verifying that a
+  page has not changed is not verifying that it is from who you think.
+- **Publisher anonymity.** The relay sees who uploads, unless `--mix`, `--tor`
+  or `--bridge` is used.
+
+## 16. Bridges, offline capsules and uniform manifests (1.3)
+
+### 16.1 Bridges: what a censor can and cannot do
+
+Full design in [CENSORSHIP.md](./CENSORSHIP.md). Adversary A11 was added to §5
+for this.
+
+| Censor's move                         | Against a public relay                   | Against a bridge                        |
+| ------------------------------------- | ---------------------------------------- | --------------------------------------- |
+| Enumerate the directory               | Works: `/v1/peers` lists everything      | Finds nothing: a bridge never announces |
+| Probe a suspected address             | `GET /v1/info` identifies it immediately | Answers like an unconfigured web server |
+| Probe with the secret prefix          | —                                        | Same answer, without a valid cookie     |
+| Replay a recorded request             | —                                        | Refused; the nonce is remembered        |
+| Write one DPI rule for all of CAPSULE | Works on the API shape                   | The cookie name differs per bridge      |
+| Obtain the bridge line                | —                                        | **Works completely**                    |
+| Fingerprint TLS                       | Works                                    | **Works**: the handshake is Node's      |
+| Traffic analysis                      | Works                                    | Partly: sizes are padded, timing is not |
+
+**New guarantees, and where they come from:**
+
+- **A probe learns nothing.** Wrong prefix, missing cookie, malformed cookie,
+  expired cookie, replayed cookie and a cookie for another path all produce the
+  same 404. There is no error that distinguishes them. Verified in the tests.
+- **A cookie cannot be moved between requests.** The MAC covers the method and
+  path, so one captured on a chunk upload does not open `/v1/info`. Verified.
+- **A bridge does not appear in any peer list.** It pulls the directory and
+  never announces itself. Verified.
+
+**New risks:**
+
+- **Distribution is unsolved, and it is the whole ballgame.** A censor who gets
+  the line has the bridge. Tor has spent fifteen years on this and CAPSULE has
+  no answer at all.
+- **The TLS fingerprint is Node's, not a browser's.** A censor fingerprinting
+  client hellos sees something unusual. Real, and not addressed.
+- **Bridge users are a smaller, separately identifiable population.** Using a
+  bridge shrinks your anonymity set relative to using the public network. Tor
+  bridge users pay the same cost.
+- **A share link created directly on a bridge contains the bridge's address.**
+  Anyone given that link learns the bridge. The CLI's documentation says to
+  combine `--bridge` with `--mix` when this matters.
+- **Sustained probing may still find a signal.** The rate limiter answers a
+  flood differently from an idle server. One probe learns nothing; ten thousand
+  might.
+
+### 16.2 Offline capsules
+
+| Property                          | Consequence                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| No relay is involved at any point | Nothing observes the transfer. There is also nothing to enforce a TTL, so there is none. |
+| Sealed by default                 | The file is ciphertext; a lost memory stick is a lost memory stick                       |
+| `--with-key`                      | The file opens on its own; whoever finds it can read it. The tool says so.               |
+| No deletion capability            | There is nobody to ask. Whoever holds the file holds it.                                 |
+
+The new risk is physical and it is the point: an offline capsule is an object.
+It can be copied without a trace, seized at a border, or found in a drawer years
+later. That is the trade for needing no network.
+
+### 16.3 The LAN beacon
+
+**A beacon tells everyone on the local network that this machine is running
+CAPSULE.** That is a disclosure, and on a network that is not yours it is the
+kind this project spends its effort avoiding. It is off by default and should be
+turned on only when the local network is the only network there is.
+
+A beacon is unauthenticated and cannot be otherwise: the point is to find a
+relay you have never heard of, with no infrastructure to check a signature
+against. What protects the content is that it was already encrypted before it
+went anywhere — a hostile relay on the LAN sees ciphertext, exactly as a hostile
+relay on the internet does. What a beacon is prevented from doing is naming
+anything other than a plain `http(s)` origin. Verified in the tests.
+
+### 16.4 Uniform manifests
+
+AES-GCM does not hide length. Until 1.3, the encrypted manifest's length
+measured the filename and the note, so a capsule called `x.txt` and one called
+`Ana Pereira - passport scan.jpg` were visibly different to the relay even
+though both were unreadable.
+
+Every manifest is now padded to a size class. It is **unconditional**, and that
+is the security argument rather than a convenience: an anonymity feature some
+users switch on splits the population into those who did and those who did not,
+and each group is smaller than the whole. Uniformity only works when it is not
+a choice.
+
+This is the only kind of work that improves an anonymity set from inside the
+code. The rest of that number is adoption, and no commit changes it — see
+[COMPARISON.md](./COMPARISON.md).

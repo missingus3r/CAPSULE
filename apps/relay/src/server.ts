@@ -42,7 +42,7 @@ import {
 } from "@capsule/protocol";
 
 const RELAY_API_VERSION = 1;
-const RELAY_SOFTWARE = "capsule-relay/1.2.0";
+const RELAY_SOFTWARE = "capsule-relay/1.3.0";
 const SUPPORTED_PROTOCOL_VERSIONS = [1, 2, 3];
 const IP_SALT_ROTATION_MS = 60 * 60_000;
 /**

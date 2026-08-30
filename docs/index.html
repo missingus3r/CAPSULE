@@ -61,7 +61,7 @@
             "url": "https://missingus3r.github.io/CAPSULE/",
             "downloadUrl": "https://github.com/missingus3r/CAPSULE",
             "license": "https://www.mozilla.org/en-US/MPL/2.0/",
-            "softwareVersion": "1.2.0",
+            "softwareVersion": "1.3.0",
             "author": {
               "@type": "Person",
               "name": "Bruno Silveira",
@@ -75,7 +75,9 @@
               "Sphinx mix packets with Loopix-style per-hop delays and cover traffic",
               "Websites under a self-certifying .capsule name",
               "Browser extension that renders sites with no network access at all",
-              "Metadata scrubbing and size-class padding"
+              "Metadata scrubbing and size-class padding",
+        "Unlisted bridges that a censor's probe cannot recognise",
+        "Offline capsules and local-network discovery, for when there is no internet"
             ]
           },
           {
@@ -928,7 +930,7 @@
     </nav>
 
     <header class="hero wrap" id="top">
-      <div class="eyebrow">Version 1.2 · MPL-2.0 · Unaudited</div>
+      <div class="eyebrow">Version 1.3 · MPL-2.0 · Unaudited</div>
       <h1>
         A file the relay <b>cannot read</b>. A site nobody <b>can rewrite</b>.
       </h1>
@@ -942,7 +944,7 @@
         <div>Cipher<b>AES-256-GCM</b></div>
         <div>Names<b>Ed25519, self-certifying</b></div>
         <div>Routing<b>Sphinx + Loopix</b></div>
-        <div>Tests<b>166 passing</b></div>
+        <div>Tests<b>183 passing</b></div>
       </div>
       <a class="star-cta" href="https://github.com/missingus3r/CAPSULE"
         >★ Star on GitHub</a
@@ -1002,6 +1004,14 @@
         <div class="cap">
           <span class="n">08</span><span class="t">Publish a .capsule site</span
           ><span class="d">site publish</span>
+        </div>
+        <div class="cap">
+          <span class="n">09</span><span class="t">Reach a blocked network</span
+          ><span class="d">--bridge</span>
+        </div>
+        <div class="cap">
+          <span class="n">10</span><span class="t">Work with no internet</span
+          ><span class="d">offline pack</span>
         </div>
       </div>
     </section>
@@ -1300,7 +1310,7 @@
             </tr>
             <tr>
               <td class="feat">Works with no internet at all</td>
-              <td class="me"><span class="no">—</span></td>
+              <td class="me"><span class="yes">✓</span></td>
               <td><span class="no">—</span></td>
               <td><span class="no">—</span></td>
               <td><span class="no">—</span></td>
@@ -1309,7 +1319,7 @@
             </tr>
             <tr>
               <td class="feat">Censorship-resistant transport</td>
-              <td class="me"><span class="no">—</span></td>
+              <td class="me"><span class="yes">✓</span></td>
               <td><span class="yes">✓</span></td>
               <td><span class="partial">~</span></td>
               <td><span class="partial">~</span></td>
@@ -1318,7 +1328,7 @@
             </tr>
             <tr>
               <td class="feat">General-purpose TCP tunnel</td>
-              <td class="me"><span class="no">—</span></td>
+              <td class="me"><span class="partial">WIP</span></td>
               <td><span class="yes">✓</span></td>
               <td><span class="no">—</span></td>
               <td><span class="no">—</span></td>
@@ -1338,10 +1348,10 @@
         </table>
       </div>
       <p class="compare-note">
-        ✓ by design and tested &nbsp;·&nbsp; ~ partly, or depends on
-        configuration &nbsp;·&nbsp; — not addressed.<br />
-        The last four rows are CAPSULE's, and they are honest losses, not
-        oversights.
+        ✓ by design and tested &nbsp;·&nbsp; ~ partly &nbsp;·&nbsp; WIP
+        designed, not built &nbsp;·&nbsp; — not addressed.<br />
+        The last row is the honest one, and it is not an engineering problem:
+        an anonymity set is how many people use a network today.
       </p>
 
       <button class="open-modal" data-modal="m-compare">
@@ -1354,7 +1364,7 @@
       <h2>What this <b>does not</b> do</h2>
       <p class="body">
         A privacy tool that oversells itself is worse than no tool, because
-        someone will rely on the part that was exaggerated. These are the four
+        someone will rely on the part that was exaggerated. These are the five
         that matter.
       </p>
 
@@ -1365,23 +1375,30 @@
             >Tor has millions of users. CAPSULE has whatever relays someone
             started today. Every property of the mix network is true and none of
             them matter much at this size. This is the risk that dominates all
-            the others.</span
+            the others, and the one thing here that code cannot fix.</span
           >
         </div>
         <div class="item">
-          <b>No censorship resistance</b>
+          <b>Bridge distribution is unsolved</b>
           <span
-            >There are no bridges, no pluggable transports, no protocol
-            obfuscation. Blocking the known relays blocks the network. Tor spent
-            a decade on this problem and CAPSULE has not started.</span
+            >A bridge is invisible to a censor who scans and probes. A censor
+            who gets the bridge line has the bridge. Tor has spent fifteen years
+            on this and CAPSULE has no answer at all.</span
           >
         </div>
         <div class="item">
-          <b>No offline or mesh transport</b>
+          <b>The TLS fingerprint is Node's, not a browser's</b>
           <span
-            >Briar, Meshtastic and Reticulum work over Bluetooth, LoRa and radio
-            when the internet is cut. CAPSULE needs IP. In a network blackout,
-            they work and this does not.</span
+            >There are no pluggable transports. For protocol obfuscation, put
+            Tor or obfs4 underneath with <code>--proxy</code>.</span
+          >
+        </div>
+        <div class="item">
+          <b>No mesh or radio transport</b>
+          <span
+            >Offline capsules cover the air gap and a LAN beacon covers the same
+            building. Where there is no IP and nobody to carry a file, Briar and
+            Meshtastic work and this does not.</span
           >
         </div>
         <div class="item">
@@ -1389,13 +1406,13 @@
           <span
             >The primitives are standard and the composition is not. Everything
             here is supported by the code, the tests and the threat model in the
-            repository, and by nothing else. Treat it accordingly.</span
+            repository, and by nothing else.</span
           >
         </div>
       </div>
 
       <p class="body" style="margin-top: 40px">
-        There is a fifth, smaller one worth naming: the browser extension talks
+        There is a sixth, smaller one worth naming: the browser extension talks
         to relays directly, so a relay sees an address asking about a name. The
         CLI can go through the mix network; the extension cannot yet.
       </p>
@@ -1532,7 +1549,7 @@
           <b>Clients</b><span>CLI, React 19 web, MV3 extension</span>
         </div>
         <div class="row">
-          <b>Tests</b><span>166, including fuzz and vectors</span>
+          <b>Tests</b><span>183, including fuzz and vectors</span>
         </div>
       </div>
 
@@ -1775,8 +1792,8 @@ capsule-id/
       <div class="modal-body">
         <p>
           The stated limitation of each system, and whether CAPSULE addresses
-          it. Ten yes, five partly, four no, and two that do not apply. The four
-          are listed at the bottom; they are the honest part of this table.
+          it. Thirteen yes, five partly, two that do not apply, and one no.
+          That last one is explained at the bottom; it is the honest part.
         </p>
         <table>
           <tr>
@@ -1819,7 +1836,7 @@ capsule-id/
           <tr>
             <td>SimpleX</td>
             <td>Depends on relays; no true offline physical network</td>
-            <td class="v v-no">no</td>
+            <td class="v v-yes">yes</td>
           </tr>
           <tr>
             <td>Session</td>
@@ -1829,7 +1846,7 @@ capsule-id/
           <tr>
             <td>Briar</td>
             <td>Maintenance mode; battery, background execution, UX</td>
-            <td class="v v-no">no</td>
+            <td class="v v-part">partly</td>
           </tr>
           <tr>
             <td>Bitchat</td>
@@ -1883,7 +1900,7 @@ capsule-id/
           <tr>
             <td>Meshtastic</td>
             <td>Needs hardware and has little bandwidth</td>
-            <td class="v v-no">no</td>
+            <td class="v v-part">partly</td>
           </tr>
           <tr>
             <td>Veilid</td>
@@ -1901,24 +1918,28 @@ capsule-id/
             <td class="v v-no">n/a</td>
           </tr>
         </table>
-        <h4>The four CAPSULE does not cover</h4>
+        <h4>The one CAPSULE does not cover</h4>
         <p>
-          <b>No offline transport.</b> Briar, Meshtastic, Bitchat and Reticulum
-          work over Bluetooth, LoRa and radio. CAPSULE needs IP.
+          <b>A large anonymity set today.</b> Not an engineering property: it is
+          how many people use the network right now, and Tor has one after
+          fifteen years of adoption. CAPSULE cannot even measure its own —
+          there are no accounts and no counters, so there is nobody to count.
         </p>
         <p>
-          <b>No censorship resistance.</b> No bridges, no pluggable transports.
-          Blocking the known relays blocks the network.
+          What code can do there, 1.3 did: manifests are padded to a size class
+          so capsules stop being distinguishable from one another, and it is
+          unconditional so it cannot split the population into those who
+          switched it on and those who did not. The rest is adoption, and the
+          most useful thing anyone reading this can do about it is run a relay.
         </p>
+        <h4>Work in progress</h4>
         <p>
-          <b>Not a general-purpose transport.</b> Tor, I2P, Lokinet and
-          Yggdrasil carry any TCP or IP connection. CAPSULE carries files and
-          static sites, because the capsule format needs the content known in
-          full up front.
-        </p>
-        <p>
-          <b>The smallest anonymity set in the table.</b> Stated first in the
-          mix network document for exactly this reason.
+          <b>A general-purpose TCP tunnel.</b> Tor, I2P, Lokinet and Yggdrasil
+          carry any TCP connection; CAPSULE carries files and static sites. The
+          capsule format needs the content known in full up front, which a
+          stream is not — so this is a second format beside the existing one,
+          not a change to it. The design is written down in the roadmap. It is
+          not built, and every table here says so.
         </p>
       </div>
     </div>
