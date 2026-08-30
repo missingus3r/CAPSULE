@@ -282,6 +282,20 @@ export interface ResolveSiteOptions {
   /** Highest sequence already seen for this name; anything lower is refused. */
   pinnedSequence?: number;
   now?: number;
+  /**
+   * Fetches one relay's record for a name by some route other than a direct
+   * request. Supplied when the caller has a path that does not reveal who is
+   * asking — the mix network — and left out for an ordinary request.
+   *
+   * It changes how the record arrives and nothing about whether it is
+   * believed: every answer is verified against the key inside the name the
+   * same way, because a route that hides the asker says nothing about the
+   * honesty of whoever answers.
+   */
+  recordFor?: (
+    relayUrl: string,
+    name: string,
+  ) => Promise<CapsuleSiteRecord | undefined>;
 }
 
 export interface ResolvedSite {
@@ -315,13 +329,20 @@ export async function resolveSite(
   await Promise.all(
     [...new Set(relayUrls)].map(async (relayUrl) => {
       try {
-        const response = await request(
-          `${trimSlash(relayUrl)}/v1/sites/${encodeURIComponent(parsed.name)}`,
-          { ...(options.signal ? { signal: options.signal } : {}) },
-        );
-        if (!response.ok) return;
-        const body = (await response.json()) as { record?: CapsuleSiteRecord };
-        const record = body?.record;
+        let record: CapsuleSiteRecord | undefined;
+        if (options.recordFor) {
+          record = await options.recordFor(relayUrl, parsed.name);
+        } else {
+          const response = await request(
+            `${trimSlash(relayUrl)}/v1/sites/${encodeURIComponent(parsed.name)}`,
+            { ...(options.signal ? { signal: options.signal } : {}) },
+          );
+          if (!response.ok) return;
+          const body = (await response.json()) as {
+            record?: CapsuleSiteRecord;
+          };
+          record = body?.record;
+        }
         if (!record) return;
         // Verified here as well as in bestSiteRecord, so a relay that answers
         // for a different name never gets counted as having seen this one.

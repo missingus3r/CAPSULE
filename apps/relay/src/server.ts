@@ -929,6 +929,19 @@ export async function buildRelayServer(
           await storage.delete(request.capsuleId ?? "", request.token);
           return { ok: true, data: asJson({ deleted: true }) };
         }
+        case MixOp.SiteRecord: {
+          // Deliberately the same answer as the public endpoint, including
+          // for a name this relay does not hold: the mix path must not be a
+          // different oracle from the direct one.
+          if (!config.sitesEnabled) {
+            return { ok: false, data: asJson({ error: "sites_disabled" }) };
+          }
+          const record = sites.get(request.capsuleId ?? "");
+          if (!record) {
+            return { ok: false, data: asJson({ error: "not_found" }) };
+          }
+          return { ok: true, data: asJson({ record }) };
+        }
         default:
           return {
             ok: false,

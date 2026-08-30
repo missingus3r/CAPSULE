@@ -1,4 +1,4 @@
-import { fromBase64Url } from "@capsule/protocol";
+import { fromBase64Url, type CapsuleSiteRecord } from "@capsule/protocol";
 import type { RelayInfo, RelayPublicConfig } from "@capsule/sdk";
 import {
   MixClient,
@@ -42,6 +42,19 @@ export interface MixNetwork {
   pathLength: number;
   /** Builds the transport a transfer uses to reach one relay. */
   transportFor: (relayUrl: string) => MixRelayTransport;
+  /**
+   * Asks one relay for a `.capsule` record without revealing who is asking.
+   *
+   * Shaped to drop straight into `resolveSite`, and quiet about every kind of
+   * no — a relay outside this network, one that does not hold the name, one
+   * too old to know the operation. A resolver asks several and keeps the
+   * newest record that verifies, so one relay saying nothing is not an error
+   * and not information.
+   */
+  recordFor: (
+    relayUrl: string,
+    name: string,
+  ) => Promise<CapsuleSiteRecord | undefined>;
   /** An honest summary of what this network can and cannot offer. */
   strength: MixNetworkStrength;
 }
@@ -122,7 +135,7 @@ export function buildMixNetwork(options: MixNetworkOptions): MixNetwork {
   const requested = options.pathLength ?? 3;
   const pathLength = Math.max(1, Math.min(requested, byUrl.size));
 
-  const client = new MixClient({
+  const clientOptions = {
     nodes: [...byUrl.values()],
     provider,
     pathLength,
@@ -136,9 +149,38 @@ export function buildMixNetwork(options: MixNetworkOptions): MixNetwork {
       ? { timeoutMs: options.timeoutMs }
       : {}),
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
-  });
+  };
+  const client = new MixClient(clientOptions);
 
   const operators = new Set([...byUrl.keys()].map(operatorOf));
+
+  /**
+   * The client to use when talking to one particular relay.
+   *
+   * Normally the shared one. The exception matters: a client polls its mailbox
+   * provider directly, so the provider sees an address and the reply token it
+   * is polling for — and the destination learns that same token when it
+   * answers. If those are the same relay it can put the two together and read
+   * the address behind a request that was supposed to arrive with none. So
+   * when the destination is also the provider, and there is anywhere else to
+   * put the mailbox, the mailbox moves.
+   */
+  const byProvider = new Map<string, MixClient>();
+  const clientFor = (destinationUrl: string): MixClient => {
+    if (destinationUrl !== provider.url) return client;
+    const alternative = [...byUrl.values()].find(
+      (node) => node.url !== destinationUrl,
+    );
+    if (!alternative) return client;
+    const existing = byProvider.get(alternative.url);
+    if (existing) return existing;
+    const replacement = new MixClient({
+      ...clientOptions,
+      provider: alternative,
+    });
+    byProvider.set(alternative.url, replacement);
+    return replacement;
+  };
 
   return {
     client,
@@ -153,7 +195,24 @@ export function buildMixNetwork(options: MixNetworkOptions): MixNetwork {
           `Relay ${relayUrl} does not run a mix node, so it cannot be reached through the network`,
         );
       }
-      return new MixRelayTransport(relayUrl, client, destination, config);
+      return new MixRelayTransport(
+        relayUrl,
+        clientFor(relayUrl),
+        destination,
+        config,
+      );
+    },
+    recordFor: async (relayUrl: string, name: string) => {
+      const destination = byUrl.get(relayUrl);
+      const config = limits.get(relayUrl);
+      if (!destination || !config) return undefined;
+      const record = await new MixRelayTransport(
+        relayUrl,
+        clientFor(relayUrl),
+        destination,
+        config,
+      ).siteRecord(name);
+      return record as CapsuleSiteRecord | undefined;
     },
     strength: {
       mixCount: byUrl.size,

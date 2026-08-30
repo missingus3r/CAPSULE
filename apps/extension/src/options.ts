@@ -11,6 +11,7 @@ const addForm = document.getElementById("add") as HTMLFormElement;
 const forgetForm = document.getElementById("forget") as HTMLFormElement;
 const urlInput = document.getElementById("url") as HTMLInputElement;
 const status = document.getElementById("status") as HTMLElement;
+const mixToggle = document.getElementById("mix") as HTMLInputElement;
 
 function empty(text: string): HTMLLIElement {
   const item = document.createElement("li");
@@ -21,6 +22,7 @@ function empty(text: string): HTMLLIElement {
 
 async function draw(): Promise<void> {
   const settings = await readSettings();
+  mixToggle.checked = settings.mix;
 
   relayList.replaceChildren();
   if (settings.relays.length === 0) {
@@ -122,6 +124,10 @@ addForm.addEventListener("submit", (event) => {
     status.textContent = `Added ${url}.`;
     await draw();
   })();
+});
+
+mixToggle.addEventListener("change", () => {
+  void writeSettings({ mix: mixToggle.checked });
 });
 
 forgetForm.addEventListener("submit", (event) => {

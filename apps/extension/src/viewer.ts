@@ -1,10 +1,12 @@
 import {
+  isPublicRelayOrigin,
   normalizeSitePath,
   parseSiteName,
   unpackSite,
   type SiteBundle,
 } from "@capsule/protocol";
-import { fetchSiteBytes, resolveSite } from "@capsule/sdk";
+import { discoverRelays, fetchSiteBytes, resolveSite } from "@capsule/sdk";
+import { buildMixNetwork, type MixNetwork } from "@capsule/mixnet";
 import {
   base64,
   frameNavigation,
@@ -107,6 +109,60 @@ async function ensurePermissions(relays: string[]): Promise<boolean> {
 
 function requestPermissions(relays: string[]): Promise<boolean> {
   return chrome.permissions.request({ origins: originsOf(relays) });
+}
+
+/** Hops each way, and how long a hop holds a packet. Matches the CLI. */
+const MIX_HOPS = 3;
+const MIX_MEAN_DELAY_MS = 2_000;
+
+/**
+ * Builds a mix path out of the relays this browser is already allowed to
+ * contact, or gives up quietly.
+ *
+ * Two rules shape it. **Only permitted relays**: a mix hop is a server the
+ * extension opens a connection to, and it must never reach one the visitor did
+ * not agree to — the peer list a relay hands out is not consent. **At least
+ * two**: with a single node there is no path, because that node would be both
+ * the way in and the destination and would see the two ends of its own
+ * request.
+ *
+ * Discovery failing, or too few relays answering, is not an error. The caller
+ * falls back to asking directly and says on screen that it did.
+ */
+async function openMixNetwork(
+  settings: Settings,
+): Promise<MixNetwork | undefined> {
+  if (!settings.mix) return undefined;
+  try {
+    const relays = await discoverRelays({
+      seeds: settings.relays,
+      maxRelays: 12,
+      // The visitor pointed this extension at these relays; following their
+      // peer lists onto a local network is only reasonable when they are
+      // themselves local, which is what a private seed says.
+      allowPrivateRelays: settings.relays.some(
+        (relay) => !isPublicRelayOrigin(relay),
+      ),
+    });
+    const permitted: typeof relays = [];
+    for (const relay of relays) {
+      if (!relay.mixPublicKey) continue;
+      if (
+        await chrome.permissions.contains({ origins: originsOf([relay.url]) })
+      ) {
+        permitted.push(relay);
+      }
+    }
+    if (permitted.length < 2) return undefined;
+    return buildMixNetwork({
+      relays: permitted,
+      pathLength: MIX_HOPS,
+      meanDelayMs: MIX_MEAN_DELAY_MS,
+      timeoutMs: Math.max(120_000, MIX_MEAN_DELAY_MS * MIX_HOPS * 8),
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 interface CachedBundle {
@@ -326,11 +382,20 @@ async function open(target: Target): Promise<void> {
     `Asking ${settings.relays.length} relay(s) about ${target.name}.`,
   );
 
+  const mix = await openMixNetwork(settings);
+  if (mix) {
+    showPanel(
+      "Resolving through the mix…",
+      `${mix.strength.mixCount} relays, ${mix.pathLength} hops each way. The relay holding ${target.name} will answer a request with nobody attached to it. This takes longer than asking it directly, which is the point.`,
+    );
+  }
+
   const pinned = settings.pins[parsed.name];
   let resolved;
   try {
     resolved = await resolveSite(parsed.name, settings.relays, {
       ...(pinned !== undefined ? { pinnedSequence: pinned } : {}),
+      ...(mix ? { recordFor: mix.recordFor } : {}),
     });
   } catch (error) {
     showPanel(
@@ -372,10 +437,14 @@ async function open(target: Target): Promise<void> {
   if (!bytes) {
     showPanel(
       resolved.record.title || "Loading…",
-      `Downloading ${parsed.name} from ${new URL(resolved.capability.relayUrl).host}.`,
+      mix
+        ? `Downloading ${parsed.name} through ${mix.pathLength} hops. The relay holding it does not learn who is reading.`
+        : `Downloading ${parsed.name} from ${new URL(resolved.capability.relayUrl).host}.`,
     );
     try {
-      const downloaded = await fetchSiteBytes(resolved.capability);
+      const downloaded = await fetchSiteBytes(resolved.capability, {
+        ...(mix ? { transport: mix.transportFor } : {}),
+      });
       const bundle = unpackSite(downloaded);
       await cacheBundle(parsed.name, sequence, downloaded);
       await writeSettings({

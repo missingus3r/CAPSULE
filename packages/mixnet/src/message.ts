@@ -33,6 +33,16 @@ export const MixOp = {
   GetChunk: 5,
   Status: 6,
   Delete: 7,
+  /**
+   * Read the record for a `.capsule` name, carrying the name in `capsuleId`.
+   *
+   * Added after the others, so a relay that predates it answers "unsupported
+   * operation" and the caller moves to another relay rather than breaking. It
+   * exists because asking a relay `GET /v1/sites/<name>` tells that relay
+   * which site is being read, which is the one thing a visitor most wants
+   * unlinked from their address.
+   */
+  SiteRecord: 8,
 } as const;
 
 export type MixOpValue = (typeof MixOp)[keyof typeof MixOp];

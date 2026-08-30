@@ -1798,12 +1798,58 @@ footer > span {
   color: var(--forest);
 }
 
-.network-panel {
+.network-panel,
+.extension-panel {
   position: relative;
   z-index: 1;
   margin-top: 1.6rem;
   padding-top: 1.1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.extension-panel h3 {
+  margin: 0.6rem 0 0.45rem;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.extension-panel p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.57);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.extension-panel small {
+  display: block;
+  margin-top: 0.5rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+.extension-link {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.7rem;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.65rem;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.extension-link:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .network-panel h3 {

@@ -166,6 +166,14 @@ export const en = {
   "privacy.details.body":
     "The relay sees your IP address at the moment you connect, though it does not keep it. Anonymous mode removes the file's metadata, hides the name and pads the size to a category, but it does not hide your address. Mix routing does: the request travels through several relays and the one storing the capsule never learns who asked. Neither hides that you use CAPSULE at all — the CLI has {flag} for that. Encryption does not protect an infected device, nor stop whoever receives the file from keeping a copy.",
 
+  "extension.eyebrow": "The other half",
+  "extension.title": "Reading a .capsule site",
+  "extension.body":
+    "A .capsule address resolves nowhere in DNS, so a browser needs the extension to open one. It rebuilds every page before showing it, and the result cannot make a single network request.",
+  "extension.cta": "How to install it",
+  "extension.note":
+    "There is no store listing. You build it from the repository and load it unpacked, which is also why you can read what you are running.",
+
   "network.eyebrow": "The network",
   "network.title": "Anyone can run a relay",
   "network.body":

@@ -128,6 +128,27 @@
         padding-left: 12px;
         margin-top: 26px;
       }
+      .switch {
+        display: flex;
+        gap: 0.6rem;
+        align-items: flex-start;
+        margin: 0 0 0.4rem;
+        cursor: pointer;
+      }
+      .switch input {
+        flex: none;
+        margin-top: 0.2rem;
+      }
+      .switch strong {
+        display: block;
+        font-size: 0.9rem;
+      }
+      .switch small {
+        display: block;
+        margin-top: 0.2rem;
+        opacity: 0.72;
+        line-height: 1.5;
+      }
     </style>
   </head>
   <body>
@@ -150,6 +171,20 @@
         <button class="primary" type="submit">Add</button>
       </form>
       <p class="status" id="status"></p>
+
+      <h2>Mix routing</h2>
+      <label class="switch">
+        <input id="mix" type="checkbox" />
+        <span>
+          <strong>Ask through other relays</strong>
+          <small
+            >On, so the relay holding a site does not learn which address asked
+            for it. It needs at least two relays above that you have allowed,
+            adds a few seconds per page, and falls back to a direct request —
+            saying so on screen — when it cannot lay a path.</small
+          >
+        </span>
+      </label>
 
       <h2>Names this browser has seen</h2>
       <ul id="pins"></ul>

@@ -13,10 +13,17 @@ import {
   type MixDirectoryNode,
 } from "../packages/mixnet/src/index.js";
 import {
+  createSiteIdentity,
   downloadCapsule,
+  fetchSiteBytes,
+  publishSite,
+  resolveSite,
   uploadCapsule,
   type RelayPublicConfig,
 } from "../packages/sdk/src/index.js";
+import { siteContentType } from "../packages/protocol/src/index.js";
+import { buildMixNetwork } from "../packages/mixnet/src/network.js";
+import { discoverRelays } from "../packages/sdk/src/network.js";
 
 /**
  * The mix network, end to end.
@@ -310,5 +317,61 @@ describe("CAPSULE over its own mix network", () => {
     expect(origin.app.capsuleMix.stats.forwarded).toBeGreaterThanOrEqual(
       before,
     );
+  }, 30_000);
+
+  it("resolves a .capsule name without the relay learning who asked", async () => {
+    const relays = [
+      await startRelay(),
+      await startRelay(),
+      await startRelay(),
+      await startRelay(),
+    ];
+    await introduce(relays);
+    const [entry, , , host] = relays as [Relay, Relay, Relay, Relay];
+
+    const { identity } = await createSiteIdentity();
+    const encoder = new TextEncoder();
+    await publishSite({
+      identity,
+      files: [
+        {
+          path: "index.html",
+          type: siteContentType("index.html"),
+          bytes: encoder.encode("<h1>read anonymously</h1>"),
+        },
+      ],
+      relayUrl: host.url,
+      ttlSeconds: 600,
+      sequence: 1,
+    });
+
+    const seen: string[] = [];
+    const directory = await discoverRelays({
+      seeds: [entry.url],
+      allowPrivateRelays: true,
+    });
+    const mix = buildMixNetwork({
+      relays: directory,
+      pathLength: 3,
+      meanDelayMs: 0,
+      fetchImpl: watchfulFetch(seen),
+    });
+
+    // The record arrives over the mix, so the relay holding it answers a
+    // request with no client attached to it.
+    const resolved = await resolveSite(identity.name, [host.url], {
+      recordFor: mix.recordFor,
+    });
+    expect(resolved?.record.sequence).toBe(1);
+
+    const bytes = await fetchSiteBytes(resolved!.capability, {
+      transport: mix.transportFor,
+    });
+    expect(bytes.byteLength).toBeGreaterThan(0);
+
+    // The point of the whole exercise: the client opened connections to the
+    // mix it entered through, and never to the relay that knows the name.
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen).not.toContain(host.url);
   }, 30_000);
 });

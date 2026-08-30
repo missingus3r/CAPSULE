@@ -159,6 +159,14 @@ export const es: Messages = {
   "privacy.details.body":
     "El relay ve tu dirección IP en el momento de la conexión, aunque no la guarda. El modo anónimo borra los metadatos del archivo, oculta el nombre y rellena el tamaño hasta una categoría, pero no oculta tu dirección. El ruteo por mixes sí: el pedido viaja por varios relays y el que almacena la cápsula nunca sabe quién la pidió. Ninguno de los dos oculta que usás CAPSULE — para eso la CLI tiene {flag}. El cifrado no protege un dispositivo infectado ni evita que quien recibe guarde una copia.",
 
+  "extension.eyebrow": "La otra mitad",
+  "extension.title": "Leer un sitio .capsule",
+  "extension.body":
+    "Una dirección .capsule no resuelve en ningún DNS, así que el navegador necesita la extensión para abrirla. Reconstruye cada página antes de mostrarla, y el resultado no puede hacer una sola petición de red.",
+  "extension.cta": "Cómo instalarla",
+  "extension.note":
+    "No hay listado en ninguna tienda. La compilás desde el repositorio y la cargás sin empaquetar, que es también por qué podés leer lo que estás corriendo.",
+
   "network.eyebrow": "La red",
   "network.title": "Cualquiera puede levantar un relay",
   "network.body":

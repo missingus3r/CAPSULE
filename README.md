@@ -227,6 +227,11 @@ the name and this is the newest version this browser has seen. `SCRIPTS OFF` is
 the default, and the site has no say in it. Nothing below that bar can reach the
 network.
 
+Reading a site goes **through the mix network by default**, so the relay holding
+it does not learn which address asked for which name. That needs at least two
+relays you have allowed; with fewer, the extension asks directly and says so on
+screen rather than letting you assume otherwise.
+
 The extension does something ordinary browsers do not: it **rebuilds every page**
 before showing it. Stylesheets, images and fonts from the bundle become `data:`
 URLs, anything pointing at the open web is removed, and a link that leaves

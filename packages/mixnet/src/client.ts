@@ -408,6 +408,31 @@ export class MixRelayTransport implements RelayTransport {
   ): Promise<void> {
     await this.run(MixOp.Delete, { capsuleId, token: deleteToken }, signal);
   }
+
+  /**
+   * Asks this relay for a `.capsule` record without telling it who asked.
+   *
+   * Returns `undefined` rather than throwing for every kind of no: the relay
+   * does not hold the name, has sites turned off, or is too old to know the
+   * operation. A caller asks several relays and keeps the newest record that
+   * verifies, so one relay's silence is not information and not an error.
+   */
+  async siteRecord(
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<unknown | undefined> {
+    try {
+      const data = await this.run(
+        MixOp.SiteRecord,
+        { capsuleId: name },
+        signal,
+      );
+      const body = asJson<{ record?: unknown }>(data);
+      return body?.record;
+    } catch {
+      return undefined;
+    }
+  }
 }
 
 export { MIX_CHUNK_SIZE };

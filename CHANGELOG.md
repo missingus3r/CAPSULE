@@ -50,9 +50,20 @@ what stopped being true. The format follows
 - `examples/site/`, a small `.capsule` site to publish against a local relay.
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
-
-### Added
-
+- **The extension routes `.capsule` reads through the mix network, by
+  default.** Opening a site used to tell the relay holding it which address
+  asked for which name — the gap [docs/SITES.md](docs/SITES.md) §7 called the
+  most important one in this version. Both halves of the read now go over the
+  mix: the record lookup through a new operation `8`, and the capsule download
+  through the same path. It uses only relays the visitor has already allowed,
+  needs at least two of them, and when it cannot lay a path it asks directly
+  and says on screen that it did rather than letting the protection be assumed.
+  A switch in the settings turns it off.
+- **Mix operation `8`, reading a `.capsule` record.** It answers exactly what
+  `GET /v1/sites/<name>` answers, including for a name the relay does not hold,
+  so the mix path is not a different oracle from the direct one. A relay that
+  predates it answers `unsupported operation` and the caller treats that like
+  any other relay that did not answer, so no version bump was needed.
 - **The web app can route through the mix network.** A switch beside anonymous
   mode sends every request over three hops, so the relay storing the capsule
   never learns who uploaded or fetched it — the thing `--mix` has done in the
@@ -63,6 +74,17 @@ what stopped being true. The format follows
 
 ### Changed
 
+- **The mailbox never sits on the relay a request is addressed to.**
+  `buildMixNetwork` picked the mailbox provider at random from every relay it
+  knew, including the destination. When they were the same relay it learned the
+  reply token by answering the request, and saw the address polling for that
+  token — enough to put a name and an address back together and undo the point
+  of routing at all. The mailbox now moves to another relay whenever the
+  destination is the provider and there is anywhere else to put it. Found by
+  the integration test written for the extension's path, not by reading.
+- **Mix routing is on by default in the web app**, not an option to discover.
+  The protection worth defaulting to is the one that holds in a small network:
+  the relay storing a capsule does not learn who sent it.
 - **The mix packet layer runs in a browser.** It was built on `node:crypto`,
   which is the whole reason mix routing was CLI-only: X25519, HKDF, AES-CTR and
   HMAC now come from the audited `@noble` packages, and the byte helpers from

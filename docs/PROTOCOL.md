@@ -952,21 +952,29 @@ that does not find that marker discards the packet: it was altered on the way.
 
 Request:
 
-| Offset | Bytes | Content                                                                                                 |
-| ------ | ----- | ------------------------------------------------------------------------------------------------------- |
-| 0      | 1     | Version (`1`)                                                                                           |
-| 1      | 1     | Operation: `1` create, `2` put chunk, `3` finalize, `4` manifest, `5` get chunk, `6` status, `7` delete |
-| 2      | 432   | Reply block                                                                                             |
-| 434    | 1+n   | Capsule identifier, length-prefixed                                                                     |
-| …      | 1+n   | Token, length-prefixed                                                                                  |
-| …      | 4     | Chunk index, big-endian                                                                                 |
-| …      | 4     | Data length, big-endian                                                                                 |
-| …      | n     | Data                                                                                                    |
+| Offset | Bytes | Content                                                                                                                  |
+| ------ | ----- | ------------------------------------------------------------------------------------------------------------------------ |
+| 0      | 1     | Version (`1`)                                                                                                            |
+| 1      | 1     | Operation: `1` create, `2` put chunk, `3` finalize, `4` manifest, `5` get chunk, `6` status, `7` delete, `8` site record |
+| 2      | 432   | Reply block                                                                                                              |
+| 434    | 1+n   | Capsule identifier, length-prefixed                                                                                      |
+| …      | 1+n   | Token, length-prefixed                                                                                                   |
+| …      | 4     | Chunk index, big-endian                                                                                                  |
+| …      | 4     | Data length, big-endian                                                                                                  |
+| …      | n     | Data                                                                                                                     |
 
 Response: version (1 B), success (1 B), `uint32` length (4 B), data.
 
 Reply block (432 B): the first hop's identifier (16), `α` (32), `β` (320),
 `γ` (32), sealing key (32).
+
+Operation `8` reads a `.capsule` record and carries the name in the capsule
+identifier field, which is length-prefixed and long enough for it. It answers
+exactly what `GET /v1/sites/<name>` answers, including for a name the relay
+does not hold, so the mix path is not a different oracle from the direct one. A
+relay that predates the operation answers `unsupported operation`; a client
+treats that like any other relay that did not answer, which is why the addition
+needed no version bump.
 
 ### 16.7 The node's HTTP API
 

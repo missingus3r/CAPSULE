@@ -27,8 +27,9 @@ What it does not guarantee:
 - **That publishing is anonymous by itself.** The relay sees the address of
   whoever uploads, unless `--mix`, `--tor` or `--bridge` is used.
 - **That nobody knows you visited.** The relay you ask sees that you asked
-  about that name. With `--mix` it does not; from the extension, it still does
-  (see §7).
+  about that name — unless the request goes through the mix network, which the
+  CLI does with `--mix` and the extension does by default when it has enough
+  relays to lay a path. When it cannot, it asks directly and says so (see §7).
 
 ## 2. The name
 
@@ -156,7 +157,11 @@ Then:
 
 1. It parses the name. If it does not parse, it stops there: no search, no
    "did you mean".
-2. It asks the configured relays and verifies every answer.
+2. It asks the configured relays and verifies every answer. By default the
+   asking goes through the mix network — mix operation `8` carries the record
+   lookup and the same path carries the capsule — so the relay holding the site
+   answers without learning who asked. With fewer than two allowed relays there
+   is no path to build, and it asks directly instead.
 3. It compares the sequence with the highest this browser has accepted for the
    name. If it is lower, it shows an error instead of the page.
 4. It downloads the capsule, decrypts it and unpacks the bundle.
@@ -260,12 +265,20 @@ necessary.
 
 ## 7. What is missing
 
-**The visitor is still exposed to the relay.** The extension queries relays
-directly from the browser, so a relay sees an IP address asking about a name.
-The CLI and the web app both route through the mix network; the extension has
-not been wired to it. What used to make this impossible — the packet layer
-needing `node:crypto` — is fixed, so this is now work rather than a blocker.
-It remains the most important gap in this version.
+**The visitor is exposed to the relay when the mix cannot be used.** The
+extension routes through the mix network by default: the record lookup goes
+over mix operation `8` and the capsule download over the same path, so the
+relay holding a site answers a request with no address attached to it.
+
+That needs at least two relays the visitor has already allowed, and it is not
+always available. When it is not, the extension asks directly — a relay then
+sees an address asking about a name — and the panel says which of the two
+happened rather than leaving it to be assumed. Turning it off is a switch in
+the settings.
+
+What remains is the shape of the fallback: a reader with one relay configured
+gets no mix at all, and the honest fix for that is more relays rather than more
+code.
 
 **No cache between sessions.** The bundle is kept in
 `chrome.storage.session`, which lives in memory and is cleared when the browser

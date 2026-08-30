@@ -15,12 +15,23 @@ export interface Settings {
   pins: Record<string, number>;
   /** Names allowed to run scripts, one explicit decision at a time. */
   scriptSites: string[];
+  /**
+   * Route through the mix network when enough relays are reachable.
+   *
+   * On by default. Reading a site otherwise tells the relay holding it which
+   * name an address asked for, which is the one thing a reader most wants
+   * kept apart from who they are. It costs seconds per page, and it falls
+   * back to a direct request — visibly — when there are not enough relays to
+   * lay a path through.
+   */
+  mix: boolean;
 }
 
 const DEFAULTS: Settings = {
   relays: DEFAULT_RELAYS,
   pins: {},
   scriptSites: [],
+  mix: true,
 };
 
 export async function readSettings(): Promise<Settings> {
@@ -36,6 +47,7 @@ export async function readSettings(): Promise<Settings> {
     scriptSites: Array.isArray(stored.scriptSites)
       ? (stored.scriptSites as string[])
       : [],
+    mix: typeof stored.mix === "boolean" ? stored.mix : DEFAULTS.mix,
   };
 }
 

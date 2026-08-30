@@ -94,23 +94,23 @@ the relay which pages were read.
 
 ## 5. The table
 
-|                                      | `.onion` v3                      | `.capsule`                      |
-| ------------------------------------ | -------------------------------- | ------------------------------- |
-| What is on the other side            | a live server                    | a static blob on relays         |
-| Publisher must stay online           | **yes, 24/7**                    | no                              |
-| Dynamic content, forms, login, DB    | **yes, all of it**               | none                            |
-| JavaScript                           | whatever the site wants          | off by default, opt-in per site |
-| The page can reach the network       | **yes**                          | **no** — `connect-src 'none'`   |
-| The site learns which pages you read | **yes, every request**           | no — the bundle arrives whole   |
-| The site learns your IP              | no, the circuit hides it         | there is no server to learn it  |
-| **The relay/HSDir learns your IP**   | no, six hops                     | **yes, from the extension**     |
-| Names can be enumerated              | no, blinded keys                 | **yes** — `GET /v1/sites`       |
-| What the signature covers            | the server's identity            | the bytes you are shown         |
-| Anti-rollback                        | `revision-counter`               | monotonic `sequence`            |
-| Latency                              | six hops, slow                   | one fetch, fast                 |
-| Size                                 | unbounded                        | **64 MiB, downloaded whole**    |
-| What the visitor installs            | Tor Browser or a `tor` daemon    | a Chromium extension            |
-| Depends on a central authority       | **yes** — consensus → HSDir ring | no — gossip                     |
+|                                      | `.onion` v3                      | `.capsule`                                              |
+| ------------------------------------ | -------------------------------- | ------------------------------------------------------- |
+| What is on the other side            | a live server                    | a static blob on relays                                 |
+| Publisher must stay online           | **yes, 24/7**                    | no                                                      |
+| Dynamic content, forms, login, DB    | **yes, all of it**               | none                                                    |
+| JavaScript                           | whatever the site wants          | off by default, opt-in per site                         |
+| The page can reach the network       | **yes**                          | **no** — `connect-src 'none'`                           |
+| The site learns which pages you read | **yes, every request**           | no — the bundle arrives whole                           |
+| The site learns your IP              | no, the circuit hides it         | there is no server to learn it                          |
+| **The relay/HSDir learns your IP**   | no, six hops                     | no, three hops — when there are relays to route through |
+| Names can be enumerated              | no, blinded keys                 | **yes** — `GET /v1/sites`                               |
+| What the signature covers            | the server's identity            | the bytes you are shown                                 |
+| Anti-rollback                        | `revision-counter`               | monotonic `sequence`                                    |
+| Latency                              | six hops, slow                   | one fetch, fast                                         |
+| Size                                 | unbounded                        | **64 MiB, downloaded whole**                            |
+| What the visitor installs            | Tor Browser or a `tor` daemon    | a Chromium extension                                    |
+| Depends on a central authority       | **yes** — consensus → HSDir ring | no — gossip                                             |
 
 ## 6. What `.capsule` does that an onion service cannot
 
@@ -146,12 +146,13 @@ availability comes from replication rather than from uptime.
 `.capsule` site is static and always will be. That is not a gap to be closed
 later; it is the shape of the thing.
 
-**It hides the visitor from the network.** In Tor, neither the HSDir nor the
-service learns who asked. This is the honest weak point of `.capsule` sites
-today, and it is recorded in [SITES.md](./SITES.md) §7: the extension queries
-relays directly from the browser, so **a relay sees an IP address asking about a
-name**. The CLI routes through the mix network with `--mix`, and the web app now
-does too; the extension has not been wired to it yet.
+**It hides the visitor from the network without needing a crowd to be there
+first.** Tor's guarantee holds because thousands of relays already exist.
+CAPSULE routes a record lookup and a capsule download through its own mix
+network — the extension does it by default now — but a path needs relays, and
+with fewer than two the extension asks directly and says so. The mechanism is
+built; the network it needs is not, and that is a difference of degree that
+matters more than the design.
 
 **Its names cannot be enumerated.** Onion v3 fixed this deliberately — a blinded
 key means an HSDir stores a descriptor without being able to tell which service

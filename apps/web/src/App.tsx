@@ -37,6 +37,7 @@ import {
   Link2,
   LockKeyhole,
   PackageOpen,
+  Puzzle,
   RotateCcw,
   Send,
   Server,
@@ -114,6 +115,15 @@ const DEFAULT_RELAY_URL = "http://localhost:8787";
  */
 const MIX_HOPS = 3;
 const MIX_MEAN_DELAY_MS = 2_000;
+
+/**
+ * Where the extension is explained and built. It is deliberately the project's
+ * own install instructions rather than a store: the extension is loaded
+ * unpacked, and pointing at a listing that does not exist would be a lie the
+ * reader only discovers after clicking.
+ */
+const EXTENSION_INSTALL_URL =
+  "https://github.com/missingus3r/CAPSULE#read-one-in-any-chromium-browser";
 
 function getPublicAppUrl(): string {
   const configured = import.meta.env.VITE_PUBLIC_APP_URL?.trim();
@@ -262,7 +272,37 @@ function PrivacyAside({
         </p>
       </details>
       <NetworkPanel relays={relays} relayUrl={relayUrl} />
+      <ExtensionPanel />
     </aside>
+  );
+}
+
+/**
+ * The other half of the network, which this page cannot reach on its own.
+ *
+ * A `.capsule` address resolves nowhere in DNS, so reading one needs the
+ * extension. There is no store listing to link to — it is loaded unpacked from
+ * a build you make yourself — and the link says that rather than implying a
+ * one-click install that does not exist.
+ */
+function ExtensionPanel() {
+  const t = useT();
+  return (
+    <section className="extension-panel" aria-labelledby="extension-title">
+      <div className="aside-eyebrow">{t("extension.eyebrow")}</div>
+      <h3 id="extension-title">{t("extension.title")}</h3>
+      <p>{t("extension.body")}</p>
+      <a
+        className="extension-link"
+        href={EXTENSION_INSTALL_URL}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        <Puzzle size={15} aria-hidden="true" />
+        {t("extension.cta")}
+      </a>
+      <small>{t("extension.note")}</small>
+    </section>
   );
 }
 
@@ -322,7 +362,17 @@ export default function App() {
     EXPIRY_OPTIONS[1]!.seconds,
   );
   const [anonymous, setAnonymous] = useState(false);
-  const [mixEnabled, setMixEnabled] = useState(false);
+  /**
+   * On unless the sender turns it off.
+   *
+   * The protection worth defaulting to is the one that holds even in a small
+   * network: the relay storing the capsule does not learn who sent it. That is
+   * true with three nodes, and it is the guarantee somebody who never opens
+   * this panel should still get. It costs minutes rather than seconds, which
+   * the switch says out loud, and it turns itself off when no relay in reach
+   * forwards for others.
+   */
+  const [mixEnabled, setMixEnabled] = useState(true);
   const [mirrorCount, setMirrorCount] = useState(0);
   const [splitAcrossRelays, setSplitAcrossRelays] = useState(false);
   const [passphrase, setPassphrase] = useState("");
@@ -443,7 +493,7 @@ export default function App() {
     setNote("");
     setTtlSeconds(EXPIRY_OPTIONS[1]!.seconds);
     setAnonymous(false);
-    setMixEnabled(false);
+    setMixEnabled(true);
     setMirrorCount(0);
     setSplitAcrossRelays(false);
     setPassphrase("");

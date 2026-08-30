@@ -2,7 +2,7 @@
 
 **Status:** implemented and working; no external audit
 **Date:** 2026-08-30
-**Scope:** relays as mix nodes, the CLI and the web app as clients
+**Scope:** relays as mix nodes; the CLI, the web app and the extension as clients
 
 ## 1. First, because it changes everything else
 
@@ -225,11 +225,12 @@ look at who operates the relays, not how many there are.
 connections to a relay. That is what Tor underneath, or a bridge, is for — see
 [CENSORSHIP.md](./CENSORSHIP.md).
 
-**The extension still talks to its relays directly.** The web app no longer
-does — mix routing is a switch beside anonymous mode — but a `.capsule` site is
-still fetched straight from a relay, so a relay still sees an address asking
-for a name. That is [SITES.md](./SITES.md) §7, and it is the larger of the two
-gaps that remain here.
+**It needs relays, and most readers have too few.** Every client can use the
+network now — the CLI, the web app and the extension — but a path needs relays
+the client can reach, and the extension will only use ones the visitor has
+already allowed. With fewer than two it asks directly and says so. That is not
+a bug to fix in code: it is the same adoption problem as §1, arriving where a
+reader can see it.
 
 The packet layer itself is no longer the obstacle. It used to be built on
 `node:crypto`, which meant it could not run in a page at all; it is built on
