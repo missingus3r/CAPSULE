@@ -16,10 +16,29 @@
 import { CAPSULE_RULE_ID, redirectRule } from "./redirect.js";
 
 async function installRedirect(): Promise<void> {
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [CAPSULE_RULE_ID],
-    addRules: [redirectRule(chrome.runtime.getURL("viewer.html"))],
+  const rule = redirectRule(chrome.runtime.getURL("viewer.html"));
+
+  // Chrome refuses a filter whose compiled form is too large and then skips the
+  // rule, which looks exactly like the extension not being installed. Asking
+  // first turns that into something an operator can read.
+  const supported = await chrome.declarativeNetRequest.isRegexSupported({
+    regex: rule.condition.regexFilter as string,
   });
+  if (!supported.isSupported) {
+    console.error(
+      `CAPSULE: Chrome refused the .capsule redirect filter (${supported.reason}). No .capsule address will open.`,
+    );
+    return;
+  }
+
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [CAPSULE_RULE_ID],
+      addRules: [rule],
+    });
+  } catch (error) {
+    console.error("CAPSULE: could not install the .capsule redirect", error);
+  }
 }
 
 // Also at the top level, not only in the two lifecycle events. A dynamic rule

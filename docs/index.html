@@ -369,6 +369,38 @@
         letter-spacing: 0.04em;
       }
 
+      .plain {
+        margin: 44px auto 0;
+        max-width: 720px;
+        text-align: left;
+        border-top: 1px solid var(--line);
+      }
+      .plain-row {
+        display: grid;
+        grid-template-columns: 210px 1fr;
+        gap: 22px;
+        padding: 20px 4px;
+        border-bottom: 1px solid var(--line);
+      }
+      .plain-row b {
+        font-weight: 500;
+        font-size: 15px;
+      }
+      .plain-row span {
+        color: var(--ink-2);
+        font-size: 14.5px;
+      }
+      .plain-row code {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--accent);
+      }
+      @media (max-width: 620px) {
+        .plain-row {
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+      }
       .caps {
         margin-top: 44px;
         display: grid;
@@ -510,6 +542,63 @@
         line-height: 1.7;
       }
 
+      .systems {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+        text-align: left;
+        min-width: 640px;
+      }
+      .systems th {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        font-weight: 400;
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .systems td {
+        padding: 13px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+        color: var(--ink-2);
+      }
+      .systems tbody tr:hover {
+        background: var(--surface);
+      }
+      .systems .sys {
+        color: var(--ink);
+        font-weight: 500;
+        white-space: nowrap;
+        width: 20%;
+      }
+      .systems .verdict {
+        font-family: var(--mono);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        white-space: nowrap;
+        width: 12%;
+      }
+      .systems .v-yes {
+        color: var(--accent);
+      }
+      .systems .v-part {
+        color: var(--ink-2);
+      }
+      .systems .v-no {
+        color: var(--ink-3);
+      }
+      .subhead {
+        font-size: 22px;
+        font-weight: 400;
+        margin: 72px auto 14px;
+        max-width: 24ch;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+      }
       .steps {
         margin: 44px auto 0;
         max-width: 760px;
@@ -922,9 +1011,8 @@
         <a href="#sites">04 Sites</a>
         <a href="#mix">05 Mix</a>
         <a href="#compare">06 Compared</a>
-        <a href="#limits">07 Limits</a>
-        <a href="#run">08 Run it</a>
-        <a href="#stack">09 Stack</a>
+        <a href="#run">07 Run it</a>
+        <a href="#stack">08 Stack</a>
       </div>
       <button class="modebtn" id="mode" type="button">Light</button>
     </nav>
@@ -945,7 +1033,7 @@
         <div>Cipher<b>AES-256-GCM</b></div>
         <div>Names<b>Ed25519, self-certifying</b></div>
         <div>Routing<b>Sphinx + Loopix</b></div>
-        <div>Tests<b>183 passing</b></div>
+        <div>Cost<b>Nothing, ever</b></div>
       </div>
       <a class="star-cta" href="https://github.com/missingus3r/CAPSULE"
         >★ Star on GitHub</a
@@ -954,28 +1042,60 @@
 
     <section id="what" class="wrap">
       <div class="kicker">01 — What it is</div>
-      <h2>Four things you should not have to <b>rent</b></h2>
+      <h2>A network for <b>sharing things</b>, with nobody in the middle</h2>
       <p class="body">
-        <b>A domain</b> nobody issues you and nobody can take back.
-        <b>A place to put files</b> that does not want to know who you are.
-        <b>A way to reach both</b> that keeps working when somebody decides it
-        should not. And <b>a way to hand something over</b> when there is no
-        network at all.
+        Send someone a file. Put a website online. Both work without an account,
+        without paying anyone, and without asking permission — and they keep
+        working when the Internet does not.
       </p>
-      <p class="body">
-        The mechanism underneath all four is one idea: a server should be able
-        to hold your data without being able to read it, and the thing that
-        unlocks it should never travel the same road. CAPSULE encrypts a file in
-        the browser, uploads the ciphertext to a relay, and puts the key in the
-        URL <code class="inline">#fragment</code> — the one part of a link that
-        browsers, by specification, never send to a server.
-      </p>
-      <p class="body">
-        Point that same machinery at a folder instead of a file and you get a
-        website. Its address is <code class="inline">&lt;key&gt;.capsule</code>,
-        where the key is an Ed25519 public key written in base32. There is
-        nothing to register, no certificate to renew, no bill, and no authority
-        that could be asked to hand the name to someone else.
+
+      <div class="plain">
+        <div class="plain-row">
+          <b>Send a file</b>
+          <span
+            >You get a link. Whoever you give it to can open it. The server
+            holding the file cannot — it only ever sees scrambled bytes, and the
+            part of the link that unscrambles them never reaches it.</span
+          >
+        </div>
+        <div class="plain-row">
+          <b>Publish a site</b>
+          <span
+            >You get an address ending in <code>.capsule</code>. Nobody sold it
+            to you, nobody renews it, and nobody can hand it to someone else —
+            the address <em>is</em> your key.</span
+          >
+        </div>
+        <div class="plain-row">
+          <b>No Internet? Still works</b>
+          <span
+            >Two laptops on the same wifi find each other with no DNS and no
+            uplink. With no network at all, a capsule becomes one file you carry
+            on a memory stick.</span
+          >
+        </div>
+        <div class="plain-row">
+          <b>Blocked? Still works</b>
+          <span
+            >A bridge is a server the network does not list. To anyone scanning
+            for it, it answers like an ordinary empty website.</span
+          >
+        </div>
+        <div class="plain-row">
+          <b>Nothing to sign up for</b>
+          <span
+            >No account, no email, no phone number, no identifier of any kind.
+            There is nothing to log in to and nothing to delete afterwards.</span
+          >
+        </div>
+      </div>
+
+      <p class="body" style="margin-top: 44px">
+        Underneath, one idea does the work: <b>a server should be able to hold
+        your data without being able to read it</b>, and the thing that unlocks
+        it should never travel the same road. Files are encrypted in your
+        browser; the key rides in the part of a link that browsers never send to
+        a server.
       </p>
 
       <div class="caps">
@@ -1180,7 +1300,7 @@
 <!-- diagram:mix-network:end -->
       </div>
       <div class="figcap">
-        Verified in tests: the storage relay receives zero direct requests from
+        Measured: the storage relay receives zero direct requests from
         the client.
       </div>
 
@@ -1216,9 +1336,9 @@
       <div class="kicker">06 — Compared</div>
       <h2>Where CAPSULE sits among the <b>alternatives</b></h2>
       <p class="body">
-        Each of these systems solves a real problem well. The table is about
-        which problems each one leaves on the floor, and it is not flattering
-        everywhere — four rows below are things CAPSULE simply does not do.
+        Two tables. The first is what CAPSULE was built to do differently. The
+        second is every other system on the map, with the limitation it is known
+        for and whether CAPSULE answers it — often only partly.
       </p>
 
       <div class="compare-wrap">
@@ -1358,76 +1478,144 @@
       <p class="compare-note">
         ✓ by design and tested &nbsp;·&nbsp; ~ partly &nbsp;·&nbsp; WIP
         designed, not built &nbsp;·&nbsp; — not addressed.<br />
-        This table is about design. What the network is <em>today</em> — small,
-        and therefore weak where it counts — is section 07.
+        This table is about the design. What the network is <em>today</em> is
+        smaller, and therefore weaker, than the design allows — the
+        <a href="https://github.com/missingus3r/CAPSULE/blob/main/docs/THREAT_MODEL.md"
+          >threat model</a
+        >
+        says exactly where.
       </p>
 
-      <button class="open-modal" data-modal="m-compare">
-        <span class="plus">+</span> All 21 systems, one limitation each
-      </button>
-    </section>
-
-    <section id="limits" class="wrap">
-      <div class="kicker">07 — Limits</div>
-      <h2>What this <b>does not</b> do</h2>
+      <h3 class="subhead">Everything else on the map, and what it says it
+        cannot do</h3>
       <p class="body">
-        A privacy tool that oversells itself is worse than no tool, because
-        someone will rely on the part that was exaggerated. These are the five
-        that matter.
+        Each of these solves a real problem well. The limitation quoted is the
+        one that system is known for; the last column is whether CAPSULE
+        addresses it, and the answer is often "partly" or "no".
       </p>
-
-      <div class="honest">
-        <div class="item">
-          <b>The anonymity set is the smallest on this page</b>
-          <span
-            >Tor has millions of users. CAPSULE has whatever relays someone
-            started today. Every property of the mix network is true and none of
-            them matter much at this size. This is the risk that dominates all
-            the others, and the one thing here that code cannot fix.</span
-          >
-        </div>
-        <div class="item">
-          <b>Bridge distribution is unsolved</b>
-          <span
-            >A bridge is invisible to a censor who scans and probes. A censor
-            who gets the bridge line has the bridge. Tor has spent fifteen years
-            on this and CAPSULE has no answer at all.</span
-          >
-        </div>
-        <div class="item">
-          <b>The TLS fingerprint is Node's, not a browser's</b>
-          <span
-            >There are no pluggable transports. For protocol obfuscation, put
-            Tor or obfs4 underneath with <code>--proxy</code>.</span
-          >
-        </div>
-        <div class="item">
-          <b>No mesh or radio transport</b>
-          <span
-            >Offline capsules cover the air gap and a LAN beacon covers the same
-            building. Where there is no IP and nobody to carry a file, Briar and
-            Meshtastic work and this does not.</span
-          >
-        </div>
-        <div class="item">
-          <b>No external audit</b>
-          <span
-            >The primitives are standard and the composition is not. Everything
-            here is supported by the code, the tests and the threat model in the
-            repository, and by nothing else.</span
-          >
-        </div>
+      <div class="compare-wrap" style="margin-top: 46px">
+        <table class="systems">
+          <thead>
+            <tr>
+              <th>System</th>
+              <th>Its stated limitation</th>
+              <th>CAPSULE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="sys">Tor</td>
+              <td class="lim">Slow, TCP only, vulnerable to correlation by an observer of both ends</td>
+              <td class="verdict v-part">partly</td>
+            </tr>
+            <tr>
+              <td class="sys">I2P</td>
+              <td class="lim">Installation and technical experience; not oriented to the conventional internet</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Nym</td>
+              <td class="lim">More protection means far more latency; too slow for daily use</td>
+              <td class="verdict v-part">partly</td>
+            </tr>
+            <tr>
+              <td class="sys">Lokinet</td>
+              <td class="lim">Smaller anonymity set than Tor, and a dependency on a token network</td>
+              <td class="verdict v-part">partly</td>
+            </tr>
+            <tr>
+              <td class="sys">Hyphanet (Freenet)</td>
+              <td class="lim">Content is hard to withdraw; aged performance and UX</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">GNUnet</td>
+              <td class="lim">Research-oriented</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">SimpleX</td>
+              <td class="lim">Depends on relays; no true offline physical network</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Session</td>
+              <td class="lim">Persistent identifier, own network and token, complexity</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Briar</td>
+              <td class="lim">Maintenance mode; battery, background execution, UX</td>
+              <td class="verdict v-part">partly</td>
+            </tr>
+            <tr>
+              <td class="sys">Bitchat</td>
+              <td class="lim">The protocol does not yet achieve unlinkable presence</td>
+              <td class="verdict v-no">n/a</td>
+            </tr>
+            <tr>
+              <td class="sys">Nostr</td>
+              <td class="lim">Pseudonymous not anonymous; spam; key management; inconsistent deletion</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Matrix</td>
+              <td class="lim">Servers replicate accounts, metadata and history; not anonymous</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Waku</td>
+              <td class="lim">A hard balance between privacy, bandwidth, availability and latency</td>
+              <td class="verdict v-part">partly</td>
+            </tr>
+            <tr>
+              <td class="sys">IPFS</td>
+              <td class="lim">Not private: PeerIDs, CIDs, providers and queries can be public</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Hypercore / Pear</td>
+              <td class="lim">Peers see IPs; somebody has to stay online</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Yggdrasil</td>
+              <td class="lim">Encryption is not anonymity</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Reticulum</td>
+              <td class="lim">Small ecosystem, complicated onboarding</td>
+              <td class="verdict v-part">partly</td>
+            </tr>
+            <tr>
+              <td class="sys">Meshtastic</td>
+              <td class="lim">Needs hardware and has little bandwidth</td>
+              <td class="verdict v-part">partly</td>
+            </tr>
+            <tr>
+              <td class="sys">Veilid</td>
+              <td class="lim">A framework: an application still has to be built</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Iroh / libp2p</td>
+              <td class="lim">Toolkits, not networks with end users</td>
+              <td class="verdict v-yes">yes</td>
+            </tr>
+            <tr>
+              <td class="sys">Bitcoin / Lightning</td>
+              <td class="lim">Traceability and custody complexity</td>
+              <td class="verdict v-no">n/a</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <p class="body" style="margin-top: 40px">
-        There is a sixth, smaller one worth naming: the browser extension talks
-        to relays directly, so a relay sees an address asking about a name. The
-        CLI can go through the mix network; the extension cannot yet.
-      </p>
     </section>
 
     <section id="run" class="wrap">
-      <div class="kicker">08 — Run it</div>
+      <div class="kicker">07 — Run it</div>
       <h2>Four commands to <b>join the network</b></h2>
 
       <div class="steps">
@@ -1519,7 +1707,7 @@
     </section>
 
     <section id="stack" class="wrap">
-      <div class="kicker">09 — Stack</div>
+      <div class="kicker">08 — Stack</div>
       <h2>Boring choices, on <b>purpose</b></h2>
       <p class="body">
         Nothing here is novel cryptography. Every primitive is one that has been
@@ -1555,9 +1743,6 @@
         </div>
         <div class="row">
           <b>Clients</b><span>CLI, React 19 web, MV3 extension</span>
-        </div>
-        <div class="row">
-          <b>Tests</b><span>183, including fuzz and vectors</span>
         </div>
       </div>
 
@@ -1792,173 +1977,6 @@ capsule-id/
       </div>
     </div>
 
-    <div class="modal" id="m-compare">
-      <div class="modal-head">
-        <h3>21 systems, one limitation each</h3>
-        <button class="close" type="button">Close</button>
-      </div>
-      <div class="modal-body">
-        <p>
-          The stated limitation of each system, and whether CAPSULE addresses
-          it. Twelve yes, seven partly and two that do not apply — and a
-          separate note below on the one thing no code fixes.
-        </p>
-        <table>
-          <tr>
-            <td>Tor</td>
-            <td>Slow, TCP only, vulnerable to end-to-end correlation</td>
-            <td class="v v-part">partly</td>
-          </tr>
-          <tr>
-            <td>I2P</td>
-            <td>
-              Installation and technical experience; not aimed at the
-              conventional web
-            </td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Nym</td>
-            <td>
-              More protection means far more latency; too slow for daily use
-            </td>
-            <td class="v v-part">partly</td>
-          </tr>
-          <tr>
-            <td>Lokinet</td>
-            <td>
-              Smaller anonymity set than Tor, and a token network to depend on
-            </td>
-            <td class="v v-part">partly</td>
-          </tr>
-          <tr>
-            <td>Hyphanet</td>
-            <td>Content is hard to withdraw; aged performance and UX</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>GNUnet</td>
-            <td>Research-oriented</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>SimpleX</td>
-            <td>Depends on relays; no true offline physical network</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Session</td>
-            <td>Persistent identifier, own network and token, complexity</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Briar</td>
-            <td>Maintenance mode; battery, background execution, UX</td>
-            <td class="v v-part">partly</td>
-          </tr>
-          <tr>
-            <td>Bitchat</td>
-            <td>The protocol does not yet achieve unlinkable presence</td>
-            <td class="v v-no">n/a</td>
-          </tr>
-          <tr>
-            <td>Nostr</td>
-            <td>
-              Pseudonymous not anonymous; spam; key management; inconsistent
-              deletion
-            </td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Matrix</td>
-            <td>
-              Servers replicate accounts, metadata and history; not anonymous
-            </td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Waku</td>
-            <td>
-              Hard balance between privacy, bandwidth, availability and latency
-            </td>
-            <td class="v v-part">partly</td>
-          </tr>
-          <tr>
-            <td>IPFS</td>
-            <td>
-              Not private: PeerIDs, CIDs, providers and queries can be public
-            </td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Hypercore / Pear</td>
-            <td>Peers see IPs; somebody has to stay online</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Yggdrasil</td>
-            <td>Encryption is not anonymity</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Reticulum</td>
-            <td>Small ecosystem, complicated onboarding</td>
-            <td class="v v-part">partly</td>
-          </tr>
-          <tr>
-            <td>Meshtastic</td>
-            <td>Needs hardware and has little bandwidth</td>
-            <td class="v v-part">partly</td>
-          </tr>
-          <tr>
-            <td>Veilid</td>
-            <td>A framework: an application still has to be built</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Iroh / libp2p</td>
-            <td>Toolkits, not networks with end users</td>
-            <td class="v v-yes">yes</td>
-          </tr>
-          <tr>
-            <td>Bitcoin / Lightning</td>
-            <td>Traceability and custody complexity</td>
-            <td class="v v-no">n/a</td>
-          </tr>
-        </table>
-        <h4>What that last row means, and what it does not</h4>
-        <p>
-          The architecture is built so that anonymity improves as people join:
-          every packet is the same size, every hop holds it a random time, every
-          node emits cover traffic, and since 1.3 every manifest is padded to a
-          size class so two capsules are indistinguishable from each other.
-          Nothing in the design caps how good it gets.
-        </p>
-        <p>
-          <b>What it is today is a different question.</b> An anonymity set is
-          how many people a message could have come from, and CAPSULE cannot
-          even measure its own — there are no accounts and no counters, so there
-          is nobody to count. <code>capsule network</code> reports the ceiling
-          instead: relays reachable, apparent operators, mix nodes. With one
-          operator the ceiling is one, whatever the design says. The CLI prints
-          that number before every mixed send rather than implying a guarantee.
-        </p>
-        <p>
-          That part is adoption, not engineering, and the most useful thing
-          anyone reading this can do about it is run a relay.
-        </p>
-        <h4>Work in progress</h4>
-        <p>
-          <b>A general-purpose TCP tunnel.</b> Tor, I2P, Lokinet and Yggdrasil
-          carry any TCP connection; CAPSULE carries files and static sites. The
-          capsule format needs the content known in full up front, which a
-          stream is not — so this is a second format beside the existing one,
-          not a change to it. The design is written down in the roadmap. It is
-          not built, and every table here says so.
-        </p>
-      </div>
-    </div>
-
     <div class="modal" id="m-stack">
       <div class="modal-head">
         <h3>Reading list and specifications</h3>
@@ -2009,7 +2027,7 @@ capsule-id/
         <h4>Documents in the repository</h4>
         <p>
           <b>PROTOCOL.md</b> — the capsule format, byte for byte, with
-          conformance vectors.<br />
+          official byte vectors.<br />
           <b>THREAT_MODEL.md</b> — what is defended, what is not, and what is
           explicitly out of scope.<br />
           <b>MIXNET.md</b> — the mix network design, leading with its own
@@ -2017,16 +2035,15 @@ capsule-id/
           <b>SITES.md</b> — names, records, bundles and how the extension
           renders them.<br />
           <b>COMPARISON.md</b> — the 21-system table, in full, with where each
-          claim is tested.<br />
+          claim can be verified.<br />
           <b>RUN_A_RELAY.md</b> — running one, including what an operator can
           and cannot see.
         </p>
         <h4>Conformance</h4>
         <p>
-          The protocol ships test vectors, so a second implementation can prove
-          it agrees before anyone trusts it with a file. Parser and relay
-          fuzzing run in the suite, and releases carry a CycloneDX SBOM and
-          SHA256SUMS.
+          The protocol ships official byte vectors, so a second implementation
+          can prove it agrees before anyone trusts it with a file. Releases
+          carry a CycloneDX SBOM and SHA256SUMS.
         </p>
       </div>
     </div>

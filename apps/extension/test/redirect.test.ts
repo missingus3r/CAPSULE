@@ -29,22 +29,39 @@ describe("the .capsule redirect filter", () => {
     }
   });
 
-  it("leaves every other address alone", () => {
+  it("leaves every address that is not under .capsule alone", () => {
     for (const url of [
       "http://example.com/",
       "https://capsule.org/",
-      "http://short.capsule/",
       `http://${NAME}.evil.com/`,
       `http://evil.com/?u=${NAME}/`,
-      // One character too many, and one too few.
-      `http://${"a".repeat(57)}.capsule/`,
-      `http://${"a".repeat(55)}.capsule/`,
       // Base32 has no 0, 1, 8 or 9.
       `http://${"0".repeat(56)}.capsule/`,
       "ftp://" + NAME + "/",
     ]) {
       expect(filter.test(url), url).toBe(false);
     }
+  });
+
+  it("still catches a name of the wrong length, so the viewer can explain", () => {
+    // The filter cannot check the length: a counted repetition compiles past
+    // the 2 KB budget Chrome allows and the rule gets skipped entirely. The
+    // check lives in parseSiteName instead, and reaching the viewer with a bad
+    // name produces an explanation rather than a DNS error.
+    for (const url of [
+      "http://short.capsule/",
+      `http://${"a".repeat(57)}.capsule/`,
+      `http://${"a".repeat(55)}.capsule/`,
+    ]) {
+      expect(filter.test(url), url).toBe(true);
+    }
+  });
+
+  it("compiles to something small enough for Chrome to accept", () => {
+    // A rough stand-in for RE2's budget: what blew it was `{56}` over a 32-way
+    // character class, so what matters is that no counted repetition survives.
+    expect(CAPSULE_URL_FILTER).not.toMatch(/\{\d+\}/u);
+    expect(CAPSULE_URL_FILTER.length).toBeLessThan(80);
   });
 
   it("is anchored, so the whole address is what gets substituted", () => {

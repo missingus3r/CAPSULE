@@ -1,4 +1,4 @@
-# CAPSULE
+# <img src="apps/web/public/capsule-mark.svg" alt="" width="36" height="36" align="top"> CAPSULE
 
 **You pay for the connection. Everything past it should belong to everyone.**
 
@@ -13,31 +13,24 @@ be for sale.
 
 ## What is it
 
-Four things you should not have to rent:
+Send someone a file. Put a website online. Both work without an account,
+without paying anyone, and without asking permission — and they keep working
+when the Internet does not.
 
-- **A domain** nobody issues you and nobody can take back — `<key>.capsule`,
-  where the key _is_ the name. No registrar, no certificate, no renewal.
-- **A place to put files** that does not want to know who you are. No account,
-  no identifier, nothing to sign up for.
-- **A way to reach both** that keeps working when somebody decides it should
-  not — unlisted bridges a censor's probe cannot recognise.
-- **A way to hand something over** when there is no network at all.
+|                              |                                                                                                                                                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Send a file**              | You get a link. Whoever you give it to can open it. The server holding the file cannot — it only ever sees scrambled bytes, and the part of the link that unscrambles them never reaches it. |
+| **Publish a site**           | You get an address ending in `.capsule`. Nobody sold it to you, nobody renews it, and nobody can hand it to someone else — the address _is_ your key.                                        |
+| **No Internet? Still works** | Two laptops on the same wifi find each other with no DNS and no uplink. With no network at all, a capsule becomes one file you carry on a memory stick.                                      |
+| **Blocked? Still works**     | A bridge is a server the network does not list. To anyone scanning for it, it answers like an ordinary empty website.                                                                        |
+| **Nothing to sign up for**   | No account, no email, no phone number, no identifier of any kind. There is nothing to log in to and nothing to delete afterwards.                                                            |
 
 ![How a capsule travels](docs/diagrams/capsule-flow.svg)
 
-The mechanism underneath all four is one idea: **a server should be able to
-hold your data without being able to read it, and the thing that unlocks it
-should never travel the same road.**
-
-**Send a file.** It is encrypted on your device with AES-256-GCM. The relay
-stores bytes it cannot decrypt. The key lives in the `#fragment` of the share
-link — the one part of a URL that, by specification, is never sent to a server.
-The person you send it to needs nothing installed.
-
-**Publish a site.** Point the same machinery at a folder and you get a website
-at `<key>.capsule`. There is nothing to register, no certificate to renew, no
-bill, and no authority that could be asked to hand your name to somebody else —
-because the name and the signing key are the same object.
+Underneath, one idea does the work: **a server should be able to hold your data
+without being able to read it**, and the thing that unlocks it should never
+travel the same road. Files are encrypted in your browser; the key rides in the
+part of a link that browsers never send to a server.
 
 ## Why
 
@@ -88,8 +81,37 @@ nobody to count — and `capsule network` reports the ceiling instead. The CLI
 prints that number before every mixed send. That part is adoption rather than
 engineering, and the most useful thing you can do about it is run a relay.
 
-All 21 systems, one limitation each, with a verdict for every row:
-[docs/COMPARISON.md](docs/COMPARISON.md).
+### Everything else on the map
+
+The limitation quoted is the one that system is known for; the last column
+is whether CAPSULE answers it.
+
+| System                  | Its stated limitation                                                            | CAPSULE |
+| ----------------------- | -------------------------------------------------------------------------------- | :-----: |
+| **Tor**                 | Slow, TCP only, vulnerable to correlation by an observer of both ends            |    ~    |
+| **I2P**                 | Installation and technical experience; not oriented to the conventional internet |   ✅    |
+| **Nym**                 | More protection means far more latency; too slow for daily use                   |    ~    |
+| **Lokinet**             | Smaller anonymity set than Tor, and a dependency on a token network              |    ~    |
+| **Hyphanet (Freenet)**  | Content is hard to withdraw; aged performance and UX                             |   ✅    |
+| **GNUnet**              | Research-oriented                                                                |   ✅    |
+| **SimpleX**             | Depends on relays; no true offline physical network                              |   ✅    |
+| **Session**             | Persistent identifier, own network and token, complexity                         |   ✅    |
+| **Briar**               | Maintenance mode; battery, background execution, UX                              |    ~    |
+| **Bitchat**             | The protocol does not yet achieve unlinkable presence                            |   n/a   |
+| **Nostr**               | Pseudonymous not anonymous; spam; key management; inconsistent deletion          |   ✅    |
+| **Matrix**              | Servers replicate accounts, metadata and history; not anonymous                  |   ✅    |
+| **Waku**                | A hard balance between privacy, bandwidth, availability and latency              |    ~    |
+| **IPFS**                | Not private: PeerIDs, CIDs, providers and queries can be public                  |   ✅    |
+| **Hypercore / Pear**    | Peers see IPs; somebody has to stay online                                       |   ✅    |
+| **Yggdrasil**           | Encryption is not anonymity                                                      |   ✅    |
+| **Reticulum**           | Small ecosystem, complicated onboarding                                          |    ~    |
+| **Meshtastic**          | Needs hardware and has little bandwidth                                          |    ~    |
+| **Veilid**              | A framework: an application still has to be built                                |   ✅    |
+| **Iroh / libp2p**       | Toolkits, not networks with end users                                            |   ✅    |
+| **Bitcoin / Lightning** | Traceability and custody complexity                                              |   n/a   |
+
+The reasoning behind each verdict, and where every CAPSULE claim can be
+verified: [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ---
 
@@ -185,36 +207,6 @@ frame with `connect-src 'none'` and no scripts.
 **A `.capsule` site cannot make a single network request.** Not a font, not a
 pixel, not a beacon. That is a property of the format, not a setting you can
 forget. Details and the exceptions: [docs/SITES.md](docs/SITES.md).
-
----
-
-## What this does not do
-
-A privacy tool that oversells itself is worse than no tool, because someone
-will rely on the part that was exaggerated.
-
-- **The anonymity set is the smallest of any system on this page.** Tor has
-  millions of users; CAPSULE has whatever relays someone started today. Every
-  property of the mix network is true and none of them matter much at this size.
-  This is the risk that dominates all the others, and it is the one thing here
-  that code cannot fix.
-- **Bridge distribution is unsolved.** A bridge is invisible to a censor who
-  scans and probes — but a censor who gets the bridge line has the bridge. Tor
-  has spent fifteen years on this problem and CAPSULE has no answer at all.
-- **The TLS fingerprint is Node's**, not a browser's, and there are no
-  pluggable transports. For protocol obfuscation, put Tor or obfs4 underneath
-  with `--proxy`.
-- **No mesh or radio transport.** Offline capsules and LAN discovery cover
-  "no internet" and "same building". Where there is no IP and nobody to carry a
-  file, Briar and Meshtastic work and this does not.
-- **No external audit.** The primitives are standard; the composition is not.
-  Everything here is supported by the code, the tests and
-  [the threat model](docs/THREAT_MODEL.md), and by nothing else.
-- **The browser extension talks to relays directly**, so a relay sees an address
-  asking about a name. The CLI can go through the mix network; the extension
-  cannot yet.
-
-Read the threat model before testing with anything sensitive.
 
 ---
 
@@ -345,13 +337,13 @@ scripts/      Diagram generator and release tooling
 
 ```bash
 npm run build       # every workspace, including the extension
-npm test            # 183 tests, including fuzzing and conformance vectors
+npm test
 npm run typecheck
 npm run format:check
 npm run diagrams    # regenerate the SVGs and re-inline them into the showcase
 ```
 
-`npm run vectors` regenerates the protocol test vectors — if that changes the
+`npm run vectors` regenerates the protocol byte vectors — if that changes the
 file, the protocol changed. `npm run release` produces `release/SHA256SUMS` and a
 CycloneDX SBOM.
 
@@ -368,7 +360,7 @@ and `X-Frame-Options: DENY`.
 - Expiry and bounded storage by default; permanence only when an operator opts in.
 - Anyone can run a relay: no registry, no gatekeeper, no privileged node.
 - A versioned, documented protocol using standard cryptography, with published
-  test vectors so a second implementation can prove it agrees.
+  byte vectors so a second implementation can prove it agrees.
 - Honest labels: say what is hidden, name what is not, report what could not be
   cleaned, and state the size of the anonymity set rather than implying a
   guarantee.
@@ -378,7 +370,7 @@ What comes next is in [the roadmap](docs/ROADMAP.md).
 ## Status and license
 
 The capsule format, relay API and capability encoding were frozen in 1.0 and
-published with [test vectors](packages/protocol/vectors/capsule-test-vectors.json).
+published with [byte vectors](packages/protocol/vectors/capsule-test-vectors.json).
 1.1 added the mix network, 1.2 added `.capsule` sites, and 1.3 added bridges and
 offline capsules. Manifests gained size-class padding in 1.3, which changes
 their length on the wire but is readable in both directions.

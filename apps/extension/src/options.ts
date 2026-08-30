@@ -46,7 +46,32 @@ async function draw(): Promise<void> {
         await draw();
       })();
     });
-    item.append(label, remove);
+
+    item.append(label);
+
+    // A relay in the list that the extension may not contact yet looks
+    // identical to one it can, which is the confusing half of asking for
+    // permissions only when they are needed. Say which is which, and offer the
+    // click that fixes it — a permission can only be requested from a gesture,
+    // so it has to be a button.
+    const allowed = await chrome.permissions.contains({
+      origins: originsOf([relay]),
+    });
+    if (!allowed) {
+      const grant = document.createElement("button");
+      grant.type = "button";
+      grant.className = "primary";
+      grant.textContent = "Allow";
+      grant.title = `CAPSULE has not been allowed to contact ${relay}`;
+      grant.addEventListener("click", () => {
+        void chrome.permissions
+          .request({ origins: originsOf([relay]) })
+          .then(() => draw());
+      });
+      item.append(grant);
+    }
+
+    item.append(remove);
     relayList.append(item);
   }
 

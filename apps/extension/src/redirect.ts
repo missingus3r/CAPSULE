@@ -7,10 +7,24 @@
  * reached" that says nothing about the extension.
  */
 
-/** 56 base32 characters: a 32-byte key, a checksum and a version. */
-export const CAPSULE_NAME_PATTERN = "[a-z2-7]{56}\\.capsule";
+/**
+ * Deliberately loose about the label, and precise about the suffix.
+ *
+ * A real name is exactly 56 base32 characters, but `[a-z2-7]{56}` is not a
+ * filter Chrome will accept: RE2 compiles a counted repetition into that many
+ * copies of the branch, and 56 copies of a 32-way choice blows past the 2 KB
+ * budget declarativeNetRequest allows per rule. The rule is then silently
+ * skipped and every `.capsule` address falls through to DNS, which fails with a
+ * generic error that says nothing about the extension.
+ *
+ * So the length check moves to where it costs nothing: `parseSiteName` in the
+ * viewer already verifies the length, the alphabet and the checksum. Sending a
+ * malformed name here is better than not sending it — the viewer explains what
+ * is wrong with it, where a DNS failure would not.
+ */
+export const CAPSULE_NAME_PATTERN = "[a-z2-7]+\\.capsule";
 
-/** RE2, anchored. Anything not exactly a `.capsule` address must not match. */
+/** RE2, anchored, so `\0` in the substitution is the whole address. */
 export const CAPSULE_URL_FILTER = `^https?://${CAPSULE_NAME_PATTERN}(:\\d+)?(/.*)?$`;
 
 export const CAPSULE_RULE_ID = 1;
