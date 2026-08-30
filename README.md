@@ -308,5 +308,6 @@ v1.0 security review was internal; it found and fixed two exploitable issues and
 three smaller ones, documented in [the threat model](docs/THREAT_MODEL.md) §13.3
 along with the risks that remain.
 
-A source license has intentionally not been chosen yet. Until the owner picks
-one, treat this repository as all rights reserved.
+Licensed under the [Mozilla Public License 2.0](LICENSE): file-level copyleft,
+so changes to CAPSULE's own files stay open while the code can be combined with
+software under other licences.
