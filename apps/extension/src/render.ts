@@ -340,11 +340,74 @@ export function renderSitePage(options: RenderOptions): RenderedPage {
 
 /** Sandbox flags for the frame a rendered page goes into. */
 export function sandboxFor(allowScripts: boolean): string {
-  // Without `allow-scripts` the frame runs no code at all, so the only way it
-  // can navigate anywhere is a real click on a link this renderer wrote —
-  // which is exactly why top navigation is safe to allow in that mode and not
-  // in the other.
+  // Without `allow-scripts` the frame runs no code at all, so the only thing
+  // that can navigate anywhere is a real click on a link this renderer wrote,
+  // and letting the frame take the tab there is safe.
+  //
+  // With scripts on it is not. A navigation is not a request: no CSP directive
+  // has covered one since `navigate-to` left the standard, so a script that
+  // could reach the top browsing context could take the visitor — and anything
+  // it put in the URL — to an address of its choosing on any click. So the
+  // frame does not get that reach, and the links the renderer wrote ask the
+  // viewer to navigate instead. See `frameNavigation`.
   return allowScripts
-    ? "allow-scripts allow-top-navigation-by-user-activation"
+    ? "allow-scripts"
     : "allow-top-navigation-by-user-activation";
+}
+
+/**
+ * What the viewer should do when the sandboxed frame asks to navigate.
+ *
+ * The frame cannot reach the top browsing context, so with scripts on every
+ * link goes through a message asking the viewer to do it. That message comes
+ * from a document a site's own scripts share, so it is a request, not an
+ * instruction: this decides what is honoured.
+ *
+ * Returns the fragment to move to, or `undefined` for anything that is not a
+ * destination the renderer would have written. An address outside CAPSULE is
+ * never followed here — it becomes the same confirmation a visitor gets when
+ * they click one with scripts off, naming where they are about to go.
+ */
+export function frameNavigation(options: {
+  href: string;
+  viewerUrl: string;
+  /** The site currently on screen, as `<label>.capsule`. */
+  name: string;
+}): string | undefined {
+  const { href, viewerUrl, name } = options;
+  let url: URL;
+  try {
+    url = new URL(href, viewerUrl);
+  } catch {
+    return undefined;
+  }
+
+  // Every link the renderer wrote points back at the viewer with the real
+  // destination in the fragment. Anything else was invented by a script.
+  //
+  // Compared field by field rather than through `origin`, which is the string
+  // "null" for a scheme the URL standard does not call special — and
+  // `chrome-extension:` is one of those wherever this runs outside Chrome.
+  const page = (value: URL): string =>
+    `${value.protocol}//${value.host}${value.pathname}`;
+  if (page(url) !== page(new URL(viewerUrl))) {
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? `#external:${encodeURIComponent(url.href)}`
+      : undefined;
+  }
+
+  const raw = decodeURIComponent(url.hash.replace(/^#/u, ""));
+  if (raw.startsWith("external:")) return url.hash;
+
+  let destination: URL;
+  try {
+    destination = new URL(raw.includes("://") ? raw : `http://${raw}`);
+  } catch {
+    return undefined;
+  }
+  // Only within the site on screen. Reaching a different name is not something
+  // a rebuilt page can express, so a message asking for one is not honoured.
+  return destination.hostname.toLowerCase() === name.toLowerCase()
+    ? url.hash
+    : undefined;
 }

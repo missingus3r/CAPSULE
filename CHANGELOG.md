@@ -35,6 +35,16 @@ what stopped being true. The format follows
   more insert a record than a lying peer can. An unreadable file is logged and
   the relay starts empty rather than refusing to start.
 
+- **A site with scripts allowed could still navigate the tab.** The frame
+  carried `allow-top-navigation-by-user-activation`, which is what a
+  scripts-off page uses to follow a link and is safe there because nothing can
+  run to abuse it. Once scripts actually ran, it became the way out: a
+  navigation is not a request subject to CSP, so a script could put whatever it
+  had computed into a URL and take the visitor there on any click. The frame no
+  longer has that reach. Links are passed up to the viewer, which honours a page
+  of the site on screen and turns everything else — including an address a
+  script invented — into the confirmation naming where it goes.
+
 ### Added
 
 - `examples/site/`, a small `.capsule` site to publish against a local relay.

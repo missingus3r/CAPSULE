@@ -5,7 +5,12 @@ import {
   type SiteBundle,
 } from "@capsule/protocol";
 import { fetchSiteBytes, resolveSite } from "@capsule/sdk";
-import { base64, renderSitePage, sandboxFor } from "./render.js";
+import {
+  base64,
+  frameNavigation,
+  renderSitePage,
+  sandboxFor,
+} from "./render.js";
 import {
   DEFAULT_RELAYS,
   originsOf,
@@ -150,6 +155,33 @@ function decodeCached(value: string): Uint8Array {
  * declared under `sandbox` in the manifest, which Chrome gives its own policy
  * and an opaque origin with no extension API reachable from it.
  */
+/**
+ * Navigation asked for by the sandboxed frame.
+ *
+ * With scripts on the frame cannot reach the top browsing context — that is
+ * the whole point — so the links the renderer wrote arrive here as a request
+ * instead. The frame shares a global with the site's own scripts, so nothing
+ * it says is trusted: `frameNavigation` decides, and an address outside
+ * CAPSULE becomes the same confirmation a visitor gets with scripts off.
+ */
+function listenForFrameNavigation(name: string): void {
+  window.addEventListener("message", (event: MessageEvent<unknown>) => {
+    if (event.source !== frame.contentWindow) return;
+    const data = event.data as { type?: string; href?: unknown };
+    if (data?.type !== "capsule:navigate") return;
+    if (typeof data.href !== "string") return;
+
+    const hash = frameNavigation({
+      href: data.href,
+      viewerUrl: chrome.runtime.getURL("viewer.html"),
+      name,
+    });
+    if (!hash) return;
+    location.hash = hash;
+    location.reload();
+  });
+}
+
 async function show(html: string, allowScripts: boolean): Promise<void> {
   if (!allowScripts) {
     frame.removeAttribute("src");
@@ -224,6 +256,7 @@ async function present(
   frame.setAttribute("sandbox", sandboxFor(allowScripts));
   frame.hidden = false;
   panel.hidden = true;
+  if (allowScripts) listenForFrameNavigation(target.name);
   await show(rendered.html, allowScripts);
 
   const notes: string[] = [];

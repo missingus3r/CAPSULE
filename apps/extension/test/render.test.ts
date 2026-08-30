@@ -7,7 +7,12 @@ import {
   type SiteBundle,
   type SiteFile,
 } from "@capsule/protocol";
-import { renderSitePage, resolveReference, sandboxFor } from "../src/render.js";
+import {
+  frameNavigation,
+  renderSitePage,
+  resolveReference,
+  sandboxFor,
+} from "../src/render.js";
 
 const encoder = new TextEncoder();
 const VIEWER = "chrome-extension://abc/viewer.html";
@@ -197,5 +202,51 @@ describe("rendering a page", () => {
     // Never same-origin: that would put the site in the extension's origin.
     expect(sandboxFor(true)).not.toContain("allow-same-origin");
     expect(sandboxFor(false)).not.toContain("allow-same-origin");
+  });
+
+  it("never lets a page that runs scripts reach the top window", () => {
+    // A navigation is not a request and no CSP directive covers one, so this
+    // flag is the whole difference between a site that can take the visitor
+    // somewhere on a click and one that cannot.
+    expect(sandboxFor(true)).toBe("allow-scripts");
+    expect(sandboxFor(true)).not.toContain("allow-top-navigation");
+  });
+});
+
+describe("what the sandboxed frame is allowed to ask the viewer for", () => {
+  const ask = (href: string): string | undefined =>
+    frameNavigation({ href, viewerUrl: VIEWER, name: NAME });
+
+  it("follows a link inside the site on screen", () => {
+    expect(ask(`${VIEWER}#http://${NAME}/about/index.html`)).toBe(
+      `#http://${NAME}/about/index.html`,
+    );
+  });
+
+  it("keeps an external link behind the confirmation it already had", () => {
+    const href = `${VIEWER}#external:${encodeURIComponent("https://example.org/")}`;
+    expect(ask(href)).toBe(
+      `#external:${encodeURIComponent("https://example.org/")}`,
+    );
+  });
+
+  it("turns an address a script invented into that same confirmation", () => {
+    // The point of the whole arrangement: a script cannot navigate anywhere by
+    // itself, and what it asks for is shown to the visitor before it happens.
+    expect(ask("https://evil.test/?stolen=1")).toBe(
+      `#external:${encodeURIComponent("https://evil.test/?stolen=1")}`,
+    );
+  });
+
+  it("refuses a viewer link that names a different site", () => {
+    const other = `${"b".repeat(56)}.capsule`;
+    expect(ask(`${VIEWER}#http://${other}/index.html`)).toBeUndefined();
+  });
+
+  it("refuses anything that is not an address at all", () => {
+    expect(ask("javascript:alert(1)")).toBeUndefined();
+    expect(ask("data:text/html,<b>hi</b>")).toBeUndefined();
+    expect(ask("not a url")).toBeUndefined();
+    expect(ask(`${VIEWER}#`)).toBeUndefined();
   });
 });

@@ -209,11 +209,32 @@ The viewer hands it the rebuilt HTML by `postMessage` and it writes it. The
 policy injected into that HTML still applies on top of the sandbox policy, so
 `connect-src 'none'` holds either way — verified in a browser, not assumed.
 
-They can be enabled per site, with a visible warning. A script _can_ take the
-frame to an external address, and that would reveal the visitor's IP to it. The
-policy still blocks `fetch`, external images and external fonts, but a
-navigation is not a request subject to CSP and no directive covers it since
-`navigate-to` left the standard.
+They can be enabled per site, with a visible warning.
+
+The frame that runs them is **not** given
+`allow-top-navigation-by-user-activation`. That flag is what the scripts-off
+frame uses to follow a link, and it is safe there because nothing can run to
+abuse it. With scripts on it would be the way out: a navigation is not a
+request subject to CSP, and no directive has covered one since `navigate-to`
+left the standard, so a script could put anything it had computed into a URL
+and take the visitor there on any click.
+
+So links go the other way instead. The bootstrap in the frame catches the
+click and passes the address up; the viewer decides what to honour, in
+`frameNavigation`:
+
+| What the frame asks for              | What happens                                |
+| ------------------------------------ | ------------------------------------------- |
+| A page of the site on screen         | The viewer goes there.                      |
+| A link out that the rebuilder wrote  | The usual confirmation, naming the address. |
+| An address a script invented         | The same confirmation, naming it.           |
+| Another `.capsule` name, or nonsense | Nothing.                                    |
+
+That bootstrap is a convenience, not a control: a script can remove the
+listener or swallow the click, and all that costs is the site's own links. It
+cannot navigate the tab either way. What remains is that a visitor who
+approves a confirmation naming an outside address has still gone there — which
+is the same decision, and the same warning, as with scripts off.
 
 `allow-same-origin` is never used. The frame lives in an opaque origin; if it
 shared the extension's origin the site would have access to `chrome.*`.

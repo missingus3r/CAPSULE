@@ -11,15 +11,16 @@
  * of the sandbox policy rather than replacing it. `connect-src 'none'` survives
  * that combination, so a site with its scripts allowed cannot issue a request.
  *
- * It is not sealed, and the visitor is warned before this frame is ever used:
- * links are rewritten with `target="_top"`, so the frame must be allowed to
- * navigate the tab on a click, and a script can take that click somewhere of
- * its own choosing. A navigation is not a request and no CSP directive has
- * covered one since `navigate-to` left the standard. That is the price of
- * turning scripts on, and it is why they are off by default.
+ * A navigation is not a request, and no CSP directive has covered one since
+ * `navigate-to` left the standard — so the frame is not given the reach to
+ * perform one. It cannot touch the top browsing context, and the links the
+ * renderer wrote are handed up to the viewer instead, which decides what to
+ * honour. A site's script may ask for anywhere it likes; an address outside
+ * CAPSULE becomes the confirmation the visitor would have seen anyway.
  */
 
 const RENDER = "capsule:render";
+const NAVIGATE = "capsule:navigate";
 
 interface RenderMessage {
   type: typeof RENDER;
@@ -48,6 +49,29 @@ window.addEventListener("message", (event: MessageEvent<unknown>) => {
   document.open();
   document.write(event.data.html);
   document.close();
+
+  // Registered after the write, because `document.open` clears what was
+  // registered on the document before it.
+  //
+  // This is a convenience, not a control. The frame has no way to reach the
+  // top browsing context, so a site's script cannot navigate the tab whether
+  // this listener runs or not; what it can do is ask, and the viewer decides
+  // what to honour. Removing this listener, or stopping the event before it
+  // arrives, costs the site its own links and gains it nothing.
+  document.addEventListener(
+    "click",
+    (click) => {
+      const node = click.target as Element | null;
+      const anchor = node?.closest?.("a[href], area[href]");
+      if (!anchor) return;
+      click.preventDefault();
+      window.parent.postMessage(
+        { type: NAVIGATE, href: (anchor as HTMLAnchorElement).href },
+        "*",
+      );
+    },
+    true,
+  );
 });
 
 // The viewer waits for this rather than for `load`, because a frame is ready to
