@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A site with no address on the Internet</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="mark">
+        <img src="assets/mark.svg" alt="" />
+        <span>Capsule</span>
+      </header>
+
+      <h1>Nobody sold you this address.</h1>
+
+      <p class="lead">
+        You are reading a page that has no DNS record, no certificate and no
+        hosting bill. Its name is not registered anywhere, because its name is a
+        public key — and the only thing that can publish under it is whoever
+        holds the matching private one.
+      </p>
+
+      <p>
+        The relay that handed you these bytes cannot read them. It stored one
+        encrypted blob and a signed record saying where to find it. It does not
+        know what this page says, who wrote it, or that you asked for it.
+      </p>
+
+      <h2>How this page reached you</h2>
+
+      <dl class="facts">
+        <dt>The name</dt>
+        <dd>
+          An Ed25519 public key, written as the label before
+          <code>.capsule</code>. Losing the key loses the site; nobody can hand
+          the name to someone else, because there is nobody to ask.
+        </dd>
+
+        <dt>The bundle</dt>
+        <dd>
+          Every file of this site packed into one capsule and encrypted before
+          it left the machine that published it.
+        </dd>
+
+        <dt>The record</dt>
+        <dd>
+          A signed pointer from the name to the capsule, gossiped between
+          relays. A relay can refuse to carry it. It cannot forge one.
+        </dd>
+
+        <dt>The rendering</dt>
+        <dd>
+          Your browser did not load this page — the extension rebuilt it.
+          Stylesheets and images became <code>data:</code> URLs, everything
+          pointing at the open web was removed, and the result landed in a
+          sandboxed frame with <code>connect-src 'none'</code>.
+        </dd>
+      </dl>
+
+      <h2>Verify it yourself</h2>
+
+      <p>
+        None of that is worth much as a claim. The next page is three checks you
+        can watch fail in front of you: a tracking pixel that never loads, a
+        script that never runs, and a link that cannot take you anywhere without
+        asking first.
+      </p>
+
+      <p><a href="proof.html">Open the checks →</a></p>
+
+      <footer>
+        Published with <code>capsule site publish</code>. The source of this
+        example lives in <code>examples/site/</code>.
+      </footer>
+    </div>
+  </body>
+</html>

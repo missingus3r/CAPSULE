@@ -221,7 +221,10 @@ export function friendlyError(
     message.includes("fetch") ||
     message.includes("offline")
   ) {
-    return "No pudimos conectar con el relay. Revisá tu conexión e intentá de nuevo.";
+    // A browser hides the difference between "the relay is down" and "the relay
+    // refused this origin", so the message has to name both. The second is the
+    // likelier one on a machine where the relay is clearly running.
+    return "No pudimos conectar con el relay. Si está corriendo, suele ser que no acepta el origen desde el que abriste esta página: probá con la misma dirección que anuncia (localhost y 127.0.0.1 son orígenes distintos), o poné CAPSULE_CORS_ORIGIN en el relay.";
   }
 
   return action === "upload"

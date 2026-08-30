@@ -169,6 +169,21 @@ node apps/cli/dist/index.js relays --seed https://relay.example.org
 Operator guide — quotas, IP-blind mode, storage without expiry, proof of work:
 [docs/RUN_A_RELAY.md](docs/RUN_A_RELAY.md).
 
+### If the web app says it cannot reach the relay
+
+A browser reports a refused origin as a plain network failure, so "cannot
+connect" usually means the relay is running and did not accept the address the
+page was opened from — `localhost` and `127.0.0.1` are the same machine but
+different origins. Open the app at the address the dev server prints, or set
+`CAPSULE_CORS_ORIGIN` on the relay. The relay logs the origin it refused.
+
+Storage **without expiry** is off unless the operator turns it on, which is why
+the "no expiry" option can show as unavailable:
+
+```bash
+CAPSULE_ALLOW_PERSISTENT_CAPSULES=true npm run dev:relay
+```
+
 ---
 
 ## Publish a `.capsule` site

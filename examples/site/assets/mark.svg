@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CAPSULE">
+  <rect width="512" height="512" rx="116" fill="#183f37"/>
+  <g transform="rotate(-35 256 256)">
+    <rect x="118" y="202" width="276" height="108" rx="54" fill="#f6f0e5"/>
+    <path d="M256 202h84a54 54 0 0 1 0 108h-84z" fill="#ef7959"/>
+    <path d="M256 202v108" stroke="#183f37" stroke-width="12"/>
+  </g>
+</svg>

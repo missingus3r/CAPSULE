@@ -90,7 +90,11 @@ const DEFAULTS = {
   host: "127.0.0.1",
   port: 8787,
   storageDir: "./data",
-  corsOrigin: "http://localhost:5173",
+  // Every spelling of "this machine" on the dev server port. `localhost` and
+  // `127.0.0.1` are the same host but different origins to a browser, and a
+  // developer who types one instead of the other gets a failure the browser
+  // deliberately reports as an unhelpful network error.
+  corsOrigin: "http://localhost:5173,http://127.0.0.1:5173,http://[::1]:5173",
   maxCapsuleBytes: 100 * 1024 * 1024,
   maxChunkBytes: 1024 * 1024 + 24,
   maxManifestBytes: 256 * 1024,

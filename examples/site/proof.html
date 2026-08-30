@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Three things this page cannot do</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="mark">
+        <img src="assets/mark.svg" alt="" />
+        <span>Capsule · checks</span>
+      </header>
+
+      <h1>Three things this page cannot do.</h1>
+
+      <p class="lead">
+        Each check below is a real attempt, left in the source on purpose. A
+        <code>.capsule</code> site is untrusted content, and the viewer treats
+        it that way.
+      </p>
+
+      <h2>Check 1 — the tracking pixel</h2>
+
+      <div class="check">
+        <h3>An image hosted somewhere else</h3>
+        <p>
+          The markup asks for an image on another server. Loading it would tell
+          that server your IP address, the time you read this, and roughly where
+          you are. Right below this line is where it would appear.
+        </p>
+        <p>
+          <img
+            src="https://example.org/tracker.png"
+            alt="This external image was removed before the page was rendered."
+            width="120"
+            height="40"
+          />
+        </p>
+        <p class="expect">
+          Expected: nothing loads, and the viewer reports one blocked external
+          resource.
+        </p>
+      </div>
+
+      <h2>Check 2 — the script</h2>
+
+      <div class="check">
+        <h3>A script that rewrites the page</h3>
+        <p id="script-check">
+          <strong>The script did not run.</strong> This sentence is exactly as
+          it was written, and no code on this page has touched it.
+        </p>
+        <script>
+          document.getElementById("script-check").innerHTML =
+            "<strong>A script rewrote this sentence.</strong> Scripts are enabled for this site — which is your decision to make, but it is a decision.";
+        </script>
+        <p class="expect">
+          Expected: the sentence is unchanged. Turn scripts on in the viewer and
+          reload to watch it change — that is what the setting costs.
+        </p>
+      </div>
+
+      <h2>Check 3 — the link out</h2>
+
+      <div class="check">
+        <h3>A link that leaves CAPSULE</h3>
+        <p>
+          Following it means making an ordinary request to an ordinary web
+          server, with everything that implies. So it is not a link the page can
+          follow on your behalf — it is a click you have to confirm.
+        </p>
+        <p><a href="https://example.org/">https://example.org/</a></p>
+        <p class="expect">
+          Expected: a confirmation first, naming the address, before anything
+          leaves.
+        </p>
+      </div>
+
+      <h2>And one thing it can</h2>
+
+      <div class="check">
+        <h3>Link to its own pages</h3>
+        <p>
+          Everything inside the bundle resolves normally, with no network
+          involved at all.
+        </p>
+        <p><a href="index.html">← Back to the first page</a></p>
+      </div>
+
+      <footer>
+        If any check above behaves differently, that is a bug worth reporting.
+      </footer>
+    </div>
+  </body>
+</html>

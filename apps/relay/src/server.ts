@@ -305,10 +305,22 @@ export async function buildRelayServer(
   const isAllowedOrigin = originMatcher(config.corsOrigins);
   // A bridge answers no cross-origin preflight and advertises no policy: those
   // headers are a tell, and nothing that talks to a bridge needs them.
+  // A browser reports a refused origin as a generic network failure, so from
+  // the application it is indistinguishable from the relay being down. Saying
+  // it here, once per origin, is the only place the real reason appears.
+  const refusedOrigins = new Set<string>();
   if (!bridge)
     await app.register(cors, {
       origin(origin, callback) {
-        callback(null, isAllowedOrigin(origin));
+        const allowed = isAllowedOrigin(origin);
+        if (!allowed && origin && !refusedOrigins.has(origin)) {
+          refusedOrigins.add(origin);
+          app.log.warn(
+            { origin, corsOrigins: config.corsOrigins },
+            "Refused a browser request from an origin that is not allowed. The app will report this as a connection failure. Set CAPSULE_CORS_ORIGIN to include it.",
+          );
+        }
+        callback(null, allowed);
       },
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Authorization", "Content-Type"],
