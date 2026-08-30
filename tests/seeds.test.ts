@@ -8,6 +8,7 @@ import type { RelayConfig } from "../apps/relay/src/config.js";
 import { buildRelayServer } from "../apps/relay/src/server.js";
 import {
   DEFAULT_SEEDS,
+  defaultSeedOrigins,
   parseSeedRef,
   parseSeedRefs,
   relayIdForPublicKey,
@@ -129,11 +130,25 @@ async function startRelay(): Promise<{ url: string; app: FastifyInstance }> {
 }
 
 describe("seed references", () => {
-  it("ships no default seed, because an unpinned one is worse than none", () => {
-    // A seed that arrives with the software is believed before anything else.
-    // Adding one without an identifier to check would hand whoever controls
-    // that address the opening view of the network for every new install.
-    expect(DEFAULT_SEEDS).toEqual([]);
+  it("ships no seed that cannot be checked", () => {
+    // A seed that arrives with the software is believed before anything else a
+    // fresh install sees, so one without an identifier to hold it to would
+    // hand whoever controls that address the opening view of the network for
+    // everybody. Shipping none is fine; shipping an unpinned one is not.
+    for (const seed of DEFAULT_SEEDS) {
+      const parsed = parseSeedRef(seed);
+      expect(parsed, `${seed} does not parse`).toBeDefined();
+      expect(parsed?.relayId, `${seed} is not pinned`).toBeTruthy();
+    }
+  });
+
+  it("exposes seed origins with no fragment, for anything building a URL", () => {
+    // `url#relayId` is a seed reference, not an address: appending a path to
+    // one puts it after the fragment, where a server never sees it.
+    for (const origin of defaultSeedOrigins()) {
+      expect(origin).not.toContain("#");
+      expect(new URL(`${origin}/v1/info`).pathname).toBe("/v1/info");
+    }
   });
 
   it("reads url#relayId, and refuses what it cannot make sense of", () => {

@@ -1,4 +1,4 @@
-import { DEFAULT_SEEDS } from "@capsule/protocol";
+import { DEFAULT_SEEDS, defaultSeedOrigins } from "@capsule/protocol";
 
 /**
  * What the extension remembers, and deliberately what it does not.
@@ -19,7 +19,7 @@ import { DEFAULT_SEEDS } from "@capsule/protocol";
  * local relay is the fallback for somebody running their own.
  */
 export const DEFAULT_RELAYS: string[] =
-  DEFAULT_SEEDS.length > 0 ? [...DEFAULT_SEEDS] : ["http://localhost:8787"];
+  DEFAULT_SEEDS.length > 0 ? defaultSeedOrigins() : ["http://localhost:8787"];
 
 export interface Settings {
   relays: string[];

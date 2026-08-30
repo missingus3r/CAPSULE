@@ -1,3 +1,5 @@
+import { defaultSeedOrigins } from "@capsule/protocol";
+
 const PERSISTENT_ALIASES = new Set([
   "never",
   "persist",
@@ -34,4 +36,17 @@ export function humanBytes(bytes: number): string {
 
 export function collectRepeated(value: string, previous: string[]): string[] {
   return [...previous, value];
+}
+
+/**
+ * The relay a command talks to when nobody said which.
+ *
+ * `CAPSULE_RELAY_URL` first, because somebody who set it meant it. Then the
+ * seed that ships, so a fresh install reaches the network without also running
+ * a relay. Then this machine, for somebody who is running one.
+ */
+export function defaultRelayUrl(): string {
+  const configured = process.env.CAPSULE_RELAY_URL?.trim();
+  if (configured) return configured;
+  return defaultSeedOrigins()[0] ?? "http://localhost:8787";
 }

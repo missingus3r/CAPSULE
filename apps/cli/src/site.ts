@@ -21,7 +21,12 @@ import {
   type TransferProgress,
 } from "@capsule/sdk";
 import type { Command } from "commander";
-import { collectRepeated, humanBytes, parseTtl } from "./options.js";
+import {
+  collectRepeated,
+  humanBytes,
+  parseTtl,
+  defaultRelayUrl,
+} from "./options.js";
 
 /**
  * `capsule site` — publishing a website whose name is its own key.
@@ -179,11 +184,7 @@ export function registerSiteCommands(
       "--key <path>",
       "site key file created by `capsule site key`",
     )
-    .option(
-      "--relay <url>",
-      "relay that stores the site",
-      process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787",
-    )
+    .option("--relay <url>", "relay that stores the site", defaultRelayUrl())
     .option(
       "--ttl <duration>",
       "how long the relay keeps the site, or never for no expiry",
@@ -329,11 +330,7 @@ export function registerSiteCommands(
     .command("resolve")
     .description("Look up a .capsule name and show the record relays hold")
     .argument("<name>", "a .capsule name")
-    .option(
-      "--relay <url>",
-      "relay to ask first",
-      process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787",
-    )
+    .option("--relay <url>", "relay to ask first", defaultRelayUrl())
     .option(
       "--seed <url>",
       "relay used to discover the network (repeatable)",
@@ -374,11 +371,7 @@ export function registerSiteCommands(
     .description("Download a .capsule site and write it to a directory")
     .argument("<name>", "a .capsule name")
     .requiredOption("--out <directory>", "where to write the files")
-    .option(
-      "--relay <url>",
-      "relay to ask first",
-      process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787",
-    )
+    .option("--relay <url>", "relay to ask first", defaultRelayUrl())
     .option(
       "--seed <url>",
       "relay used to discover the network (repeatable)",
@@ -432,7 +425,7 @@ export function registerSiteCommands(
     .option(
       "--relay <url>",
       "relay that already holds the record",
-      process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787",
+      defaultRelayUrl(),
     )
     .option(
       "--seed <url>",

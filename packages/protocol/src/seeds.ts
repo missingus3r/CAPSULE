@@ -48,7 +48,19 @@ export interface RelaySeedRef {
  * `url#relayId` entries — the id comes from `GET /v1/info` — and prefer more
  * than one, run by more than one person.
  */
-export const DEFAULT_SEEDS: readonly string[] = [];
+export const DEFAULT_SEEDS: readonly string[] = [
+  // The genesis relay. The hostname is the address it runs at, spelled the way
+  // a certificate authority can issue for: Let's Encrypt does not sign bare
+  // IPs through the ordinary flow, and `<ip>.sslip.io` resolves to exactly
+  // that IP. Pinned, so seizing the name, the certificate or the host is not
+  // enough to stand in for it — only the key can answer the challenge.
+  "https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M",
+];
+
+/** The seed origins, with no fragment. Use for anything that builds a URL. */
+export function defaultSeedOrigins(): string[] {
+  return parseSeedRefs(DEFAULT_SEEDS).map((seed) => seed.url);
+}
 
 /**
  * `https://relay.example#<relayId>`, or a bare origin.

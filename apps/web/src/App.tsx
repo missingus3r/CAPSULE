@@ -15,6 +15,7 @@ import {
   type MixNetworkStrength,
 } from "@capsule/mixnet";
 import {
+  defaultSeedOrigins,
   decodeShareCapability,
   encodeOwnerCapability,
   isPublicRelayOrigin,
@@ -107,7 +108,15 @@ const EXPIRY_OPTIONS: ExpiryOption[] = [
   { labelKey: "expiry.never", shortKey: "expiry.never.short", seconds: null },
 ];
 
-const DEFAULT_RELAY_URL = "http://localhost:8787";
+/**
+ * Where this app stores capsules when nobody configured anything.
+ *
+ * The genesis relay, so a fresh checkout works without also running one. A
+ * relay of your own is better and `VITE_RELAY_URL` is how you say so: this one
+ * sees the address, the timing and the size of everything sent through it,
+ * which is exactly what running your own avoids.
+ */
+const DEFAULT_RELAY_URL = defaultSeedOrigins()[0] ?? "http://localhost:8787";
 
 /**
  * Mix routing defaults, matching what the CLI uses without a flag.

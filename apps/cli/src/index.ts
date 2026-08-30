@@ -45,7 +45,12 @@ import {
   type MixNetwork,
 } from "@capsule/mixnet";
 import { Command } from "commander";
-import { collectRepeated, humanBytes, parseTtl } from "./options.js";
+import {
+  collectRepeated,
+  defaultRelayUrl,
+  humanBytes,
+  parseTtl,
+} from "./options.js";
 import { readPassphrase } from "./passphrase.js";
 import { createProxiedFetch, parseProxyUrl } from "./proxy.js";
 import { registerOfflineCommands } from "./offline.js";
@@ -234,9 +239,10 @@ function parseSeed(value: string): RelaySeed {
  */
 function defaultSeeds(): string[] {
   const configured = process.env.CAPSULE_RELAY_URL?.trim();
-  if (configured) return [configured];
-  if (DEFAULT_SEEDS.length > 0) return [...DEFAULT_SEEDS];
-  return ["http://localhost:8787"];
+  // Pinned when it is the seed that shipped: a bare origin here would be a
+  // relay believed on the strength of its address alone.
+  if (!configured && DEFAULT_SEEDS.length > 0) return [...DEFAULT_SEEDS];
+  return [defaultRelayUrl()];
 }
 
 /**
@@ -369,7 +375,7 @@ program
   .option(
     "--relay <url>",
     "relay base URL; defaults to the bridge when --bridge is given",
-    process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787",
+    defaultRelayUrl(),
   )
   .option(
     "--app <url>",

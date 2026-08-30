@@ -50,6 +50,21 @@ what stopped being true. The format follows
 - `examples/site/`, a small `.capsule` site to publish against a local relay.
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
+- **A genesis relay, pinned.**
+  `https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M`
+  ships as the default seed, so a fresh checkout reaches the network without
+  also running a relay. The hostname is the address `68.211.136.69` spelled so
+  a certificate can exist for it — Let's Encrypt does not sign bare IPs through
+  the ordinary flow, and `<ip>.sslip.io` resolves to that IP and nothing else.
+  The pin is the point: the relay signs a challenge the client just generated,
+  so seizing the name, the certificate or the host is not enough to stand in
+  for it. Verified against the running relay, not only in tests.
+
+  It is one relay run by one person, which is not a network: it sees the
+  address, the timing and the size of everything sent through it, and a mix
+  path across relays a single party operates protects nobody. The README and
+  the showcase page say so where they name it.
+
 - **A pinned seed now has to prove itself, and the check it replaces was
   decorative.** `fetchRelayInfo` compared the `relayId` a relay sent back
   against the pinned one — but `relayId` and `publicKey` are both public, so

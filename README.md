@@ -152,8 +152,27 @@ node apps/cli/dist/index.js delete "<deletion-capability>"
 
 ### 3. Join the network
 
-A relay is one process. There is no registry and nobody to ask: point yours at a
-relay you already know and they introduce themselves with signed announcements.
+There is a relay running, so a fresh checkout reaches the network without you
+having to start one:
+
+```
+https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M
+```
+
+That is the **genesis relay**, and the part after `#` is not decoration. A
+pinned seed has to sign a challenge the client generated a moment ago, so
+seizing the name, the certificate or the host is not enough to stand in for it
+— only the key can answer. Clients use it by default; nothing needs configuring.
+
+The hostname is that address, `68.211.136.69`, spelled so a certificate can
+exist for it: Let's Encrypt does not sign bare IPs through the ordinary flow,
+and `<ip>.sslip.io` resolves to exactly that IP and nothing else.
+
+**Running your own is better and it is the point.** The genesis relay sees the
+address, the timing and the size of everything sent through it, and one relay
+run by one person is not a network. A relay is one process. There is no registry
+and nobody to ask: point yours at one you already know and they introduce
+themselves with signed announcements.
 
 ```bash
 export CAPSULE_PUBLIC_URL="https://relay.example.org"   # where others reach you

@@ -361,6 +361,37 @@
         height: auto;
         min-width: 660px;
       }
+      .genesis {
+        margin: 40px auto 0;
+        max-width: 840px;
+        padding: 24px 26px;
+        border: 1px solid var(--line-2);
+        border-radius: 12px;
+        text-align: left;
+      }
+      .genesis p {
+        margin: 12px 0 0;
+        color: var(--ink-2);
+        font-size: 13.5px;
+        line-height: 1.62;
+      }
+      .genesis-seed {
+        overflow-x: auto;
+        white-space: nowrap;
+        font-family: var(--mono);
+        font-size: 12.5px;
+      }
+      .genesis-seed code {
+        color: var(--ink);
+      }
+      .genesis-pin {
+        color: var(--accent);
+      }
+      .genesis-warn {
+        padding-top: 12px;
+        border-top: 1px dashed var(--line-2);
+        color: var(--ink-3);
+      }
       .figcap {
         font-family: var(--mono);
         font-size: 11px;
@@ -1714,7 +1745,8 @@
             ><span
               >One process with a public URL. It joins the network by gossip,
               stores only ciphertext, and keeps no addresses in its logs by
-              default.</span
+              default. Until you do, clients reach the network through the
+              genesis relay below.</span
             >
           </div>
         </div>
@@ -1811,6 +1843,33 @@
         <div class="row">
           <b>Clients</b><span>CLI, React 19 web, MV3 extension</span>
         </div>
+      </div>
+
+      <div class="genesis">
+        <div class="aside-eyebrow">The genesis relay</div>
+        <p>
+          A relay is already running, so a fresh checkout reaches the network
+          without you starting one:
+        </p>
+        <p class="genesis-seed">
+          <code>https://68.211.136.69.sslip.io</code
+          ><code class="genesis-pin"
+            >#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M</code
+          >
+        </p>
+        <p>
+          The part after <code>#</code> is not decoration. A pinned seed has to
+          sign a challenge the client generated a moment ago, so seizing the
+          name, the certificate or the host is not enough to stand in for it —
+          only the key can answer. The hostname is that address,
+          <code>68.211.136.69</code>, spelled so a certificate can exist for it.
+        </p>
+        <p class="genesis-warn">
+          One relay run by one person is not a network. It sees the address, the
+          timing and the size of everything sent through it, and mix routing
+          across relays a single party operates protects nobody. Running your
+          own is the point, not a formality.
+        </p>
       </div>
 
       <button class="open-modal" data-modal="m-stack">

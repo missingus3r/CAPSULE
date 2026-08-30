@@ -18,7 +18,7 @@ import {
   type SiteIdentityFile,
 } from "@capsule/sdk";
 import type { Command } from "commander";
-import { parseTtl } from "./options.js";
+import { parseTtl, defaultRelayUrl } from "./options.js";
 
 /**
  * `capsule index` — building a directory of `.capsule` sites.
@@ -305,11 +305,7 @@ export function registerIndexerCommands(
       "--out <path>",
       "write the generated site here instead of publishing",
     )
-    .option(
-      "--relay <url>",
-      "relay that stores the index",
-      process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787",
-    )
+    .option("--relay <url>", "relay that stores the index", defaultRelayUrl())
     .option("--ttl <duration>", "how long the relay keeps the index", "7d")
     .option("--sequence <n>", "version number for the published index")
     .option("--limit <n>", "records to ask each relay for", "500")
