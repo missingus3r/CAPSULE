@@ -193,6 +193,22 @@ By default the frame carries
 a real click on a link the rebuilder wrote. That makes the guarantee absolute:
 the page cannot make a single network request.
 
+The page arrives through `srcdoc` in that mode, and through a different route
+when scripts are allowed. The reason is a rule that is easy to miss and was
+missed here at first: **a document created from `srcdoc` inherits the
+Content-Security-Policy of the page embedding it.** An extension page's policy
+is `script-src 'self'`, and a `<meta>` policy in the written document can only
+add restrictions on top of an inherited one, never lift it — so through
+`srcdoc` a site's own scripts could never run, whatever the visitor chose.
+
+With scripts on, the page therefore goes into `sandboxed.html`, declared under
+`sandbox` in the manifest. Chrome gives such a page its own policy and loads it
+into an opaque origin with no extension API reachable from it: the same
+isolation `srcdoc` gave, arrived at deliberately rather than as a side effect.
+The viewer hands it the rebuilt HTML by `postMessage` and it writes it. The
+policy injected into that HTML still applies on top of the sandbox policy, so
+`connect-src 'none'` holds either way — verified in a browser, not assumed.
+
 They can be enabled per site, with a visible warning. A script _can_ take the
 frame to an external address, and that would reveal the visitor's IP to it. The
 policy still blocks `fetch`, external images and external fonts, but a

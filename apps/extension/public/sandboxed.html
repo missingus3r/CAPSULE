@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CAPSULE</title>
+  </head>
+  <body>
+    <!--
+      The frame a site runs in when its scripts are allowed.
+
+      It exists because of a rule that is easy to miss: a document created from
+      `srcdoc` inherits the Content-Security-Policy of the page that embeds it,
+      and an extension page's policy is `script-src 'self'`. A `<meta>` policy in
+      the written document can only add restrictions on top of that, never lift
+      one — so with `srcdoc` a site's own scripts could never run, whatever the
+      visitor chose.
+
+      A page listed under `sandbox` in the manifest gets its own policy instead,
+      and Chrome loads it into an opaque origin with no access to any extension
+      API. That is the same isolation `srcdoc` gave, arrived at deliberately
+      rather than as a side effect, and it is the only place in this extension
+      where `unsafe-inline` appears.
+
+      The page holds no secrets and does nothing but write what the viewer sends
+      it. The policy the viewer injects into that HTML still applies on top, so
+      `connect-src 'none'` continues to hold: a site with scripts on can compute
+      whatever it likes and still cannot send it anywhere.
+    -->
+    <script type="module" src="sandboxed.js"></script>
+  </body>
+</html>

@@ -14,6 +14,7 @@ await build({
     join(root, "src/background.ts"),
     join(root, "src/viewer.ts"),
     join(root, "src/options.ts"),
+    join(root, "src/sandboxed.ts"),
   ],
   outdir: out,
   bundle: true,

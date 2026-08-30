@@ -15,6 +15,17 @@ what stopped being true. The format follows
   address fell through to DNS and failed like the extension was not installed.
   It now declares `*://*.capsule/*`, which matches nothing that resolves on the
   open web, and says so in the service worker log if it is ever taken away.
+- **Turning scripts on for a site did nothing.** The page was handed to the
+  frame through `srcdoc`, and a `srcdoc` document inherits the
+  Content-Security-Policy of the page embedding it — `script-src 'self'` for an
+  extension page. The policy the viewer injects can only add restrictions to an
+  inherited one, never lift one, so a site's own scripts were blocked whatever
+  the visitor chose, with the violation reported against a policy the visitor
+  never set. With scripts on the page now goes into a frame declared under
+  `sandbox` in the manifest, which Chrome gives its own policy and an opaque
+  origin with no extension API in it. `connect-src 'none'` still applies on top,
+  so a site with scripts allowed can compute anything and still cannot send it
+  anywhere — checked in a browser rather than assumed.
 - **A relay forgot every `.capsule` name when it restarted.** Records were held
   in memory only, while the capsules they point at were on disk — so a restart
   emptied a relay's half of the name space, including names its own operator had

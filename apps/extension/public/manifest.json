@@ -25,8 +25,12 @@
       "matches": ["<all_urls>"]
     }
   ],
+  "sandbox": {
+    "pages": ["sandboxed.html"]
+  },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; frame-src 'self' data:; child-src 'self' data:"
+    "extension_pages": "script-src 'self'; object-src 'none'; frame-src 'self' data:; child-src 'self' data:",
+    "sandbox": "sandbox allow-scripts allow-top-navigation-by-user-activation; script-src 'self' 'unsafe-inline' data:; style-src 'unsafe-inline' data:; img-src data:; font-src data:; media-src data:; object-src 'none'; child-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'"
   },
   "icons": {
     "128": "icon128.png"

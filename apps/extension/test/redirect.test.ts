@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { CAPSULE_URL_FILTER } from "../src/redirect.js";
 
 /**
@@ -71,5 +72,38 @@ describe("the .capsule redirect filter", () => {
     expect(CAPSULE_URL_FILTER.endsWith("$")).toBe(true);
     const matched = `http://${NAME}/about/`.match(filter);
     expect(matched?.[0]).toBe(`http://${NAME}/about/`);
+  });
+});
+
+describe("the frame a site with scripts runs in", () => {
+  const manifest = JSON.parse(
+    readFileSync(new URL("../public/manifest.json", import.meta.url), "utf8"),
+  ) as {
+    sandbox?: { pages?: string[] };
+    content_security_policy?: Record<string, string>;
+  };
+
+  it("declares a sandboxed page, because srcdoc inherits this page's policy", () => {
+    // A `srcdoc` document takes the Content-Security-Policy of the page
+    // embedding it, and an extension page's is `script-src 'self'`. A meta
+    // policy inside can only add restrictions, so through srcdoc a site's own
+    // scripts can never run — verified in Chrome, and the reason this page
+    // exists at all.
+    expect(manifest.sandbox?.pages).toContain("sandboxed.html");
+  });
+
+  it("keeps the network shut in the sandbox policy too", () => {
+    const policy = manifest.content_security_policy?.sandbox ?? "";
+    expect(policy).toContain("connect-src 'none'");
+    expect(policy).toContain("form-action 'none'");
+    expect(policy).toContain("child-src 'none'");
+    // Everything a site may load has to come from the bundle it arrived in.
+    expect(policy).not.toMatch(/https?:/u);
+  });
+
+  it("is the only place unsafe-inline appears", () => {
+    const pages = manifest.content_security_policy?.extension_pages ?? "";
+    expect(pages).toContain("script-src 'self'");
+    expect(pages).not.toContain("unsafe-inline");
   });
 });

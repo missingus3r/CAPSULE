@@ -136,6 +136,43 @@ function decodeCached(value: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * Puts a rebuilt page into the frame.
+ *
+ * Two routes, and the reason is a rule that is easy to miss: a document created
+ * from `srcdoc` **inherits the Content-Security-Policy of the page embedding
+ * it**, and this page's policy is `script-src 'self'`. A `<meta>` policy in the
+ * written document can only add restrictions on top, never lift one, so through
+ * `srcdoc` a site's own scripts can never run whatever the visitor chose.
+ *
+ * With scripts off that does not matter — nothing needs to execute — and
+ * `srcdoc` is the simpler thing. With scripts on the page goes into a frame
+ * declared under `sandbox` in the manifest, which Chrome gives its own policy
+ * and an opaque origin with no extension API reachable from it.
+ */
+async function show(html: string, allowScripts: boolean): Promise<void> {
+  if (!allowScripts) {
+    frame.removeAttribute("src");
+    frame.srcdoc = html;
+    return;
+  }
+
+  frame.removeAttribute("srcdoc");
+  await new Promise<void>((resolve) => {
+    const onMessage = (event: MessageEvent<unknown>): void => {
+      if (event.source !== frame.contentWindow) return;
+      if ((event.data as { type?: string })?.type !== "capsule:ready") return;
+      window.removeEventListener("message", onMessage);
+      // "*" because the frame has an opaque origin and cannot be named. Only
+      // that frame receives it, because the message is posted into it.
+      frame.contentWindow?.postMessage({ type: "capsule:render", html }, "*");
+      resolve();
+    };
+    window.addEventListener("message", onMessage);
+    frame.src = chrome.runtime.getURL("sandboxed.html");
+  });
+}
+
 async function present(
   settings: Settings,
   target: Target,
@@ -185,9 +222,9 @@ async function present(
   });
 
   frame.setAttribute("sandbox", sandboxFor(allowScripts));
-  frame.srcdoc = rendered.html;
   frame.hidden = false;
   panel.hidden = true;
+  await show(rendered.html, allowScripts);
 
   const notes: string[] = [];
   if (rendered.blockedExternals.length > 0) {
