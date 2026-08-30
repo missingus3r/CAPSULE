@@ -50,6 +50,27 @@ what stopped being true. The format follows
 - `examples/site/`, a small `.capsule` site to publish against a local relay.
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
+- **A pinned seed now has to prove itself, and the check it replaces was
+  decorative.** `fetchRelayInfo` compared the `relayId` a relay sent back
+  against the pinned one — but `relayId` and `publicKey` are both public, so
+  anyone who fetched a relay's `/v1/info` once could serve those values and
+  pass. A pinned lookup sends a fresh challenge and requires an Ed25519
+  signature over it, and derives `relayId` from the key rather than reading it,
+  so an identifier cannot be claimed for a key the relay does not hold. A
+  relay too old to answer a challenge is **refused when pinned** rather than
+  believed. Unpinned discovery is unchanged, and the query parameter is
+  optional, so nothing else moved. Specified in
+  [docs/PROTOCOL.md](docs/PROTOCOL.md) §`GET /v1/info`; the attack is in
+  `tests/seeds.test.ts`, written from the impostor's side.
+- **One place to put the seeds a fresh install starts from.**
+  `DEFAULT_SEEDS` in `@capsule/protocol`, shared by the CLI, the web app and
+  the extension, in `url#relayId` form. It **ships empty**: a seed that arrives
+  with the software is the address every new install believes before anything
+  else, and an unpinned one would hand whoever controls it the opening view of
+  the network for everybody. The web app also remembers the relays it reached
+  and tries them, pinned to what they announced, before falling back to a seed
+  — a default should be how a browser finds the network once, not a party it
+  depends on for good.
 - **`capsule index`, a directory of sites that asked to be listed.** It reads
   every name the reachable relays admit to holding, downloads each bundle,
   keeps the ones whose `capsule.json` opts in, and publishes the result as a

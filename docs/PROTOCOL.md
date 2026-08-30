@@ -620,6 +620,46 @@ stores in `identity.json` inside its data directory.
 }
 ```
 
+`relayId` is **not a name a relay chooses**: it is
+`base64url(SHA-256(publicKey))`. A client derives it from the key in the same
+document rather than reading it, so a relay presenting a key it does not own is
+caught by arithmetic.
+
+##### `GET /v1/info?challenge=<16-64 base64url characters>`
+
+The same document plus a proof of possession:
+
+```json
+{
+  "challenge": "<echoed back exactly>",
+  "challengeSignature": "<base64url Ed25519 signature>"
+}
+```
+
+The signature is over UTF-8 of:
+
+```
+CAPSULE/relay-challenge/v1
+<relayId>
+<challenge>
+```
+
+**A client that pins a relay must ask for this, and must refuse a relay that
+does not answer it.** `relayId` and `publicKey` are both public — anyone can
+fetch them once — so a check that only compares the values a relay sends back
+is satisfied by whoever read them. Pinning means nothing without the
+signature.
+
+This matters most where it is least visible: a seed that ships with the
+software is the address every fresh install believes before anything else, and
+whoever answers there decides which relays that install ever hears about. Such
+a seed does not need to forge a record to do damage; it only needs to be the
+only voice.
+
+The parameter is optional and a relay that predates it simply returns the
+document without those fields. An unpinned lookup does not send one, so nothing
+about ordinary discovery changed.
+
 #### `GET /v1/peers`
 
 Returns `self` and the list of known relays (`url`, `relayId`, `publicKey`,

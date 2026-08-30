@@ -153,6 +153,30 @@ While it is on:
 Say it plainly in your service policy: it is not "permanent", it is "until
 somebody deletes it or until this relay stops existing".
 
+## 4b. Being a seed somebody pins
+
+A seed is the relay a fresh install asks first, so it is the most valuable
+address in the network to impersonate. If yours is going to be one, it has to
+be handed out **pinned** — with the identifier a client can hold you to:
+
+```bash
+curl -s https://relay.example.org/v1/info | jq -r '.relayId'
+# → the id; hand out the seed as:
+#   https://relay.example.org#<relayId>
+```
+
+A client given that form sends a challenge and requires your relay to sign it.
+Your relay answers on its own, with no configuration: the key it already has is
+the one that signs. What this buys is precise — somebody who seizes the name,
+the certificate or the host **cannot** stand in for you, because they cannot
+produce the signature. What it does not buy is protection against you: a seed
+that answers correctly still decides which relays a new install first hears
+about, which is why more than one seed, run by more than one person, is worth
+more than any check.
+
+Handing out the bare origin instead is trust-on-first-use, which is fine for
+somebody typing it in and wrong for anything that ships with the software.
+
 ## 5. Operational privacy
 
 ```bash

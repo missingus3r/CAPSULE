@@ -48,6 +48,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { discoverySeeds, rememberRelays } from "./lib/seeds";
 import { DropZone } from "./components/DropZone";
 import { PublishSite } from "./components/PublishSite";
 import { ProgressState } from "./components/ProgressState";
@@ -430,7 +431,10 @@ export default function App() {
         if (!cancelled) setRelayConfig(null);
       });
     discoverRelays({
-      seeds: [relayUrl],
+      // The configured relay first, then ones remembered from earlier visits,
+      // then whatever seeds shipped. A pinned seed has to prove it holds the
+      // identity it was pinned to before any of its answers count.
+      seeds: discoverySeeds(relayUrl),
       maxRelays: 12,
       // A relay can put anything in its peer list. Following it into the
       // visitor's own network is only acceptable when this app is already
@@ -438,7 +442,9 @@ export default function App() {
       ...(isPublicRelayOrigin(relayUrl) ? {} : { allowPrivateRelays: true }),
     })
       .then((relays) => {
-        if (!cancelled) setNetwork(relays);
+        if (cancelled) return;
+        setNetwork(relays);
+        rememberRelays(relays);
       })
       .catch(() => undefined);
     return () => {

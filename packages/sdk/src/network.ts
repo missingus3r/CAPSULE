@@ -8,6 +8,7 @@
  * relay is only ever a candidate the client may choose to use.
  */
 
+import { newRelayChallenge, verifyRelayIdentity } from "@capsule/protocol";
 import {
   RELAY_API_VERSION,
   isPublicRelayOrigin,
@@ -189,25 +190,56 @@ export async function fetchRelayInfo(
     fetchImpl?: FetchLike;
     signal?: AbortSignal;
     timeoutMs?: number;
-    /** Reject the relay unless it announces this identity. */
+    /**
+     * Reject the relay unless it proves it holds this identity.
+     *
+     * Proves, not announces. `relayId` and `publicKey` are both public, so a
+     * check that only compares the strings a relay sends back is satisfied by
+     * anyone who read them once — which is exactly the attack a pinned seed
+     * exists to stop. A pinned lookup sends a fresh challenge and requires a
+     * signature over it.
+     */
     expectRelayId?: string;
   } = {},
 ): Promise<RelayInfo> {
   const origin = normalizeOrigin(relayUrl);
   const request = resolveFetch(options.fetchImpl);
+  const challenge = options.expectRelayId ? newRelayChallenge() : undefined;
+  const target = challenge
+    ? `${origin}/v1/info?challenge=${encodeURIComponent(challenge)}`
+    : `${origin}/v1/info`;
   const response = await withTimeout(
-    (signal) => request(`${origin}/v1/info`, { signal }),
+    (signal) => request(target, { signal }),
     options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     options.signal,
   );
   if (!response.ok) {
     throw new Error(`Relay ${origin} answered ${response.status} on /v1/info`);
   }
-  const info = parseRelayInfo(await response.json(), origin);
-  if (options.expectRelayId && info.relayId !== options.expectRelayId) {
-    throw new Error(
-      `Relay ${origin} announced a different identity than the one pinned`,
+  const document = (await response.json()) as Record<string, unknown>;
+  const info = parseRelayInfo(document, origin);
+
+  if (options.expectRelayId && challenge) {
+    const failure = await verifyRelayIdentity(
+      {
+        relayId: info.relayId,
+        publicKey: info.publicKey,
+        ...(typeof document.challenge === "string"
+          ? { challenge: document.challenge }
+          : {}),
+        ...(typeof document.challengeSignature === "string"
+          ? { challengeSignature: document.challengeSignature }
+          : {}),
+      },
+      { relayId: options.expectRelayId, challenge },
     );
+    if (failure) {
+      throw new Error(
+        failure === "no-proof-offered"
+          ? `Relay ${origin} could not prove it holds the pinned identity. A relay older than this client cannot answer a challenge, and a pinned seed that cannot prove itself is refused rather than believed.`
+          : `Relay ${origin} failed the pinned identity check (${failure})`,
+      );
+    }
   }
   return info;
 }

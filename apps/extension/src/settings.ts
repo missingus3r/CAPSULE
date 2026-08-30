@@ -1,3 +1,5 @@
+import { DEFAULT_SEEDS } from "@capsule/protocol";
+
 /**
  * What the extension remembers, and deliberately what it does not.
  *
@@ -7,7 +9,17 @@
  * no per-visit record and nothing that survives without being asked for.
  */
 
-export const DEFAULT_RELAYS: string[] = ["http://localhost:8787"];
+/**
+ * Where a fresh install looks first.
+ *
+ * `DEFAULT_SEEDS` is empty until somebody operating a relay fills it in, and
+ * it must be filled in as `url#relayId`: a seed that ships with the extension
+ * is the address every new install believes before anything else, so an
+ * unpinned one hands whoever controls it the opening view of the network. The
+ * local relay is the fallback for somebody running their own.
+ */
+export const DEFAULT_RELAYS: string[] =
+  DEFAULT_SEEDS.length > 0 ? [...DEFAULT_SEEDS] : ["http://localhost:8787"];
 
 export interface Settings {
   relays: string[];

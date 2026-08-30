@@ -35,6 +35,7 @@ import {
   type MixResponse,
 } from "@capsule/mixnet";
 import {
+  RELAY_CHALLENGE_CONTEXT,
   encodeBridgeLine,
   randomBridgeKey,
   toBase64Url,
@@ -478,25 +479,55 @@ export async function buildRelayServer(
 
   // The identity card of a relay. Anyone can run one: publish this endpoint,
   // point the relay at a peer, and clients discover it through the directory.
-  app.get("/v1/info", async () => ({
-    version: RELAY_API_VERSION,
-    software: RELAY_SOFTWARE,
-    protocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
-    relayId: identity.relayId,
-    publicKey: identity.publicKey,
-    ...(config.publicUrl ? { url: config.publicUrl } : {}),
-    ...(config.nickname ? { nickname: config.nickname } : {}),
-    persistentCapsules: config.allowPersistentCapsules,
-    ...(config.mixEnabled ? { mixPublicKey: identity.mixPublicKey } : {}),
-    mixEnabled: config.mixEnabled,
-    limits: limits(),
-    defaultTtlSeconds: config.defaultTtlSeconds,
-    maxTtlSeconds: config.maxTtlSeconds,
-    peerCount: peers.size,
-    acceptsAnnouncements: true,
-    sitesEnabled: config.sitesEnabled,
-    siteCount: sites.size,
-  }));
+  app.get<{ Querystring: { challenge?: string } }>(
+    "/v1/info",
+    async (request) => {
+      /**
+       * Proof, when asked for, that this relay holds the key it presents.
+       *
+       * `relayId` and `publicKey` are public, so a client that pins one and then
+       * believes whoever repeats it back has pinned nothing. A caller sends a
+       * challenge it just generated and gets a signature over it, which an
+       * impostor cannot produce without the private key. Unasked, nothing
+       * changes and an older client sees the document it expects.
+       */
+      const asked = request.query.challenge;
+      const challenge =
+        typeof asked === "string" && /^[A-Za-z0-9_-]{16,64}$/u.test(asked)
+          ? asked
+          : undefined;
+
+      return {
+        version: RELAY_API_VERSION,
+        software: RELAY_SOFTWARE,
+        protocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+        relayId: identity.relayId,
+        publicKey: identity.publicKey,
+        ...(challenge
+          ? {
+              challenge,
+              challengeSignature: identity.sign(
+                `${RELAY_CHALLENGE_CONTEXT}
+${identity.relayId}
+${challenge}`,
+              ),
+            }
+          : {}),
+        ...(config.publicUrl ? { url: config.publicUrl } : {}),
+        ...(config.nickname ? { nickname: config.nickname } : {}),
+        persistentCapsules: config.allowPersistentCapsules,
+        ...(config.mixEnabled ? { mixPublicKey: identity.mixPublicKey } : {}),
+        mixEnabled: config.mixEnabled,
+        limits: limits(),
+        defaultTtlSeconds: config.defaultTtlSeconds,
+        maxTtlSeconds: config.maxTtlSeconds,
+        peerCount: peers.size,
+        acceptsAnnouncements: true,
+        sitesEnabled: config.sitesEnabled,
+        siteCount: sites.size,
+      };
+    },
+  );
 
   app.get("/v1/peers", async () => ({
     version: RELAY_API_VERSION,

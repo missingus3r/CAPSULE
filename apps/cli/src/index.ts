@@ -5,6 +5,8 @@ import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { Readable } from "node:stream";
 import {
+  DEFAULT_SEEDS,
+  parseSeedRef,
   combineShares,
   decodeBridgeLine,
   bridgeOrigin,
@@ -209,11 +211,32 @@ function progressReporter(
   return { onProgress };
 }
 
-/** Accepts `https://relay.example` or `https://relay.example#<relayId>`. */
+/**
+ * Accepts `https://relay.example` or `https://relay.example#<relayId>`.
+ *
+ * The second form is the one that means anything: a pinned relay has to prove
+ * it holds that identity by signing a challenge, so pointing a client at a
+ * seized address fails instead of quietly succeeding. A bare origin is
+ * trust-on-first-use, which is fine for one somebody typed and wrong for one
+ * that ships with the software.
+ */
 function parseSeed(value: string): RelaySeed {
-  const [url, relayId] = value.split("#");
-  if (!url) throw new Error(`Invalid seed relay: ${value}`);
-  return relayId ? { url, relayId } : url;
+  const parsed = parseSeedRef(value);
+  if (!parsed) throw new Error(`Invalid seed relay: ${value}`);
+  return parsed.relayId
+    ? { url: parsed.url, relayId: parsed.relayId }
+    : parsed.url;
+}
+
+/**
+ * What to ask when nobody said. The relay in the environment wins, then the
+ * seeds that shipped, then a relay on this machine.
+ */
+function defaultSeeds(): string[] {
+  const configured = process.env.CAPSULE_RELAY_URL?.trim();
+  if (configured) return [configured];
+  if (DEFAULT_SEEDS.length > 0) return [...DEFAULT_SEEDS];
+  return ["http://localhost:8787"];
 }
 
 /**
@@ -284,11 +307,9 @@ program
   .action(async (options: { seed: string[] }) => {
     const globalOptions = program.opts<GlobalOptions>();
     const fetchImpl = transport();
-    const seeds = (
-      options.seed.length > 0
-        ? options.seed
-        : [process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787"]
-    ).map(parseSeed);
+    const seeds = (options.seed.length > 0 ? options.seed : defaultSeeds()).map(
+      parseSeed,
+    );
 
     const relays = await discoverRelays({
       seeds,
@@ -762,7 +783,7 @@ program
     const seeds =
       commandOptions.seed.length > 0
         ? commandOptions.seed.map(parseSeed)
-        : [process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787"];
+        : defaultSeeds();
     const maxRelays = Number(commandOptions.max);
     if (!Number.isSafeInteger(maxRelays) || maxRelays <= 0) {
       throw new Error("--max must be a positive integer");

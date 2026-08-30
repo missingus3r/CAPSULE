@@ -503,6 +503,18 @@ Listed because they are still there, not because they are acceptable forever.
 - **Operator diversity.** The cap per apparent operator and the proof of work
   make Sybil expensive, not impossible. A large directory is not evidence of
   jurisdictional or operational independence.
+- **The first relay a fresh install asks.** Bootstrapping needs an entry point,
+  and whoever answers there decides which relays that install ever hears about
+  — an eclipse, not a forgery, and mix routing through relays one party
+  controls protects nobody. Two things bound it. A **pinned** seed must prove
+  it holds the identity it was pinned to, by signing a challenge the client
+  generated a moment ago; the identifier itself is `SHA-256(publicKey)`, so it
+  cannot be claimed for a key the relay does not have. And a seed **can hide
+  relays but cannot invent them**, because every relay learned through one is
+  verified independently. What remains is that a seed which answers correctly
+  can still show a partial view, and that the safest default is more than one
+  seed run by more than one person. `DEFAULT_SEEDS` ships empty: an unpinned
+  default would be strictly worse than none.
 
 ## 14. The mix network (1.1)
 
