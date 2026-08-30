@@ -227,6 +227,26 @@ frame with `connect-src 'none'` and no scripts.
 pixel, not a beacon. That is a property of the format, not a setting you can
 forget. Details and the exceptions: [docs/SITES.md](docs/SITES.md).
 
+### It is not a `.onion` with a different suffix
+
+The address is built exactly the way an onion v3 address is — an Ed25519 key, a
+checksum and a version in base32 — for exactly the same reason: a readable name
+needs a registrar, and a registrar is somebody who can be leaned on. What sits
+behind the name is not the same thing at all:
+
+> An **`.onion`** is a route to a server running right now.
+> A **`.capsule`** is a signed pointer to a static site already replicated
+> across relays.
+
+So the publisher can turn the machine off, the page cannot run scripts or reach
+the network, nobody learns which pages you read, and the signature covers the
+bytes you are shown rather than the identity of a host. What Tor gives in return
+is a real dynamic web — sessions, forms, search — and a visitor its relays
+cannot see, which is the gap this version has not closed.
+
+Side by side, including what each one gets wrong:
+[docs/SITES_VS_ONION.md](docs/SITES_VS_ONION.md).
+
 ---
 
 ## Working when the network is against you
