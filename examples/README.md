@@ -21,11 +21,14 @@ npm run build
 npm run dev:relay                                  # a second terminal
 
 node apps/cli/dist/index.js site key --out site.capsulekey
-node apps/cli/dist/index.js site publish ./examples/site --key site.capsulekey --ttl 30d
+node apps/cli/dist/index.js site publish ./examples/site --key site.capsulekey --ttl 7d
 ```
 
 The key file **is** the site. It is git-ignored on purpose: whoever copies it
 can replace the pages.
+
+`--ttl 7d` is the ceiling a relay allows out of the box; ask for longer and it
+refuses the capsule. Raise it with `CAPSULE_MAX_TTL_SECONDS` on the relay.
 
 ## Read it back
 

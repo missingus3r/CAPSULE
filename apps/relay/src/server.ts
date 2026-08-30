@@ -300,7 +300,15 @@ export async function buildRelayServer(
   });
   await peers.initialize();
 
-  const sites = new SiteDirectory({ maxSites: config.maxSites });
+  const sites = new SiteDirectory({
+    maxSites: config.maxSites,
+    // Records live beside the capsules they point at: losing them meant every
+    // `.capsule` name a relay knew disappeared on restart, including the ones
+    // its own operator had just published.
+    storageDir: config.storageDir,
+    log: (message, details) => app.log.info(details ?? {}, message),
+  });
+  if (config.sitesEnabled) await sites.initialize();
 
   const isAllowedOrigin = originMatcher(config.corsOrigins);
   // A bridge answers no cross-origin preflight and advertises no policy: those
@@ -1018,6 +1026,7 @@ export async function buildRelayServer(
     mix.stop();
     await cleanupInFlight;
     await peerSyncInFlight;
+    await sites.flush();
   });
 
   return app;

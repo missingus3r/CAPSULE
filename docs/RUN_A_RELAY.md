@@ -47,6 +47,11 @@ On its first start the relay generates its Ed25519 identity and writes it to
 relay's identity: lose it and the network sees a new relay. Back up the data
 directory, or at least that file.
 
+The data directory also holds `capsules/`, one directory per capsule, and
+`sites.json`, the `.capsule` records this relay serves. Both survive a restart.
+Losing `sites.json` costs nothing permanent — publishers re-announce and peers
+gossip — but until they do, the names it held resolve nowhere at this relay.
+
 ## 3. Joining the network
 
 Two variables are enough:

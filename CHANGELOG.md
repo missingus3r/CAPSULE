@@ -4,6 +4,38 @@ Every released version of CAPSULE, with what changed and — where it applies �
 what stopped being true. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`.capsule` addresses did not open at all.** The extension declared no host
+  permission, and a `declarativeNetRequest` **redirect** rule — unlike `block` —
+  only applies where the extension holds host access to the address being
+  redirected. Chrome accepted the rule and ignored it, so every `.capsule`
+  address fell through to DNS and failed like the extension was not installed.
+  It now declares `*://*.capsule/*`, which matches nothing that resolves on the
+  open web, and says so in the service worker log if it is ever taken away.
+- **A relay forgot every `.capsule` name when it restarted.** Records were held
+  in memory only, while the capsules they point at were on disk — so a restart
+  emptied a relay's half of the name space, including names its own operator had
+  published minutes earlier. They are now kept in `sites.json` in the data
+  directory and re-verified on load: the name is re-derived from the key, the
+  signature checked and the age limit applied, so a file edited on disk can no
+  more insert a record than a lying peer can. An unreadable file is logged and
+  the relay starts empty rather than refusing to start.
+
+### Added
+
+- `examples/site/`, a small `.capsule` site to publish against a local relay.
+  Three of its checks are deliberate: an external image the viewer must drop, an
+  inline script it must not run, and an outbound link it must ask about first.
+
+### Changed
+
+- The publishing examples asked for `--ttl 30d`, which a relay with the default
+  seven-day ceiling refuses. They ask for `--ttl 7d`, and the ceiling is named
+  where it bites.
+
 ## [1.3.0] — 2026-08-30
 
 Three of the four gaps the comparison table called out, and an honest note

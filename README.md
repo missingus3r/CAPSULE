@@ -195,12 +195,16 @@ CAPSULE_ALLOW_PERSISTENT_CAPSULES=true npm run dev:relay
 node apps/cli/dist/index.js site key --out site.capsulekey
 
 # 2. Publish a folder that has an index.html
-node apps/cli/dist/index.js site publish ./www --key site.capsulekey --ttl 30d
+node apps/cli/dist/index.js site publish ./www --key site.capsulekey --ttl 7d
 #    → http://6dijvuvwrd5jqp4efjbb4hwcsmtsf6sgi3at4jeto63k7x5fkbwat2yb.capsule/
 
 # 3. Update it later — the name stays, the version goes up
 node apps/cli/dist/index.js site publish ./www --key site.capsulekey
 ```
+
+A relay refuses a TTL longer than its own ceiling — seven days out of the box,
+raised with `CAPSULE_MAX_TTL_SECONDS`. The record survives a restart of the
+relay; a site published to a relay running an older version than this does not.
 
 ### Read one in any Chromium browser
 

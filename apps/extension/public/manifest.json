@@ -5,6 +5,7 @@
   "description": "Opens .capsule sites: names that are their own key, pages no relay can read or forge.",
   "minimum_chrome_version": "137",
   "permissions": ["declarativeNetRequest", "storage"],
+  "host_permissions": ["*://*.capsule/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js",

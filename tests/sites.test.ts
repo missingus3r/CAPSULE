@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -77,13 +77,14 @@ function relayConfig(storageDir: string): RelayConfig {
   };
 }
 
-async function startRelay(): Promise<{
+async function startRelay(reuseStorageDir?: string): Promise<{
   app: FastifyInstance;
   config: RelayConfig;
   url: string;
 }> {
-  const storageDir = await mkdtemp(join(tmpdir(), "capsule-site-e2e-"));
-  directories.push(storageDir);
+  const storageDir =
+    reuseStorageDir ?? (await mkdtemp(join(tmpdir(), "capsule-site-e2e-")));
+  if (!reuseStorageDir) directories.push(storageDir);
   const config = relayConfig(storageDir);
   const app = await buildRelayServer(config, { logger: false });
   servers.push(app);
@@ -285,5 +286,59 @@ describe(".capsule sites end-to-end", () => {
     expect(onDisk).not.toContain(identity.name);
     expect(onDisk).not.toContain("index.html");
     expect(secret.length).toBeGreaterThan(0);
+  });
+
+  it("still knows the name after the relay restarts", async () => {
+    const first = await startRelay();
+    const { identity } = await createSiteIdentity();
+
+    await publishSite({
+      identity,
+      files: [page("index.html", "one")],
+      relayUrl: first.url,
+      ttlSeconds: 600,
+      sequence: 1,
+      title: "Kept",
+    });
+
+    // The capsule behind a site was always written to disk; the record tying
+    // the name to it was not, so restarting a relay silently emptied its half
+    // of the `.capsule` name space — including names its own operator had
+    // published minutes earlier.
+    await first.app.close();
+    const second = await startRelay(first.config.storageDir);
+
+    const resolved = await resolveSite(identity.name, [second.url]);
+    expect(resolved?.record.sequence).toBe(1);
+    expect(resolved?.record.title).toBe("Kept");
+    // The capability still names the relay that stored the bundle, which the
+    // restart gave a new port; what is being checked here is the record.
+    expect(resolved?.record.name).toBe(identity.name);
+  });
+
+  it("refuses a record that was edited on disk", async () => {
+    const first = await startRelay();
+    const { identity } = await createSiteIdentity();
+    await publishSite({
+      identity,
+      files: [page("index.html", "one")],
+      relayUrl: first.url,
+      ttlSeconds: 600,
+      sequence: 1,
+      title: "Real",
+    });
+    await first.app.close();
+
+    // A relay operator can edit the file. The signature is over the record, so
+    // the edit survives exactly as long as it takes the next relay to read it.
+    const path = join(first.config.storageDir, "sites.json");
+    const stored = JSON.parse(await readFile(path, "utf8")) as {
+      records: Array<{ record: { title: string } }>;
+    };
+    stored.records[0]!.record.title = "Forged";
+    await writeFile(path, JSON.stringify(stored));
+
+    const second = await startRelay(first.config.storageDir);
+    expect(await resolveSite(identity.name, [second.url])).toBeUndefined();
   });
 });

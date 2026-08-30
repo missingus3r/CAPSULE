@@ -126,6 +126,14 @@ Three endpoints, all optional (`CAPSULE_SITES_ENABLED=false` turns them off):
 | `GET /v1/sites/:name`   | Returns the record, or `404`.                                                                                                                                |
 | `GET /v1/sites?limit=n` | Lists recent records, for gossip between relays.                                                                                                             |
 
+A relay keeps its records in `sites.json` inside its data directory, and
+reads them back when it starts. Every restored record goes through the same
+checks an announcement does — the name is re-derived from the key, the
+signature is verified, the age limit applies — so a file edited on disk can no
+more insert a record than a lying peer can. An unreadable file is not fatal:
+the relay says so in its log and starts empty, because publishers re-announce
+and gossip refills the directory.
+
 Relays pass records to each other on every sync round, capped per round
 (`CAPSULE_SITE_GOSSIP_LIMIT`, 200 by default) and in total
 (`CAPSULE_MAX_SITES`, 5000). Without this a name would only resolve at the
@@ -196,11 +204,22 @@ shared the extension's origin the site would have access to `chrome.*`.
 
 ### 6.3 Permissions
 
-The extension asks for `declarativeNetRequest` and `storage`, and **no** host
-permission at all up front. Access to a relay is requested when somebody adds
-it in the settings, for that origin and nothing else, and given back when they
-remove it. An extension that can read any site is an extension that has to be
-trusted far more than necessary.
+The extension asks for `declarativeNetRequest`, `storage` and one host
+permission: `*://*.capsule/*`.
+
+That last one is not optional and not a convenience. The `declarativeNetRequest`
+permission covers `allow`, `allowAllRequests` and `block` rules on its own, but
+a **redirect** rule only applies where the extension holds host access to the
+address being redirected. Without it Chrome accepts the rule and then ignores
+it, every `.capsule` address falls through to DNS, and the failure is
+indistinguishable from the extension not being installed. It grants nothing on
+the open web: `.capsule` resolves nowhere, so the pattern matches no site that
+exists.
+
+Access to a **relay** is still requested one origin at a time, when somebody
+adds it in the settings, and given back when they remove it. An extension that
+can read any site is an extension that has to be trusted far more than
+necessary.
 
 ## 7. What is missing
 

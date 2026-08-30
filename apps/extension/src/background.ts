@@ -31,6 +31,23 @@ async function installRedirect(): Promise<void> {
     return;
   }
 
+  // A redirect rule is not covered by the `declarativeNetRequest` permission
+  // the way a block rule is: it applies only where the extension holds host
+  // access to the address being redirected. Without it Chrome accepts the rule
+  // and then ignores it, and every `.capsule` address falls through to DNS —
+  // which is indistinguishable from the extension not being installed. The
+  // permission is declared in the manifest, so this can only fail where
+  // somebody has narrowed the extension's site access by hand.
+  const allowed = await chrome.permissions.contains({
+    origins: ["http://*.capsule/*"],
+  });
+  if (!allowed) {
+    console.error(
+      "CAPSULE: the extension is not allowed to act on .capsule addresses, so the redirect cannot be installed. Give it access to all .capsule sites in chrome://extensions.",
+    );
+    return;
+  }
+
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: [CAPSULE_RULE_ID],
