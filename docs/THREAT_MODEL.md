@@ -333,8 +333,17 @@ The TTL was the main retention control. Turning it off changes two things:
 
 Controls in place:
 
-- It is off by default. The operator must enable it with
-  `CAPSULE_ALLOW_PERSISTENT_CAPSULES=true`.
+- It is **on by default and bounded**, which is a deliberate change from
+  earlier versions, where it was off and the operator opted in. What replaced
+  the opt-in is the cap: a relay nobody configured accepts a gigabyte of
+  storage without expiry and an eighth of that from any one sender, so the
+  default commitment is a known quantity rather than an unbounded one. An
+  operator who does not want it sets
+  `CAPSULE_ALLOW_PERSISTENT_CAPSULES=false`.
+- The residual risk this accepts is that a relay run by somebody who never read
+  this document holds capsules with no end date. That was traded against the
+  opposite failure, which was the common one: apps offering an option that
+  almost every relay refused.
 - `CAPSULE_MAX_PERSISTENT_BYTES` bounds how much storage without expiry can
   occupy; the relay answers `507 insufficient_storage` at the cap.
 - Periodic cleanup never touches a capsule without expiry.

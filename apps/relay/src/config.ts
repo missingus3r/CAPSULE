@@ -343,10 +343,20 @@ export function loadRelayConfig(
       DEFAULTS.siteGossipLimit,
       { minimum: 0, maximum: 1000 },
     ),
+    /**
+     * On by default, bounded by `maxPersistentBytes`.
+     *
+     * It was off, which made the common case a relay that quietly refused an
+     * option the apps had already offered. The bound is what makes the default
+     * defensible: a gigabyte in total and an eighth of it per sender, so a
+     * relay nobody configured gives up a known amount of disk rather than an
+     * open-ended one. An operator who does not want to keep anything without
+     * an end date sets `CAPSULE_ALLOW_PERSISTENT_CAPSULES=false`.
+     */
     allowPersistentCapsules: booleanFromEnvironment(
       environment,
       "CAPSULE_ALLOW_PERSISTENT_CAPSULES",
-      false,
+      true,
     ),
     maxPersistentBytes,
     maxPersistentBytesPerSender: integerFromEnvironment(

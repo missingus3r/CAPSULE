@@ -115,13 +115,23 @@ node apps/cli/dist/index.js relays --seed https://relay.example.org
 
 ## 4. Capsules without expiry
 
-They are **off** by default, because storing files with no end date is a cost
-and a liability decision only the person paying for the disk can make.
+They are **on** by default, and bounded: a relay nobody configured accepts them
+up to **1 GiB in total** and **128 MiB per sender**. That bound is the point.
+Storing files with no end date is a cost, and the default answer is a known
+amount of disk rather than an open-ended promise or an option the apps offer
+and the relay then refuses.
+
+Raise the ceiling if you have the disk:
 
 ```bash
-CAPSULE_ALLOW_PERSISTENT_CAPSULES=true
 CAPSULE_MAX_PERSISTENT_BYTES=10737418240              # 10 GiB cap
 CAPSULE_MAX_PERSISTENT_BYTES_PER_SENDER=1073741824    # 1 GiB per sender
+```
+
+Or refuse them outright, which is a legitimate policy and not a degraded relay:
+
+```bash
+CAPSULE_ALLOW_PERSISTENT_CAPSULES=false
 ```
 
 The per-sender cap keeps the first person who arrives from taking all the
@@ -130,7 +140,7 @@ counts against a salted hash of the address, and the salt is discarded and
 regenerated every window: when it rotates, the counters forget. That is
 deliberate.
 
-When you enable it:
+While it is on:
 
 - the relay accepts `expiresInSeconds: null` and publishes that in
   `/v1/config`, so clients offer the option instead of trying and failing;
@@ -307,7 +317,8 @@ only network there is.
 - [ ] Data volume with monitored free space.
 - [ ] `CAPSULE_IP_BLIND=true` and a reverse proxy that does not log IPs.
 - [ ] Size and TTL limits that match your disk.
-- [ ] An explicit decision about capsules without expiry.
+- [ ] Capsules without expiry: the 1 GiB default is a decision even when you
+      leave it alone. Raise it, lower it, or turn it off, but know which.
 - [ ] An abuse policy and a contact route published.
 - [ ] `CAPSULE_ALLOW_PRIVATE_PEERS=false` (this is the anti-SSRF brake).
 - [ ] `curl /v1/info` and `/v1/peers` answer from outside your network.

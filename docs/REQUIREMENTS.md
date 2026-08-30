@@ -28,7 +28,7 @@ respectively.
 > is kept as a historical reference. Several items moved from "out of scope" to
 > "implemented": replication across relays (explicit, chosen by the sender),
 > hiding the exact size with size-class padding, hiding the IP from the relay in
-> the CLI via SOCKS5/Tor, storage without expiry when the operator enables it,
+> the CLI via SOCKS5/Tor, storage without expiry under a quota the operator sets,
 > recovery of a lost key by passphrase or `k`-of-`n` sharing, mix routing
 > (1.1), `.capsule` sites (1.2), and censorship-resistant bridges plus offline
 > and local-network operation (1.3).

@@ -179,8 +179,9 @@ that anyone wanting to contribute infrastructure can do so without asking.
 **Capsules without expiry**
 
 - `expiresAt: null` in the v2 manifest and `expiresInSeconds: null` in the API.
-- Off by default; the operator enables it and sets a quota
-  (`CAPSULE_MAX_PERSISTENT_BYTES`), with `507` when it runs out.
+- On by default under a quota (`CAPSULE_MAX_PERSISTENT_BYTES`, a gigabyte
+  unless raised), with `507` when it runs out and an operator switch to refuse
+  them entirely.
 - Periodic cleanup never touches them; only the owner capability deletes them.
 
 ### 6.1 Design still to be validated

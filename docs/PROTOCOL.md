@@ -518,8 +518,10 @@ while that relay keeps it, and the `deleteToken` withdraws it.
 
 - In v1 `expiresAt` must be a date after `createdAt`. `null` is invalid and must
   be refused.
-- A relay accepts `expiresInSeconds: null` only if its operator enabled it.
-  Otherwise it answers `400 persistent_capsules_disabled`.
+- A relay accepts `expiresInSeconds: null` unless its operator refused them.
+  Otherwise it answers `400 persistent_capsules_disabled`. Either way this is
+  policy, not protocol: a client must read `persistentCapsules` rather than
+  assume.
 - The relay exposes `persistentCapsules` in `/v1/config` and `/v1/info` so the
   client knows before encrypting.
 
