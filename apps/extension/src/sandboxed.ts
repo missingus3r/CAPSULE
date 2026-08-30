@@ -9,8 +9,14 @@
  * every reference resolved inside the bundle, everything pointing outward
  * removed — and carries its own Content-Security-Policy, which applies on top
  * of the sandbox policy rather than replacing it. `connect-src 'none'` survives
- * that combination, so a site with its scripts allowed can compute anything at
- * all and still has nowhere to send it.
+ * that combination, so a site with its scripts allowed cannot issue a request.
+ *
+ * It is not sealed, and the visitor is warned before this frame is ever used:
+ * links are rewritten with `target="_top"`, so the frame must be allowed to
+ * navigate the tab on a click, and a script can take that click somewhere of
+ * its own choosing. A navigation is not a request and no CSP directive has
+ * covered one since `navigate-to` left the standard. That is the price of
+ * turning scripts on, and it is why they are off by default.
  */
 
 const RENDER = "capsule:render";
