@@ -1,11 +1,11 @@
 # CAPSULE
 
-**A file the relay cannot read. A website nobody can rewrite.**
+**You pay for the connection. Everything past it should belong to everyone.**
 
-CAPSULE encrypts a file in your browser, uploads only the ciphertext to a server
-anyone can run, and puts the key in the part of the link that browsers never
-send to a server. The same machinery publishes websites under a `.capsule`
-address whose name _is_ its own key.
+A free, decentralised network where anyone can launch their own domain, share
+files with no account and no identity attached, and stay reachable when the
+Internet is not. If you already pay to be online, what is inside it should not
+be for sale.
 
 📄 [Full showcase page](https://missingus3r.github.io/CAPSULE/) · 🔒 [Threat model](docs/THREAT_MODEL.md) · 📊 [Compared to 21 other networks](docs/COMPARISON.md)
 
@@ -13,65 +13,80 @@ address whose name _is_ its own key.
 
 ## What is it
 
-Two tools built on one idea: **a server should be able to hold your data without
-being able to read it, and the thing that unlocks it should never travel the
-same road.**
+Four things you should not have to rent:
+
+- **A domain** nobody issues you and nobody can take back — `<key>.capsule`,
+  where the key _is_ the name. No registrar, no certificate, no renewal.
+- **A place to put files** that does not want to know who you are. No account,
+  no identifier, nothing to sign up for.
+- **A way to reach both** that keeps working when somebody decides it should
+  not — unlisted bridges a censor's probe cannot recognise.
+- **A way to hand something over** when there is no network at all.
 
 ![How a capsule travels](docs/diagrams/capsule-flow.svg)
+
+The mechanism underneath all four is one idea: **a server should be able to
+hold your data without being able to read it, and the thing that unlocks it
+should never travel the same road.**
 
 **Send a file.** It is encrypted on your device with AES-256-GCM. The relay
 stores bytes it cannot decrypt. The key lives in the `#fragment` of the share
 link — the one part of a URL that, by specification, is never sent to a server.
 The person you send it to needs nothing installed.
 
-**Publish a site.** Point the same machinery at a folder and you get a website at
-`<key>.capsule`. There is nothing to register, no certificate to renew, and no
-authority that could be asked to hand your name to somebody else — because the
-name and the signing key are the same object.
+**Publish a site.** Point the same machinery at a folder and you get a website
+at `<key>.capsule`. There is nothing to register, no certificate to renew, no
+bill, and no authority that could be asked to hand your name to somebody else —
+because the name and the signing key are the same object.
 
 ## Why
 
-Every mainstream file service encrypts in transit and at rest. What none of them
-give up is the ability to read the file, and that ability is what gets
+Every mainstream file service encrypts in transit and at rest. What none of
+them give up is the ability to read the file, and that ability is what gets
 subpoenaed, breached, scanned and sold. The interesting question is not "is it
 encrypted" but **who holds the key**.
 
 Publishing has the same shape. A domain is rented, a certificate is issued, a
 host serves the bytes — three parties, any of whom can be leaned on to make a
-page disappear or say something else.
+page disappear or say something else, and all three send an invoice.
 
 > A relay that _could_ read your file eventually _will_ be asked to.
 
 CAPSULE's answer is to give the server less to hold: ciphertext of an unknown
 size, with no account attached, for a bounded time, and — if you ask — split
-across several relays so no single one has enough to rebuild anything.
+across several relays so no single one has enough to rebuild anything. Nobody
+sells you a name, because nobody issues one. Nobody bills you for storage,
+because a relay is a process somebody chose to run.
 
 ## Compared
 
-|                                       | CAPSULE | Tor | IPFS | Nostr | Matrix | Briar |
-| ------------------------------------- | :-----: | :-: | :--: | :---: | :----: | :---: |
-| Server cannot read the content        |   ✅    |  ~  |  ❌  |  ❌   |   ~    |  ✅   |
-| No account, no identifier             |   ✅    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
-| Content size hidden from the host     |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ❌   |
-| Resists end-to-end timing correlation |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |   ~   |
-| Split so no single host has enough    |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ❌   |
-| Self-certifying site names            |   ✅    | ✅  |  ~   |  ❌   |   ❌   |  ❌   |
-| Pages cannot phone home               |   ✅    |  ~  |  ❌  |  ❌   |   ❌   |  ❌   |
-| **Works with no internet at all**     |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ✅   |
-| **Censorship-resistant transport**    |   ✅    | ✅  |  ~   |   ~   |   ❌   |  ✅   |
-| **General-purpose TCP tunnel**        |   🚧    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
-| **Large anonymity set today**         |   ❌    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
+|                                                  | CAPSULE | Tor | IPFS | Nostr | Matrix | Briar |
+| ------------------------------------------------ | :-----: | :-: | :--: | :---: | :----: | :---: |
+| Server cannot read the content                   |   ✅    |  ~  |  ❌  |  ❌   |   ~    |  ✅   |
+| No account, no identifier                        |   ✅    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
+| Content size hidden from the host                |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ❌   |
+| Resists end-to-end timing correlation            |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |   ~   |
+| Split so no single host has enough               |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ❌   |
+| Self-certifying site names                       |   ✅    | ✅  |  ~   |  ❌   |   ❌   |  ❌   |
+| Pages cannot phone home                          |   ✅    |  ~  |  ❌  |  ❌   |   ❌   |  ❌   |
+| **Works with no internet at all**                |   ✅    | ❌  |  ❌  |  ❌   |   ❌   |  ✅   |
+| **Censorship-resistant transport**               |   ✅    | ✅  |  ~   |   ~   |   ❌   |  ✅   |
+| **General-purpose TCP tunnel**                   |   🚧    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
+| **Designed for anonymity that grows with users** |   ✅    |  ~  |  ❌  |  ❌   |   ❌   |   ~   |
 
 🚧 designed, not built — [ROADMAP.md](docs/ROADMAP.md) §16.1.
 
-The last row is the honest one, and it is not an engineering problem. The
-anonymity set is how many people use the network right now; Tor has one after
-fifteen years of adoption. CAPSULE cannot even measure its own, because there
-are no accounts and no counters — `capsule network` reports the network's
-_capacity_ instead, and says so. What code can do there, 1.3 did: every
-manifest is now padded to a size class so capsules stop being distinguishable
-from each other. The rest is adoption, and the most useful thing you can do
-about it is run a relay.
+That last row is about the architecture: every packet is the same size, every
+hop holds it a random time, every node emits cover traffic, and since 1.3 every
+manifest is padded so two capsules are indistinguishable from each other.
+Nothing in the design caps how good it gets as people join.
+
+**What it is today is a different question**, and it is the honest weak point:
+the network is small, so the protection is small. CAPSULE cannot even measure
+its own anonymity set — there are no accounts and no counters, so there is
+nobody to count — and `capsule network` reports the ceiling instead. The CLI
+prints that number before every mixed send. That part is adoption rather than
+engineering, and the most useful thing you can do about it is run a relay.
 
 All 21 systems, one limitation each, with a verdict for every row:
 [docs/COMPARISON.md](docs/COMPARISON.md).

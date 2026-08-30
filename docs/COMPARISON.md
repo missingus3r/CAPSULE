@@ -5,9 +5,9 @@
 
 This document goes through the stated limitation of every network on the map,
 one at a time, and says whether CAPSULE addresses it, partly addresses it, or
-does not. As of 1.3 the count is thirteen yes, five partly, two that do not
-apply and one no — and that last one is the one that matters most, so it is
-explained at length rather than buried.
+does not. As of 1.3 the count is twelve yes, seven partly and two that do not
+apply. There is a separate section at the end on the one thing no amount of
+code fixes, because it is the most important paragraph here.
 
 Two warnings that apply to everything below:
 
@@ -77,36 +77,45 @@ people switch on splits everyone into those who did and those who did not.
 what the live network can offer, and the CLI prints it again before every mixed
 send. It also says plainly what it cannot measure, which is the next section.
 
-## The one that is not covered, and cannot be by code
+## Anonymity: what the design does, and what only adoption can
 
-**A large anonymity set today.**
+The architecture is built so that anonymity improves as people join. Every mix
+packet is the same 65,920 bytes whatever it carries; every hop holds it for a
+random time drawn from an exponential distribution; every node emits cover
+loops indistinguishable from real traffic; there are no accounts or
+identifiers to partition users by; and since 1.3 every encrypted manifest is
+padded to a size class, so two capsules are indistinguishable from each other
+rather than differing by the length of a filename. Nothing in the design caps
+how good it gets.
 
-This row is not marked yes and will not be, because it is not an engineering
-property. The anonymity set is _how many people a message could plausibly have
-come from_. It is a fact about how many people use the network right now. Tor
-has it after fifteen years of adoption, funding and community — not because of
-a feature somebody shipped.
+That last one is worth dwelling on, because it is the shape of all such work:
+**manifest padding is unconditional.** An anonymity feature that some senders
+switch on splits everyone into those who did and those who did not, and each
+group is smaller than the whole. Uniformity only helps when it is not a choice.
 
-CAPSULE cannot even measure its own. There are no accounts, no sessions and no
-counters — that is the entire point of the project — so there is nobody to
-count. What `capsule network` reports is the network's _capacity_ to provide
-anonymity: relays reachable, apparent operators, mix nodes, mix operators. That
-is a ceiling, not the number. With one operator the ceiling is one, whatever
-the traffic looks like.
+**What the network is today is a different question, and it is the honest weak
+point.** The set is small, so the protection is small. Four nodes under one
+operator are not an anonymity network; they are a way for a relay not to see
+your IP.
 
-What engineering _can_ do here, and what 1.3 does:
+CAPSULE cannot even measure its own anonymity set. There are no accounts, no
+sessions and no counters — that is the point of the project — so there is
+nobody to count. `capsule network` reports the _ceiling_ instead: relays
+reachable, apparent operators, mix nodes, mix operators. With one operator the
+ceiling is one, whatever the traffic looks like, and the CLI prints that number
+before every mixed send rather than implying a guarantee.
 
-- **Make clients indistinguishable from each other.** If two users' traffic
-  differs, the effective set is smaller than the user count. Manifest padding
-  landed in 1.3 for exactly this reason, and it is unconditional so that it
-  cannot partition anybody.
-- **Report the ceiling honestly**, before each send, instead of implying a
-  guarantee.
-- **Make joining cheap**, so the number can grow: a relay is one process, with
-  no registration and nobody to ask.
+So the honest split is:
 
-The rest is adoption. The single most useful thing anyone reading this can do
-about that row is run a relay.
+|                                   | Where it stands                                          |
+| --------------------------------- | -------------------------------------------------------- |
+| Does the design scale with users? | Yes, and that is what the table row claims               |
+| Is the set large today?           | No. It is the smallest of any system here                |
+| Can code fix that?                | No. It is adoption                                       |
+| What helps?                       | Running a relay, in a jurisdiction the others are not in |
+
+[MIXNET.md](./MIXNET.md) leads with this rather than burying it, and so does
+the _Limits_ section of the showcase page.
 
 ## Work in progress
 

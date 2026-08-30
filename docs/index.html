@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>CAPSULE — private file transfer and websites with no server</title>
+    <title>CAPSULE — a free network for files and websites with no server</title>
     <meta
       name="description"
-      content="CAPSULE encrypts a file in your browser, stores only ciphertext on relays anyone can run, and puts the key in a link fragment that never reaches a server. It also publishes websites under a .capsule name that is its own key, readable in any Chromium browser."
+      content="A free, decentralised network where anyone can launch their own .capsule domain, share files with no account and no identity attached, and stay reachable when the Internet is not. Encryption happens in your browser; relays store ciphertext they cannot read."
     />
     <meta
       name="keywords"
@@ -24,11 +24,11 @@
     <meta property="og:site_name" content="CAPSULE" />
     <meta
       property="og:title"
-      content="CAPSULE — private file transfer and websites with no server"
+      content="CAPSULE — a free network for files and websites with no server"
     />
     <meta
       property="og:description"
-      content="A file encrypted in your browser, stored as ciphertext on relays anyone can run, opened by a key that never touches a server. And websites whose name is their own key."
+      content="You pay for the connection. Everything past it should belong to everyone: your own domain, files with no account attached, and a network that still works when the Internet does not."
     />
     <meta property="og:url" content="https://missingus3r.github.io/CAPSULE/" />
     <meta property="og:locale" content="en_US" />
@@ -36,11 +36,11 @@
     <meta name="twitter:creator" content="@missingus3r" />
     <meta
       name="twitter:title"
-      content="CAPSULE — private file transfer and websites with no server"
+      content="CAPSULE — a free network for files and websites with no server"
     />
     <meta
       name="twitter:description"
-      content="A file encrypted in your browser, stored as ciphertext on relays anyone can run, opened by a key that never touches a server."
+      content="You pay for the connection. Everything past it should belong to everyone."
     />
 
     <link
@@ -932,13 +932,14 @@
     <header class="hero wrap" id="top">
       <div class="eyebrow">Version 1.3 · MPL-2.0 · Unaudited</div>
       <h1>
-        A file the relay <b>cannot read</b>. A site nobody <b>can rewrite</b>.
+        You pay for the connection. <b>Everything past it</b> should belong to
+        everyone.
       </h1>
       <p class="lede">
-        CAPSULE encrypts in your browser, stores only ciphertext on relays
-        anyone can run, and puts the key in the part of the link that never
-        reaches a server. The same machinery publishes websites under a name
-        that <em>is</em> its own key.
+        A free, decentralised network where anyone can launch their own domain,
+        share files with no account and no identity attached, and stay reachable
+        when the Internet is not. If you already pay to be online, what is
+        inside it should not be for sale.
       </p>
       <div class="hero-meta">
         <div>Cipher<b>AES-256-GCM</b></div>
@@ -953,21 +954,28 @@
 
     <section id="what" class="wrap">
       <div class="kicker">01 — What it is</div>
-      <h2>Two things, built on <b>one idea</b></h2>
+      <h2>Four things you should not have to <b>rent</b></h2>
       <p class="body">
-        The idea is that a server should be able to hold your data without being
-        able to read it, and that the thing which unlocks it should never travel
-        the same road. CAPSULE encrypts a file in the browser, uploads the
-        ciphertext to a relay, and puts the key in the URL
-        <code class="inline">#fragment</code> — the one part of a link that
+        <b>A domain</b> nobody issues you and nobody can take back.
+        <b>A place to put files</b> that does not want to know who you are.
+        <b>A way to reach both</b> that keeps working when somebody decides it
+        should not. And <b>a way to hand something over</b> when there is no
+        network at all.
+      </p>
+      <p class="body">
+        The mechanism underneath all four is one idea: a server should be able
+        to hold your data without being able to read it, and the thing that
+        unlocks it should never travel the same road. CAPSULE encrypts a file in
+        the browser, uploads the ciphertext to a relay, and puts the key in the
+        URL <code class="inline">#fragment</code> — the one part of a link that
         browsers, by specification, never send to a server.
       </p>
       <p class="body">
         Point that same machinery at a folder instead of a file and you get a
         website. Its address is <code class="inline">&lt;key&gt;.capsule</code>,
         where the key is an Ed25519 public key written in base32. There is
-        nothing to register, no certificate to renew, and no authority that
-        could be asked to hand the name to someone else.
+        nothing to register, no certificate to renew, no bill, and no authority
+        that could be asked to hand the name to someone else.
       </p>
 
       <div class="caps">
@@ -1336,13 +1344,13 @@
               <td><span class="no">—</span></td>
             </tr>
             <tr>
-              <td class="feat">Large anonymity set today</td>
-              <td class="me"><span class="no">—</span></td>
-              <td><span class="yes">✓</span></td>
+              <td class="feat">Designed for anonymity that grows with users</td>
+              <td class="me"><span class="yes">✓</span></td>
+              <td><span class="partial">~</span></td>
               <td><span class="no">—</span></td>
               <td><span class="no">—</span></td>
               <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="partial">~</span></td>
             </tr>
           </tbody>
         </table>
@@ -1350,8 +1358,8 @@
       <p class="compare-note">
         ✓ by design and tested &nbsp;·&nbsp; ~ partly &nbsp;·&nbsp; WIP
         designed, not built &nbsp;·&nbsp; — not addressed.<br />
-        The last row is the honest one, and it is not an engineering problem:
-        an anonymity set is how many people use a network today.
+        This table is about design. What the network is <em>today</em> — small,
+        and therefore weak where it counts — is section 07.
       </p>
 
       <button class="open-modal" data-modal="m-compare">
@@ -1792,8 +1800,8 @@ capsule-id/
       <div class="modal-body">
         <p>
           The stated limitation of each system, and whether CAPSULE addresses
-          it. Thirteen yes, five partly, two that do not apply, and one no.
-          That last one is explained at the bottom; it is the honest part.
+          it. Twelve yes, seven partly and two that do not apply — and a
+          separate note below on the one thing no code fixes.
         </p>
         <table>
           <tr>
@@ -1918,19 +1926,26 @@ capsule-id/
             <td class="v v-no">n/a</td>
           </tr>
         </table>
-        <h4>The one CAPSULE does not cover</h4>
+        <h4>What that last row means, and what it does not</h4>
         <p>
-          <b>A large anonymity set today.</b> Not an engineering property: it is
-          how many people use the network right now, and Tor has one after
-          fifteen years of adoption. CAPSULE cannot even measure its own —
-          there are no accounts and no counters, so there is nobody to count.
+          The architecture is built so that anonymity improves as people join:
+          every packet is the same size, every hop holds it a random time, every
+          node emits cover traffic, and since 1.3 every manifest is padded to a
+          size class so two capsules are indistinguishable from each other.
+          Nothing in the design caps how good it gets.
         </p>
         <p>
-          What code can do there, 1.3 did: manifests are padded to a size class
-          so capsules stop being distinguishable from one another, and it is
-          unconditional so it cannot split the population into those who
-          switched it on and those who did not. The rest is adoption, and the
-          most useful thing anyone reading this can do about it is run a relay.
+          <b>What it is today is a different question.</b> An anonymity set is
+          how many people a message could have come from, and CAPSULE cannot
+          even measure its own — there are no accounts and no counters, so there
+          is nobody to count. <code>capsule network</code> reports the ceiling
+          instead: relays reachable, apparent operators, mix nodes. With one
+          operator the ceiling is one, whatever the design says. The CLI prints
+          that number before every mixed send rather than implying a guarantee.
+        </p>
+        <p>
+          That part is adoption, not engineering, and the most useful thing
+          anyone reading this can do about it is run a relay.
         </p>
         <h4>Work in progress</h4>
         <p>
