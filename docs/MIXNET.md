@@ -2,7 +2,7 @@
 
 **Status:** implemented and working; no external audit
 **Date:** 2026-08-30
-**Scope:** relays as mix nodes, the CLI as client
+**Scope:** relays as mix nodes, the CLI and the web app as clients
 
 ## 1. First, because it changes everything else
 
@@ -225,10 +225,17 @@ look at who operates the relays, not how many there are.
 connections to a relay. That is what Tor underneath, or a bridge, is for — see
 [CENSORSHIP.md](./CENSORSHIP.md).
 
-**It does not work in the browser yet.** The web app and the extension still
-talk directly to their relays. The network needs X25519 in Web Crypto, which is
-only now arriving in browsers; until then `--mix` is CLI-only, and saying
-otherwise would be false.
+**The extension still talks to its relays directly.** The web app no longer
+does — mix routing is a switch beside anonymous mode — but a `.capsule` site is
+still fetched straight from a relay, so a relay still sees an address asking
+for a name. That is [SITES.md](./SITES.md) §7, and it is the larger of the two
+gaps that remain here.
+
+The packet layer itself is no longer the obstacle. It used to be built on
+`node:crypto`, which meant it could not run in a page at all; it is built on
+the audited `@noble` implementations now, produces byte-identical packets, and
+`test/interop.test.ts` pins that so an older relay and a newer one keep
+understanding each other.
 
 **It has no formal analysis and no audit.** The constructions are published and
 used as specified, but _this_ composition has not been reviewed by anyone

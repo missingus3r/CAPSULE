@@ -1,6 +1,7 @@
 import { FileUp, FolderOpen, RefreshCw, X } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
-import { formatBytes, formatMimeType } from "../lib/ui";
+import { useI18n } from "../i18n";
+import { formatBytes, mimeTypeKey } from "../lib/ui";
 
 interface DropZoneProps {
   file: File | null;
@@ -11,6 +12,7 @@ interface DropZoneProps {
 export function DropZone({ file, disabled = false, onFile }: DropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const { locale, t } = useI18n();
 
   const pickFirstFile = (files: FileList | null) => {
     const nextFile = files?.item(0) ?? null;
@@ -24,6 +26,7 @@ export function DropZone({ file, disabled = false, onFile }: DropZoneProps) {
   };
 
   if (file) {
+    const typeKey = mimeTypeKey(file.type);
     return (
       <div className="selected-file" data-testid="selected-file">
         <div className="file-icon" aria-hidden="true">
@@ -32,13 +35,14 @@ export function DropZone({ file, disabled = false, onFile }: DropZoneProps) {
         <div className="file-copy">
           <strong title={file.name}>{file.name}</strong>
           <span>
-            {formatBytes(file.size)} · {formatMimeType(file.type)}
+            {formatBytes(file.size, locale) || t("size.unknown")} ·{" "}
+            {typeKey ? t(typeKey) : file.type}
           </span>
         </div>
         <button
           className="icon-button"
           type="button"
-          aria-label="Quitar archivo"
+          aria-label={t("drop.remove")}
           disabled={disabled}
           onClick={() => onFile(null)}
         >
@@ -51,7 +55,7 @@ export function DropZone({ file, disabled = false, onFile }: DropZoneProps) {
           onClick={() => inputRef.current?.click()}
         >
           <RefreshCw size={15} />
-          Cambiar
+          {t("drop.replace")}
         </button>
         <input
           ref={inputRef}
@@ -90,8 +94,8 @@ export function DropZone({ file, disabled = false, onFile }: DropZoneProps) {
         <span className="drop-icon" aria-hidden="true">
           <FolderOpen size={26} strokeWidth={1.8} />
         </span>
-        <strong>{dragging ? "Soltalo acá" : "Elegí un archivo"}</strong>
-        <span>o arrastralo hasta acá</span>
+        <strong>{dragging ? t("drop.dragging") : t("drop.choose")}</strong>
+        <span>{t("drop.hint")}</span>
       </label>
     </div>
   );

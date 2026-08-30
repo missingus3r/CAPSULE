@@ -150,8 +150,8 @@ later; it is the shape of the thing.
 service learns who asked. This is the honest weak point of `.capsule` sites
 today, and it is recorded in [SITES.md](./SITES.md) §7: the extension queries
 relays directly from the browser, so **a relay sees an IP address asking about a
-name**. The CLI can route through the mix network with `--mix` or through Tor
-with `--tor`; the extension cannot, because the mix layer needs Node.
+name**. The CLI routes through the mix network with `--mix`, and the web app now
+does too; the extension has not been wired to it yet.
 
 **Its names cannot be enumerated.** Onion v3 fixed this deliberately — a blinded
 key means an HSDir stores a descriptor without being able to tell which service

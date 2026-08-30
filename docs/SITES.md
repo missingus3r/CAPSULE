@@ -262,8 +262,10 @@ necessary.
 
 **The visitor is still exposed to the relay.** The extension queries relays
 directly from the browser, so a relay sees an IP address asking about a name.
-The CLI can go through the mix network; the extension cannot, because that
-requires Node. This is the most important gap in this version.
+The CLI and the web app both route through the mix network; the extension has
+not been wired to it. What used to make this impossible — the packet layer
+needing `node:crypto` — is fixed, so this is now work rather than a blocker.
+It remains the most important gap in this version.
 
 **No cache between sessions.** The bundle is kept in
 `chrome.storage.session`, which lives in memory and is cleared when the browser

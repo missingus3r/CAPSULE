@@ -51,8 +51,41 @@ what stopped being true. The format follows
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
 
+### Added
+
+- **The web app can route through the mix network.** A switch beside anonymous
+  mode sends every request over three hops, so the relay storing the capsule
+  never learns who uploaded or fetched it — the thing `--mix` has done in the
+  CLI since 1.1. Under the switch it prints what the live network actually
+  offers, because a four-node network is not anonymity and should not be sold
+  as it. The switch is off when no relay in reach forwards for others, and says
+  so rather than failing at upload.
+
 ### Changed
 
+- **The mix packet layer runs in a browser.** It was built on `node:crypto`,
+  which is the whole reason mix routing was CLI-only: X25519, HKDF, AES-CTR and
+  HMAC now come from the audited `@noble` packages, and the byte helpers from
+  `@capsule/protocol`, which the browser already had. **Nothing about the wire
+  format changed** — every primitive was compared against what `node:crypto`
+  produced, a packet built by either version is processed by the other, and
+  `packages/mixnet/test/interop.test.ts` pins those bytes so a relay on an older
+  version and one on a newer version cannot drift apart. The functions stayed
+  synchronous: Web Crypto has no synchronous form and cannot derive a public key
+  from a private one, so using it would have turned the packet layer into
+  promises for no gain.
+- **Capsules without expiry are accepted by default.**
+  `CAPSULE_ALLOW_PERSISTENT_CAPSULES` was `false`, so the ordinary relay refused
+  an option the apps had already put in front of the sender, and the web app
+  showed "no expiry" as unavailable on almost every relay there was. It is now
+  `true`, bounded by the quota that was already there: 1 GiB in total and
+  128 MiB per sender unless the operator raises it. An operator who does not
+  want to hold anything with no end date sets it to `false`, and the apps go
+  back to showing the option as unavailable rather than failing at upload.
+  Relays already running are unaffected until they restart, and one that set
+  the variable explicitly keeps what it set. The reasoning, and the residual
+  risk this accepts, are in
+  [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) §12.2.
 - The publishing examples asked for `--ttl 30d`, which a relay with the default
   seven-day ceiling refuses. They ask for `--ttl 7d`, and the ceiling is named
   where it bites.

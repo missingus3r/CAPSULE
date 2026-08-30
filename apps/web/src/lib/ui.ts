@@ -1,4 +1,5 @@
 import { decodeShareCapability } from "@capsule/protocol";
+import type { Locale, MessageKey } from "../i18n";
 
 export interface DisplayMetadata {
   filename: string;
@@ -11,8 +12,12 @@ export interface DisplayMetadata {
   note?: string;
 }
 
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "Tamaño desconocido";
+/**
+ * Byte sizes and dates are formatted by the platform rather than by hand, so
+ * a Portuguese reader gets a comma where they expect one.
+ */
+export function formatBytes(bytes: number, locale: Locale = "en"): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "";
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB", "TB"];
   let value = bytes / 1024;
@@ -21,36 +26,47 @@ export function formatBytes(bytes: number): string {
     value /= 1024;
     unit = units[index];
   }
-  const digits = value >= 10 ? 1 : 2;
-  return `${value.toFixed(digits).replace(/\.0+$/u, "")} ${unit}`;
+  const formatted = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: value >= 10 ? 1 : 2,
+  }).format(value);
+  return `${formatted} ${unit}`;
 }
 
-export function formatDate(value?: string): string | undefined {
+export function formatDate(
+  value?: string,
+  locale: Locale = "en",
+): string | undefined {
   if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
-  return new Intl.DateTimeFormat("es-UY", {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-export function formatMimeType(mimeType: string): string {
-  if (!mimeType || mimeType === "application/octet-stream") return "Archivo";
-  const [family, detail] = mimeType.split("/");
-  if (!detail) return mimeType;
-  const friendly: Record<string, string> = {
-    pdf: "Documento PDF",
-    jpeg: "Imagen JPEG",
-    jpg: "Imagen JPG",
-    png: "Imagen PNG",
-    webp: "Imagen WebP",
-    mp4: "Video MP4",
-    mpeg: "Audio MPEG",
-    zip: "Archivo ZIP",
-    plain: "Texto",
+/**
+ * A mime type reduced to something worth reading, as a message key where one
+ * exists. Anything unrecognised keeps its own name: inventing a label for it
+ * would say less than the type already does.
+ */
+export function mimeTypeKey(mimeType: string): MessageKey | undefined {
+  if (!mimeType || mimeType === "application/octet-stream") {
+    return "mime.generic";
+  }
+  const detail = mimeType.split("/")[1];
+  const known: Record<string, MessageKey> = {
+    pdf: "mime.pdf",
+    jpeg: "mime.jpeg",
+    jpg: "mime.jpeg",
+    png: "mime.png",
+    gif: "mime.gif",
+    webp: "mime.webp",
+    mp4: "mime.mp4",
+    zip: "mime.zip",
+    plain: "mime.plain",
   };
-  return friendly[detail] ?? `${family} · ${detail.toUpperCase()}`;
+  return detail ? known[detail] : undefined;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -186,17 +202,24 @@ export function extractCapability(input: string): string | null {
   }
 }
 
-export function friendlyError(
+/**
+ * Maps a failure onto a message key.
+ *
+ * The key rather than the sentence, so the caller renders it in the reader's
+ * language. The matching is on the SDK's own English messages, which is why it
+ * stays here and not in a dictionary.
+ */
+export function errorKey(
   error: unknown,
   action: "upload" | "download",
-): string {
+): MessageKey {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
 
   if (message.includes("expired") || message.includes("410")) {
-    return "Esta cápsula ya venció y dejó de estar disponible.";
+    return "error.expired";
   }
   if (message.includes("not found") || message.includes("404")) {
-    return "No encontramos esta cápsula. Puede haber vencido o haber sido retirada.";
+    return "error.notFound";
   }
   if (
     message.includes("limit") ||
@@ -205,7 +228,7 @@ export function friendlyError(
     message.includes("payload") ||
     message.includes("413")
   ) {
-    return "El archivo o el vencimiento supera el límite de este relay.";
+    return "error.tooLarge";
   }
   if (
     message.includes("authentication") ||
@@ -214,22 +237,20 @@ export function friendlyError(
     message.includes("fragment") ||
     message.includes("invalid")
   ) {
-    return "El enlace está incompleto o el archivo no pudo verificarse. Pedí un enlace nuevo.";
+    return "error.authentication";
   }
   if (
     message.includes("network") ||
     message.includes("fetch") ||
     message.includes("offline")
   ) {
-    // A browser hides the difference between "the relay is down" and "the relay
-    // refused this origin", so the message has to name both. The second is the
-    // likelier one on a machine where the relay is clearly running.
-    return "No pudimos conectar con el relay. Si está corriendo, suele ser que no acepta el origen desde el que abriste esta página: probá con la misma dirección que anuncia (localhost y 127.0.0.1 son orígenes distintos), o poné CAPSULE_CORS_ORIGIN en el relay.";
+    // A browser hides the difference between "the relay is down" and "the
+    // relay refused this origin", so the message names both. The second is the
+    // likelier one on a machine where the relay is plainly running.
+    return "error.network";
   }
 
-  return action === "upload"
-    ? "No pudimos preparar la cápsula. El archivo sigue en tu dispositivo; podés intentar otra vez."
-    : "No pudimos abrir la cápsula. Probá nuevamente o pedí un enlace nuevo.";
+  return action === "upload" ? "error.uploadGeneric" : "error.downloadGeneric";
 }
 
 export async function copyText(value: string): Promise<boolean> {

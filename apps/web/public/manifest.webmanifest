@@ -1,7 +1,8 @@
 {
   "name": "CAPSULE",
   "short_name": "CAPSULE",
-  "description": "Archivos cifrados, compartidos por enlace y con vencimiento.",
+  "lang": "en",
+  "description": "Encrypted files, shared by link, with an expiry date.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f4f0e8",

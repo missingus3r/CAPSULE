@@ -10,6 +10,11 @@ import {
   type RelayPublicConfig,
 } from "@capsule/sdk";
 import {
+  buildMixNetwork,
+  type MixNetwork,
+  type MixNetworkStrength,
+} from "@capsule/mixnet";
+import {
   decodeShareCapability,
   encodeOwnerCapability,
   isPublicRelayOrigin,
@@ -35,21 +40,21 @@ import {
   RotateCcw,
   Send,
   Server,
-  ShieldCheck,
   Shuffle,
-  Sparkles,
   TriangleAlert,
+  Waypoints,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DropZone } from "./components/DropZone";
 import { ProgressState } from "./components/ProgressState";
+import { CATALOGUES, LOCALES, useI18n, useT, type MessageKey } from "./i18n";
 import {
   copyText,
+  errorKey,
   extractCapability,
   formatBytes,
   formatDate,
-  formatMimeType,
-  friendlyError,
+  mimeTypeKey,
   normalizeMetadata,
   normalizeProgress,
   type DisplayMetadata,
@@ -60,9 +65,8 @@ type SendStage = "form" | "uploading" | "success" | "error";
 type ReceiveStage = "empty" | "downloading" | "ready" | "error";
 
 interface ExpiryOption {
-  label: string;
-  shortLabel: string;
-  detail: string;
+  labelKey: MessageKey;
+  shortKey: MessageKey;
   /** `null` asks the relay to keep the capsule until it is deleted. */
   seconds: number | null;
 }
@@ -84,33 +88,32 @@ interface ReceivedCapsule {
 }
 
 const EXPIRY_OPTIONS: ExpiryOption[] = [
+  { labelKey: "expiry.hour", shortKey: "expiry.hour.short", seconds: 60 * 60 },
   {
-    label: "Una hora",
-    shortLabel: "1 h",
-    detail: "Para pasar algo ahora",
-    seconds: 60 * 60,
-  },
-  {
-    label: "Un día",
-    shortLabel: "24 h",
-    detail: "La opción más práctica",
+    labelKey: "expiry.day",
+    shortKey: "expiry.day.short",
     seconds: 24 * 60 * 60,
   },
   {
-    label: "Siete días",
-    shortLabel: "7 días",
-    detail: "Para dar más tiempo",
+    labelKey: "expiry.week",
+    shortKey: "expiry.week.short",
     seconds: 7 * 24 * 60 * 60,
   },
-  {
-    label: "Sin vencimiento",
-    shortLabel: "Sin límite",
-    detail: "Queda hasta que la borres",
-    seconds: null,
-  },
+  { labelKey: "expiry.never", shortKey: "expiry.never.short", seconds: null },
 ];
 
 const DEFAULT_RELAY_URL = "http://localhost:8787";
+
+/**
+ * Mix routing defaults, matching what the CLI uses without a flag.
+ *
+ * The delay is the whole point rather than a cost to tune away: a hop that
+ * forwards immediately is a hop an observer can pair up by timing. Three hops
+ * at two seconds each way is minutes, not milliseconds, and the interface says
+ * so before the transfer starts.
+ */
+const MIX_HOPS = 3;
+const MIX_MEAN_DELAY_MS = 2_000;
 
 function getPublicAppUrl(): string {
   const configured = import.meta.env.VITE_PUBLIC_APP_URL?.trim();
@@ -132,6 +135,57 @@ function Brand() {
   );
 }
 
+/**
+ * Renders a translated line carrying one placeholder that belongs in a
+ * `<code>` element. Splitting it here keeps markup out of the dictionaries,
+ * where a translator would have to copy tags around by hand.
+ */
+function WithCode({
+  text,
+  name,
+  value,
+}: {
+  text: string;
+  name: string;
+  value: string;
+}) {
+  const [before = "", after = ""] = text.split(`{${name}}`);
+  return (
+    <>
+      {before}
+      <code>{value}</code>
+      {after}
+    </>
+  );
+}
+
+/** Each language is offered in its own name, not translated into the current one. */
+function LanguageSwitcher() {
+  const { locale, setLocale, t } = useI18n();
+  return (
+    <div
+      className="language-switcher"
+      role="group"
+      aria-label={t("lang.switch")}
+    >
+      {LOCALES.map((option) => (
+        <button
+          key={option}
+          type="button"
+          lang={option}
+          aria-pressed={option === locale}
+          className={option === locale ? "active" : ""}
+          aria-label={CATALOGUES[option]["lang.name"]}
+          title={CATALOGUES[option]["lang.name"]}
+          onClick={() => setLocale(option)}
+        >
+          {option.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function NetworkPanel({
   relays,
   relayUrl,
@@ -139,18 +193,18 @@ function NetworkPanel({
   relays: RelayInfo[];
   relayUrl: string;
 }) {
+  const t = useT();
   const known = relays.length > 0 ? relays : null;
   return (
     <section className="network-panel" aria-labelledby="network-title">
-      <div className="aside-eyebrow">
-        <Server size={16} />
-        La red
-      </div>
-      <h3 id="network-title">Cualquiera puede levantar un relay</h3>
+      <div className="aside-eyebrow">{t("network.eyebrow")}</div>
+      <h3 id="network-title">{t("network.title")}</h3>
       <p>
-        No hay registro ni permiso: se levanta un relay, se lo apunta a otro que
-        ya conozcas y ambos se presentan. Esta app usa{" "}
-        <code>{new URL(relayUrl).host}</code> y descubre el resto desde ahí.
+        <WithCode
+          text={t("network.body")}
+          name="host"
+          value={new URL(relayUrl).host}
+        />
       </p>
       {known ? (
         <ul className="relay-list">
@@ -158,16 +212,16 @@ function NetworkPanel({
             <li key={relay.relayId}>
               <strong>{relay.nickname ?? new URL(relay.url).host}</strong>
               <span>
-                {relay.persistentCapsules ? "sin vencimiento" : "sólo temporal"}{" "}
-                · {relay.peerCount} vecinos
+                {relay.persistentCapsules
+                  ? t("network.persistent")
+                  : t("network.temporary")}{" "}
+                · {t("network.peers", { count: relay.peerCount })}
               </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="relay-empty">
-          Todavía no respondió ningún relay de la red.
-        </p>
+        <p className="relay-empty">{t("network.empty")}</p>
       )}
     </section>
   );
@@ -180,47 +234,31 @@ function PrivacyAside({
   relays: RelayInfo[];
   relayUrl: string;
 }) {
+  const t = useT();
+  const steps = [1, 2, 3] as const;
   return (
     <aside className="privacy-aside" aria-labelledby="privacy-title">
-      <div className="aside-eyebrow">
-        <ShieldCheck size={16} />
-        Privacidad, sin letra chica
-      </div>
-      <h2 id="privacy-title">
-        El archivo sale cerrado. La llave viaja en el enlace.
-      </h2>
-      <div className="privacy-steps" aria-label="Cómo funciona">
-        <div>
-          <span>1</span>
-          <p>
-            <strong>Se cifra acá</strong>
-            Antes de subir, dentro de tu dispositivo.
-          </p>
-        </div>
-        <div>
-          <span>2</span>
-          <p>
-            <strong>El relay guarda ruido</strong>
-            Recibe datos cifrados, no el archivo abierto.
-          </p>
-        </div>
-        <div>
-          <span>3</span>
-          <p>
-            <strong>El enlace abre</strong>
-            Cualquiera que lo tenga puede descargar y descifrar.
-          </p>
-        </div>
+      <div className="aside-eyebrow">{t("privacy.eyebrow")}</div>
+      <h2 id="privacy-title">{t("privacy.title")}</h2>
+      <div className="privacy-steps" aria-label={t("privacy.steps")}>
+        {steps.map((step) => (
+          <div key={step}>
+            <span>{step}</span>
+            <p>
+              <strong>{t(`privacy.step${step}.title` as MessageKey)}</strong>
+              {t(`privacy.step${step}.detail` as MessageKey)}
+            </p>
+          </div>
+        ))}
       </div>
       <details>
-        <summary>Lo que todavía puede verse</summary>
+        <summary>{t("privacy.details.summary")}</summary>
         <p>
-          El relay puede observar tu IP, el momento y el tamaño de la
-          transferencia. El modo anónimo borra metadatos del archivo, oculta el
-          nombre y rellena el tamaño hasta una categoría, pero no oculta tu IP:
-          para eso hace falta un proxy o Tor, disponible hoy en la CLI con{" "}
-          <code>--tor</code>. El cifrado no protege un dispositivo infectado ni
-          evita que quien recibe guarde una copia.
+          <WithCode
+            text={t("privacy.details.body")}
+            name="flag"
+            value="--tor"
+          />
         </p>
       </details>
       <NetworkPanel relays={relays} relayUrl={relayUrl} />
@@ -235,6 +273,8 @@ function MetadataCard({
   metadata: DisplayMetadata;
   received?: boolean;
 }) {
+  const { locale, t } = useI18n();
+  const typeKey = mimeTypeKey(metadata.mimeType);
   return (
     <div className="metadata-card">
       <div className="metadata-file-icon" aria-hidden="true">
@@ -243,30 +283,30 @@ function MetadataCard({
       <div className="metadata-main">
         <strong title={metadata.filename}>{metadata.filename}</strong>
         <span>
-          {formatBytes(metadata.byteLength)} ·{" "}
-          {formatMimeType(metadata.mimeType)}
+          {formatBytes(metadata.byteLength, locale) || t("size.unknown")} ·{" "}
+          {typeKey ? t(typeKey) : metadata.mimeType}
         </span>
       </div>
       {metadata.persistent ? (
         <div className="metadata-expiry">
           <InfinityIcon size={14} />
           <span>
-            Sin vencimiento
-            <strong>Se borra sólo con tu clave de retiro</strong>
+            {t("metadata.noExpiry")}
+            <strong>{t("metadata.noExpiryDetail")}</strong>
           </span>
         </div>
       ) : metadata.expiresAt ? (
         <div className="metadata-expiry">
           <Clock3 size={14} />
           <span>
-            Vence
-            <strong>{formatDate(metadata.expiresAt)}</strong>
+            {t("metadata.expires")}
+            <strong>{formatDate(metadata.expiresAt, locale)}</strong>
           </span>
         </div>
       ) : null}
       {metadata.note ? (
         <blockquote>
-          <span>Nota</span>
+          <span>{t("metadata.note")}</span>
           {metadata.note}
         </blockquote>
       ) : null}
@@ -282,19 +322,20 @@ export default function App() {
     EXPIRY_OPTIONS[1]!.seconds,
   );
   const [anonymous, setAnonymous] = useState(false);
+  const [mixEnabled, setMixEnabled] = useState(false);
   const [mirrorCount, setMirrorCount] = useState(0);
   const [splitAcrossRelays, setSplitAcrossRelays] = useState(false);
   const [passphrase, setPassphrase] = useState("");
   const [recovery, setRecovery] = useState("");
   const [protecting, setProtecting] = useState(false);
-  const [recoveryError, setRecoveryError] = useState("");
+  const [recoveryError, setRecoveryError] = useState<MessageKey | null>(null);
   const [relayConfig, setRelayConfig] = useState<RelayPublicConfig | null>(
     null,
   );
   const [network, setNetwork] = useState<RelayInfo[]>([]);
   const [sendStage, setSendStage] = useState<SendStage>("form");
   const [sendProgress, setSendProgress] = useState(0);
-  const [sendError, setSendError] = useState("");
+  const [sendError, setSendError] = useState<MessageKey | null>(null);
   const [shared, setShared] = useState<SharedCapsule | null>(null);
   const [copied, setCopied] = useState<"share" | "owner" | "recovery" | null>(
     null,
@@ -304,9 +345,10 @@ export default function App() {
   const [capability, setCapability] = useState<string | null>(null);
   const [receiveStage, setReceiveStage] = useState<ReceiveStage>("empty");
   const [receiveProgress, setReceiveProgress] = useState(0);
-  const [receiveError, setReceiveError] = useState("");
+  const [receiveError, setReceiveError] = useState<MessageKey | null>(null);
   const [received, setReceived] = useState<ReceivedCapsule | null>(null);
   const activeDownload = useRef<string | null>(null);
+  const { locale, t } = useI18n();
 
   const relayUrl = useMemo(
     () => import.meta.env.VITE_RELAY_URL?.trim() || DEFAULT_RELAY_URL,
@@ -349,6 +391,47 @@ export default function App() {
     [network, relayUrl],
   );
 
+  // Relays that will forward for others. A mix path needs several, and the
+  // network is whatever the directory happens to hold right now.
+  const mixCandidates = useMemo(
+    () => network.filter((relay) => relay.mixPublicKey),
+    [network],
+  );
+
+  /**
+   * The mix network, rebuilt whenever the directory changes.
+   *
+   * Building it is arithmetic over the relay list, not a connection, so there
+   * is nothing to tear down when it is replaced. `strength` is what the toggle
+   * shows: a three-node network is not a secret to keep from the person
+   * relying on it.
+   */
+  const mixNetwork = useMemo<MixNetwork | undefined>(() => {
+    if (!mixEnabled || mixCandidates.length === 0) return undefined;
+    try {
+      return buildMixNetwork({
+        relays: mixCandidates,
+        pathLength: MIX_HOPS,
+        meanDelayMs: MIX_MEAN_DELAY_MS,
+        timeoutMs: Math.max(120_000, MIX_MEAN_DELAY_MS * MIX_HOPS * 8),
+      });
+    } catch {
+      // Not enough usable relays to lay a path. The toggle says so rather
+      // than the upload failing later.
+      return undefined;
+    }
+  }, [mixCandidates, mixEnabled]);
+
+  const mixStrength: MixNetworkStrength | undefined = mixNetwork?.strength;
+
+  // Memoised because `beginDownload` depends on it and that callback is itself
+  // an effect dependency: a fresh object every render would restart a download
+  // that is already running.
+  const mixTransport = useMemo(
+    () => (mixNetwork ? { transport: mixNetwork.transportFor } : undefined),
+    [mixNetwork],
+  );
+
   useEffect(() => {
     if (ttlSeconds === null && relayConfig && !persistentAllowed) {
       setTtlSeconds(EXPIRY_OPTIONS[1]!.seconds);
@@ -360,14 +443,15 @@ export default function App() {
     setNote("");
     setTtlSeconds(EXPIRY_OPTIONS[1]!.seconds);
     setAnonymous(false);
+    setMixEnabled(false);
     setMirrorCount(0);
     setSplitAcrossRelays(false);
     setPassphrase("");
     setRecovery("");
-    setRecoveryError("");
+    setRecoveryError(null);
     setSendStage("form");
     setSendProgress(0);
-    setSendError("");
+    setSendError(null);
     setShared(null);
     setCopied(null);
   };
@@ -378,36 +462,40 @@ export default function App() {
     if (nextMode === "receive") setReceiveStage("empty");
   };
 
-  const beginDownload = useCallback(async (nextCapability: string) => {
-    activeDownload.current = nextCapability;
-    setCapability(nextCapability);
-    setReceiveStage("downloading");
-    setReceiveProgress(0.02);
-    setReceiveError("");
-    setReceived(null);
+  const beginDownload = useCallback(
+    async (nextCapability: string) => {
+      activeDownload.current = nextCapability;
+      setCapability(nextCapability);
+      setReceiveStage("downloading");
+      setReceiveProgress(0.02);
+      setReceiveError(null);
+      setReceived(null);
 
-    try {
-      const result = await downloadCapsule({
-        capability: decodeShareCapability(nextCapability),
-        onProgress: (progress: unknown) => {
-          if (activeDownload.current === nextCapability) {
-            setReceiveProgress(Math.max(0.02, normalizeProgress(progress)));
-          }
-        },
-      });
-      if (activeDownload.current !== nextCapability) return;
-      setReceiveProgress(1);
-      setReceived({
-        metadata: normalizeMetadata(result.metadata, result.blob),
-        blob: result.blob,
-      });
-      setReceiveStage("ready");
-    } catch (error) {
-      if (activeDownload.current !== nextCapability) return;
-      setReceiveError(friendlyError(error, "download"));
-      setReceiveStage("error");
-    }
-  }, []);
+      try {
+        const result = await downloadCapsule({
+          capability: decodeShareCapability(nextCapability),
+          ...(mixTransport ?? {}),
+          onProgress: (progress: unknown) => {
+            if (activeDownload.current === nextCapability) {
+              setReceiveProgress(Math.max(0.02, normalizeProgress(progress)));
+            }
+          },
+        });
+        if (activeDownload.current !== nextCapability) return;
+        setReceiveProgress(1);
+        setReceived({
+          metadata: normalizeMetadata(result.metadata, result.blob),
+          blob: result.blob,
+        });
+        setReceiveStage("ready");
+      } catch (error) {
+        if (activeDownload.current !== nextCapability) return;
+        setReceiveError(errorKey(error, "download"));
+        setReceiveStage("error");
+      }
+    },
+    [mixTransport],
+  );
 
   useEffect(() => {
     const detectHash = () => {
@@ -427,7 +515,7 @@ export default function App() {
     if (!file) return;
     setSendStage("uploading");
     setSendProgress(0.02);
-    setSendError("");
+    setSendError(null);
     setShared(null);
 
     try {
@@ -445,6 +533,7 @@ export default function App() {
 
       const result = await uploadCapsule({
         data: file,
+        ...(mixTransport ?? {}),
         filename: file.name,
         mimeType: file.type || "application/octet-stream",
         ...(note.trim() ? { note: note.trim() } : {}),
@@ -493,7 +582,7 @@ export default function App() {
       });
       setSendStage("success");
     } catch (error) {
-      setSendError(friendlyError(error, "upload"));
+      setSendError(errorKey(error, "upload"));
       setSendStage("error");
     }
   };
@@ -515,7 +604,7 @@ export default function App() {
   const handleProtect = async () => {
     if (!shared || passphrase.length < 8) return;
     setProtecting(true);
-    setRecoveryError("");
+    setRecoveryError(null);
     try {
       // Deriving the key deliberately takes a moment: that cost is what a
       // guessing attacker pays for every attempt.
@@ -526,12 +615,8 @@ export default function App() {
       );
       setRecovery(blob);
       setPassphrase("");
-    } catch (error) {
-      setRecoveryError(
-        error instanceof Error
-          ? error.message
-          : "No pudimos proteger la clave.",
-      );
+    } catch {
+      setRecoveryError("error.protectFailed");
     } finally {
       setProtecting(false);
     }
@@ -540,9 +625,7 @@ export default function App() {
   const handleReceiveSubmit = () => {
     const nextCapability = extractCapability(receiveInput);
     if (!nextCapability) {
-      setReceiveError(
-        "Pegá un enlace CAPSULE completo. La parte que empieza con #capsule= contiene la llave.",
-      );
+      setReceiveError("error.badLink");
       setReceiveStage("error");
       return;
     }
@@ -568,7 +651,7 @@ export default function App() {
     setCapability(null);
     setReceived(null);
     setReceiveInput("");
-    setReceiveError("");
+    setReceiveError(null);
     setReceiveProgress(0);
     setReceiveStage("empty");
     history.replaceState(
@@ -587,29 +670,23 @@ export default function App() {
 
       <header className="site-header">
         <Brand />
-        <p>
-          <LockKeyhole size={14} />
-          Sin cuenta. Cifrado en tu dispositivo.
-        </p>
+        <p>{t("app.tagline")}</p>
+        <LanguageSwitcher />
       </header>
 
       <main className="workspace">
         <section className="main-panel" aria-labelledby="main-title">
           <div className="panel-intro">
-            <span className="eyebrow">
-              <Sparkles size={15} />
-              Compartí sin dejarlo para siempre
-            </span>
-            <h1 id="main-title">Un archivo. Un enlace. El tiempo justo.</h1>
-            <p>
-              CAPSULE cifra antes de subir y retira el archivo cuando vence.
-            </p>
+            <h1 id="main-title">
+              {mode === "send" ? t("send.title") : t("receive.title")}
+            </h1>
+            <p>{mode === "send" ? t("send.sub") : t("receive.sub")}</p>
           </div>
 
           <div
             className="mode-tabs"
             role="tablist"
-            aria-label="Elegir una acción"
+            aria-label={t("mode.choose")}
           >
             <button
               type="button"
@@ -619,7 +696,7 @@ export default function App() {
               onClick={() => selectMode("send")}
             >
               <Send size={17} />
-              Enviar
+              {t("mode.send")}
             </button>
             <button
               type="button"
@@ -629,9 +706,12 @@ export default function App() {
               onClick={() => selectMode("receive")}
             >
               <ArrowDownToLine size={17} />
-              Recibir
+              {t("mode.receive")}
               {capability ? (
-                <span className="tab-dot" aria-label="Cápsula detectada" />
+                <span
+                  className="tab-dot"
+                  aria-label={t("mode.capsuleDetected")}
+                />
               ) : null}
             </button>
           </div>
@@ -645,8 +725,8 @@ export default function App() {
                       <CheckCircle2 size={29} />
                     </span>
                     <div>
-                      <span>La cápsula está lista</span>
-                      <h2>Compartí este enlace</h2>
+                      <span>{t("success.eyebrow")}</span>
+                      <h2>{t("success.title")}</h2>
                     </div>
                   </div>
 
@@ -655,58 +735,71 @@ export default function App() {
                   <ul className="delivery-summary">
                     <li>
                       <Server size={14} aria-hidden="true" />
-                      Guardada en {shared.relayUrls.length}{" "}
-                      {shared.relayUrls.length === 1 ? "relay" : "relays"}:{" "}
-                      {shared.relayUrls
-                        .map((url) => new URL(url).host)
-                        .join(", ")}
+                      {t(
+                        shared.relayUrls.length === 1
+                          ? "summary.storedOn"
+                          : "summary.storedOn.plural",
+                        {
+                          count: shared.relayUrls.length,
+                          hosts: shared.relayUrls
+                            .map((url) => new URL(url).host)
+                            .join(", "),
+                        },
+                      )}
                     </li>
                     {shared.anonymity.padded ? (
                       <li>
                         <EyeOff size={14} aria-hidden="true" />
-                        Tamaño rellenado con{" "}
-                        {formatBytes(shared.anonymity.paddingBytes)} para que el
-                        relay vea una categoría y no el tamaño real
+                        {t("summary.padded", {
+                          bytes: formatBytes(
+                            shared.anonymity.paddingBytes,
+                            locale,
+                          ),
+                        })}
                       </li>
                     ) : null}
                     {shared.anonymity.removedMetadata.length > 0 ? (
                       <li>
                         <EyeOff size={14} aria-hidden="true" />
-                        Metadatos borrados del archivo:{" "}
-                        {shared.anonymity.removedMetadata.join(", ")}
+                        {t("summary.scrubbed", {
+                          items: shared.anonymity.removedMetadata.join(", "),
+                        })}
                       </li>
                     ) : null}
                     {anonymous && !shared.anonymity.metadataScrubbed ? (
                       <li>
                         <TriangleAlert size={14} aria-hidden="true" />
-                        Todavía no sabemos limpiar metadatos de este formato: el
-                        archivo se envió tal cual
+                        {t("summary.notScrubbed")}
                       </li>
                     ) : null}
                     {shared.sharding ? (
                       <li>
                         <Shuffle size={14} aria-hidden="true" />
-                        Repartida {shared.sharding.k} de {shared.sharding.n}:
-                        ningún relay guarda lo suficiente para reconstruirla
+                        {t("summary.sharded", {
+                          k: shared.sharding.k,
+                          n: shared.sharding.n,
+                        })}
                       </li>
                     ) : null}
                     {shared.anonymity.remainingMetadata.map((entry) => (
                       <li key={entry}>
                         <TriangleAlert size={14} aria-hidden="true" />
-                        Quedó sin borrar: {entry}
+                        {t("summary.remaining", { item: entry })}
                       </li>
                     ))}
                     {shared.mirrorFailures.map((failure) => (
                       <li key={failure.relayUrl}>
                         <TriangleAlert size={14} aria-hidden="true" />
-                        No pudimos copiar a {new URL(failure.relayUrl).host}
+                        {t("summary.mirrorFailed", {
+                          host: new URL(failure.relayUrl).host,
+                        })}
                       </li>
                     ))}
                   </ul>
 
                   <div className="share-layout">
                     <div className="share-link-block">
-                      <label htmlFor="share-url">Enlace privado</label>
+                      <label htmlFor="share-url">{t("share.label")}</label>
                       <div className="share-field">
                         <Link2 size={18} aria-hidden="true" />
                         <input
@@ -725,22 +818,17 @@ export default function App() {
                           ) : (
                             <Copy size={17} />
                           )}
-                          {copied === "share" ? "Copiado" : "Copiar"}
+                          {copied === "share"
+                            ? t("share.copied")
+                            : t("share.copy")}
                         </button>
                       </div>
-                      <p>
-                        <KeyRound size={14} />
-                        Este enlace contiene la llave. Enviálo sólo a quien deba
-                        abrirlo.
-                      </p>
+                      <p>{t("share.containsKey")}</p>
                     </div>
                     {shared.qrDataUrl ? (
                       <div className="qr-card">
-                        <img
-                          src={shared.qrDataUrl}
-                          alt="Código QR del enlace privado"
-                        />
-                        <span>Escanear para abrir</span>
+                        <img src={shared.qrDataUrl} alt={t("share.qrAlt")} />
+                        <span>{t("share.qrScan")}</span>
                       </div>
                     ) : null}
                   </div>
@@ -749,15 +837,14 @@ export default function App() {
                     <div>
                       <KeyRound size={17} aria-hidden="true" />
                       <p>
-                        <strong>Guardá tu clave de retiro</strong>
-                        Es distinta del enlace compartido y permite eliminar la
-                        cápsula antes de que venza.
+                        <strong>{t("owner.title")}</strong>
+                        {t("owner.detail")}
                       </p>
                     </div>
                     <div className="share-field">
                       <KeyRound size={18} aria-hidden="true" />
                       <input
-                        aria-label="Clave privada de retiro"
+                        aria-label={t("owner.inputLabel")}
                         readOnly
                         value={shared.ownerCapability}
                         onFocus={(event) => event.target.select()}
@@ -772,31 +859,21 @@ export default function App() {
                         ) : (
                           <Copy size={17} />
                         )}
-                        {copied === "owner" ? "Copiada" : "Copiar"}
+                        {copied === "owner"
+                          ? t("share.copied")
+                          : t("share.copy")}
                       </button>
                     </div>
-                    <small>
-                      No la compartas. CAPSULE no puede recuperarla por vos: si
-                      la vas a necesitar más adelante, protegela con una
-                      contraseña acá abajo.
-                    </small>
+                    <small>{t("owner.warning")}</small>
 
                     <div className="recovery-block">
-                      <strong>
-                        <ShieldCheck size={14} aria-hidden="true" />
-                        Guardarla con una contraseña
-                      </strong>
-                      <small>
-                        Cifra la clave de retiro con una contraseña tuya, acá
-                        mismo. El resultado se puede anotar o guardar en
-                        cualquier lado: sin la contraseña no sirve de nada. El
-                        relay no participa ni se entera.
-                      </small>
+                      <strong>{t("recovery.title")}</strong>
+                      <small>{t("recovery.detail")}</small>
                       {recovery ? (
                         <div className="share-field">
                           <KeyRound size={18} aria-hidden="true" />
                           <input
-                            aria-label="Clave de retiro protegida"
+                            aria-label={t("recovery.label")}
                             readOnly
                             value={recovery}
                             onFocus={(event) => event.target.select()}
@@ -811,7 +888,9 @@ export default function App() {
                             ) : (
                               <Copy size={17} />
                             )}
-                            {copied === "recovery" ? "Copiada" : "Copiar"}
+                            {copied === "recovery"
+                              ? t("share.copied")
+                              : t("share.copy")}
                           </button>
                         </div>
                       ) : (
@@ -819,12 +898,12 @@ export default function App() {
                           <input
                             type="password"
                             autoComplete="new-password"
-                            placeholder="Una contraseña que recuerdes"
+                            placeholder={t("recovery.placeholder")}
                             value={passphrase}
                             disabled={protecting}
                             onChange={(event) => {
                               setPassphrase(event.target.value);
-                              setRecoveryError("");
+                              setRecoveryError(null);
                             }}
                           />
                           <button
@@ -832,13 +911,22 @@ export default function App() {
                             disabled={protecting || passphrase.length < 8}
                             onClick={() => void handleProtect()}
                           >
-                            {protecting ? "Protegiendo…" : "Proteger"}
+                            {protecting
+                              ? t("recovery.protecting")
+                              : t("recovery.protect")}
                           </button>
                         </div>
                       )}
                       {recoveryError ? (
                         <span className="recovery-error" role="alert">
-                          {recoveryError}
+                          {t(recoveryError)}
+                        </span>
+                      ) : null}
+                      {!recovery &&
+                      passphrase.length > 0 &&
+                      passphrase.length < 8 ? (
+                        <span className="recovery-error">
+                          {t("error.passphraseShort")}
                         </span>
                       ) : null}
                     </div>
@@ -850,7 +938,7 @@ export default function App() {
                     onClick={resetSend}
                   >
                     <RotateCcw size={17} />
-                    Crear otra cápsula
+                    {t("action.createAnother")}
                   </button>
                 </div>
               ) : (
@@ -859,8 +947,10 @@ export default function App() {
                     <div className="field-label">
                       <span>1</span>
                       <div>
-                        <label htmlFor="capsule-file">Elegí qué enviar</label>
-                        <small>Un archivo por cápsula</small>
+                        <label htmlFor="capsule-file">
+                          {t("send.step1.label")}
+                        </label>
+                        <small>{t("send.step1.hint")}</small>
                       </div>
                     </div>
                     <DropZone
@@ -875,14 +965,13 @@ export default function App() {
                       <div className="field-label">
                         <span>2</span>
                         <div>
-                          <label>Elegí cuándo vence</label>
-                          <small>Después deja de estar disponible</small>
+                          <label>{t("send.step2.label")}</label>
                         </div>
                       </div>
                       <div
                         className="expiry-options"
                         role="radiogroup"
-                        aria-label="Vencimiento de la cápsula"
+                        aria-label={t("expiry.group")}
                       >
                         {EXPIRY_OPTIONS.map((option) => {
                           const unavailable =
@@ -899,17 +988,15 @@ export default function App() {
                               disabled={isSending || unavailable}
                               title={
                                 unavailable
-                                  ? "Este relay no guarda cápsulas sin vencimiento"
-                                  : option.label
+                                  ? t("expiry.unavailable")
+                                  : t(option.labelKey)
                               }
                               onClick={() => setTtlSeconds(option.seconds)}
                             >
-                              <span>{option.shortLabel}</span>
-                              <small>
-                                {unavailable
-                                  ? "No disponible en este relay"
-                                  : option.detail}
-                              </small>
+                              <span>{t(option.shortKey)}</span>
+                              {unavailable ? (
+                                <small>{t("expiry.unavailable")}</small>
+                              ) : null}
                               {ttlSeconds === option.seconds ? (
                                 <Check size={15} aria-hidden="true" />
                               ) : null}
@@ -920,9 +1007,7 @@ export default function App() {
                       {ttlSeconds === null ? (
                         <p className="inline-warning">
                           <InfinityIcon size={14} aria-hidden="true" />
-                          Sin vencimiento el relay guarda la cápsula hasta que
-                          la borres con tu clave de retiro. Si perdés esa clave,
-                          queda ahí.
+                          {t("expiry.neverWarning")}
                         </p>
                       ) : null}
                     </div>
@@ -931,8 +1016,10 @@ export default function App() {
                       <div className="field-label">
                         <span>3</span>
                         <div>
-                          <label htmlFor="capsule-note">Sumá una nota</label>
-                          <small>Opcional · también va cifrada</small>
+                          <label htmlFor="capsule-note">
+                            {t("send.step3.label")}
+                          </label>
+                          <small>{t("send.step3.hint")}</small>
                         </div>
                       </div>
                       <div className="note-field">
@@ -942,7 +1029,7 @@ export default function App() {
                           rows={3}
                           value={note}
                           disabled={isSending}
-                          placeholder="Ej.: Las fotos del fin de semana"
+                          placeholder={t("send.step3.placeholder")}
                           onChange={(event) => setNote(event.target.value)}
                         />
                         <span>{note.length}/280</span>
@@ -954,8 +1041,8 @@ export default function App() {
                     <div className="field-label">
                       <span>4</span>
                       <div>
-                        <label>Elegí cuánto ocultar</label>
-                        <small>Opcional · cada opción tiene un costo</small>
+                        <label>{t("send.step4.label")}</label>
+                        <small>{t("send.step4.hint")}</small>
                       </div>
                     </div>
                     <div className="option-stack">
@@ -971,14 +1058,49 @@ export default function App() {
                         <span className="switch-copy">
                           <strong>
                             <EyeOff size={15} aria-hidden="true" />
-                            Modo anónimo
+                            {t("anon.title")}
+                          </strong>
+                          <small>{t("anon.detail")}</small>
+                        </span>
+                      </label>
+
+                      <label
+                        className={
+                          mixCandidates.length === 0
+                            ? "switch-row is-unavailable"
+                            : "switch-row"
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={mixEnabled}
+                          disabled={isSending || mixCandidates.length === 0}
+                          onChange={(event) =>
+                            setMixEnabled(event.target.checked)
+                          }
+                        />
+                        <span className="switch-copy">
+                          <strong>
+                            <Waypoints size={15} aria-hidden="true" />
+                            {t("mix.title")}
                           </strong>
                           <small>
-                            Borra metadatos del archivo (EXIF/XMP), reemplaza el
-                            nombre por uno neutro, rellena el tamaño hasta una
-                            categoría y espacia las subidas. Sube algo más de
-                            datos y tarda un poco más.
+                            {mixCandidates.length === 0
+                              ? t("mix.unavailable")
+                              : t("mix.detail")}
                           </small>
+                          {/* What the network can actually offer, not what
+                              the feature is called. A small network is not a
+                              secret to keep from whoever is relying on it. */}
+                          {mixStrength ? (
+                            <small className="mix-strength">
+                              {t(`mix.verdict.${mixStrength.verdict}`, {
+                                mixes: mixStrength.mixCount,
+                                operators: mixStrength.operatorCount,
+                                hops: mixStrength.pathLength,
+                              })}
+                            </small>
+                          ) : null}
                         </span>
                       </label>
 
@@ -986,16 +1108,12 @@ export default function App() {
                         <div className="switch-row as-static">
                           <Layers size={15} aria-hidden="true" />
                           <span className="switch-copy">
-                            <strong>Copias en otros relays</strong>
-                            <small>
-                              Si un relay se cae o te bloquea, la cápsula sigue
-                              disponible en otro. Más copias significa más
-                              servidores que ven el tamaño y el horario.
-                            </small>
+                            <strong>{t("mirror.title")}</strong>
+                            <small>{t("mirror.detail")}</small>
                             <span
                               className="mirror-options"
                               role="radiogroup"
-                              aria-label="Cantidad de copias"
+                              aria-label={t("mirror.count")}
                             >
                               {[
                                 0,
@@ -1020,7 +1138,7 @@ export default function App() {
                                   disabled={isSending}
                                   onClick={() => setMirrorCount(count)}
                                 >
-                                  {count === 0 ? "Sólo uno" : `+${count}`}
+                                  {count === 0 ? t("mirror.one") : `+${count}`}
                                 </button>
                               ))}
                             </span>
@@ -1036,9 +1154,7 @@ export default function App() {
                                 />
                                 <span>
                                   <Shuffle size={13} aria-hidden="true" />
-                                  Repartir en vez de copiar: ningún relay guarda
-                                  la cápsula entera y alcanza con dos para
-                                  abrirla.
+                                  {t("mirror.split")}
                                 </span>
                               </label>
                             ) : null}
@@ -1053,10 +1169,10 @@ export default function App() {
                       progress={sendProgress}
                       title={
                         sendProgress < 0.18
-                          ? "Cifrando en este dispositivo"
-                          : "Subiendo datos cifrados"
+                          ? t("progress.encrypting")
+                          : t("progress.uploading")
                       }
-                      detail="No cierres esta ventana todavía"
+                      detail={t("progress.keepOpen")}
                     />
                   ) : null}
 
@@ -1064,8 +1180,8 @@ export default function App() {
                     <div className="error-banner" role="alert">
                       <TriangleAlert size={19} />
                       <div>
-                        <strong>La cápsula no salió</strong>
-                        <span>{sendError}</span>
+                        <strong>{t("sendError.title")}</strong>
+                        <span>{sendError ? t(sendError) : null}</span>
                       </div>
                     </div>
                   ) : null}
@@ -1077,19 +1193,16 @@ export default function App() {
                     onClick={handleUpload}
                   >
                     {isSending ? (
-                      <>Preparando…</>
+                      t("action.preparing")
                     ) : (
                       <>
                         <LockKeyhole size={18} />
-                        Cifrar y crear enlace
+                        {t("action.encrypt")}
                         <Send size={17} />
                       </>
                     )}
                   </button>
-                  <p className="action-note">
-                    El archivo original no se modifica y permanece en tu
-                    dispositivo.
-                  </p>
+                  <p className="action-note">{t("action.originalUntouched")}</p>
                 </>
               )}
             </div>
@@ -1100,19 +1213,16 @@ export default function App() {
                   <span className="large-state-icon" aria-hidden="true">
                     <PackageOpen size={31} />
                   </span>
-                  <h2>Abriendo la cápsula</h2>
-                  <p>
-                    Descargamos los datos cifrados y los abrimos en este
-                    dispositivo.
-                  </p>
+                  <h2>{t("receive.opening")}</h2>
+                  <p>{t("receive.openingDetail")}</p>
                   <ProgressState
                     progress={receiveProgress}
                     title={
                       receiveProgress < 0.82
-                        ? "Descargando"
-                        : "Verificando y descifrando"
+                        ? t("receive.downloading")
+                        : t("receive.verifying")
                     }
-                    detail="La llave no se envía al relay"
+                    detail={t("receive.keyNotSent")}
                   />
                 </div>
               ) : receiveStage === "ready" && received ? (
@@ -1122,8 +1232,8 @@ export default function App() {
                       <CheckCircle2 size={29} />
                     </span>
                     <div>
-                      <span>Cápsula abierta y verificada</span>
-                      <h2>Está lista para guardar</h2>
+                      <span>{t("receive.readyEyebrow")}</span>
+                      <h2>{t("receive.readyTitle")}</h2>
                     </div>
                   </div>
                   <MetadataCard metadata={received.metadata} received />
@@ -1133,7 +1243,9 @@ export default function App() {
                     onClick={saveReceivedFile}
                   >
                     <Download size={19} />
-                    Guardar {received.metadata.filename}
+                    {t("receive.save", {
+                      filename: received.metadata.filename,
+                    })}
                   </button>
                   <button
                     className="text-action"
@@ -1141,7 +1253,7 @@ export default function App() {
                     onClick={clearReceived}
                   >
                     <ArrowLeft size={16} />
-                    Cerrar esta cápsula
+                    {t("receive.close")}
                   </button>
                 </div>
               ) : (
@@ -1154,15 +1266,14 @@ export default function App() {
                   </span>
                   <h2>
                     {receiveStage === "error"
-                      ? "Revisemos el enlace"
-                      : "Pegá un enlace CAPSULE"}
+                      ? t("receive.errorTitle")
+                      : t("receive.emptyTitle")}
                   </h2>
-                  <p>
-                    Si abriste el enlace completo, la descarga empieza sola.
-                    También podés pegarlo acá.
-                  </p>
+                  <p>{t("receive.emptyDetail")}</p>
                   <div className="receive-input">
-                    <label htmlFor="receive-link">Enlace privado</label>
+                    <label htmlFor="receive-link">
+                      {t("receive.linkLabel")}
+                    </label>
                     <div>
                       <Link2 size={18} aria-hidden="true" />
                       <input
@@ -1184,7 +1295,7 @@ export default function App() {
                   {receiveStage === "error" ? (
                     <div className="error-banner compact" role="alert">
                       <TriangleAlert size={18} />
-                      <span>{receiveError}</span>
+                      <span>{receiveError ? t(receiveError) : null}</span>
                     </div>
                   ) : null}
                   <button
@@ -1194,14 +1305,16 @@ export default function App() {
                     onClick={handleReceiveSubmit}
                   >
                     <PackageOpen size={19} />
-                    Abrir cápsula
+                    {t("receive.open")}
                   </button>
                   <div className="hash-explainer">
                     <KeyRound size={16} />
                     <p>
-                      La parte que empieza con <code>#capsule=</code> contiene
-                      la llave. El navegador no la manda al relay cuando
-                      solicita la página.
+                      <WithCode
+                        text={t("receive.hashExplainer")}
+                        name="fragment"
+                        value="#capsule="
+                      />
                     </p>
                   </div>
                 </div>
@@ -1215,8 +1328,7 @@ export default function App() {
 
       <footer>
         <Brand />
-        <p>Privado por diseño · Temporal por elección</p>
-        <span>Sin analíticas ni rastreadores de terceros.</span>
+        <span>{t("footer.noTracking")}</span>
       </footer>
     </div>
   );

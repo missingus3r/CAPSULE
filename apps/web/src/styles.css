@@ -136,7 +136,7 @@ footer {
 .site-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   min-height: 88px;
   padding-block: 20px;
 }
@@ -177,13 +177,47 @@ footer {
 }
 
 .site-header > p {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
+  margin: 0 0 0 auto;
   color: var(--ink-soft);
   font-size: 13px;
   font-weight: 600;
+}
+
+.language-switcher {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.8);
+}
+
+.language-switcher button {
+  padding: 6px 11px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.language-switcher button:hover {
+  color: var(--ink);
+}
+
+.language-switcher button.active {
+  background: var(--forest);
+  color: #fffdf8;
+}
+
+.language-switcher button:focus-visible {
+  outline: 2px solid var(--coral-dark);
+  outline-offset: -2px;
 }
 
 .workspace {
@@ -207,7 +241,6 @@ footer {
   padding: 38px 42px 24px;
 }
 
-.eyebrow,
 .aside-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -221,7 +254,7 @@ footer {
 
 .panel-intro h1 {
   max-width: 680px;
-  margin: 11px 0 9px;
+  margin: 0 0 9px;
   color: var(--ink);
   font-family:
     "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
@@ -530,14 +563,14 @@ footer {
 
 .expiry-options {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 
 .expiry-options button {
   position: relative;
   display: flex;
-  min-height: 76px;
+  min-height: 64px;
   flex-direction: column;
   justify-content: center;
   padding: 11px;
@@ -569,7 +602,6 @@ footer {
 }
 
 .expiry-options button small {
-  max-width: 95px;
   margin-top: 3px;
   color: var(--muted);
   font-size: 9.5px;
@@ -1364,9 +1396,9 @@ footer {
 }
 
 footer {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 18px;
   padding: 12px 0 35px;
   color: var(--muted-light);
@@ -1386,11 +1418,6 @@ footer .brand-mark {
 footer .brand-mark::after {
   width: 13px;
   height: 14px;
-}
-
-footer p {
-  margin: 0;
-  text-align: center;
 }
 
 footer > span {
@@ -1462,14 +1489,15 @@ footer > span {
   }
 
   .site-header > p {
-    width: 118px;
-    font-size: 9.5px;
-    line-height: 1.25;
-    text-align: right;
+    display: none;
   }
 
-  .site-header > p svg {
-    display: none;
+  .language-switcher {
+    margin-left: auto;
+  }
+
+  .language-switcher button {
+    padding: 6px 9px;
   }
 
   .main-panel {
@@ -1504,13 +1532,13 @@ footer > span {
     gap: 23px;
   }
 
-  .expiry-options button {
-    min-height: 70px;
-    padding: 9px;
+  .expiry-options {
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .expiry-options button small {
-    display: none;
+  .expiry-options button {
+    min-height: 58px;
+    padding: 9px;
   }
 
   .expiry-options button > span {
@@ -1668,6 +1696,27 @@ footer > span {
 
 .switch-row.as-static {
   cursor: default;
+}
+
+/* No relay in reach can do this. The row stays readable so the reason shows. */
+.switch-row.is-unavailable {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.switch-row.is-unavailable:hover {
+  border-color: var(--line);
+}
+
+/*
+ * What the live network offers, under the switch that offers it. Set apart
+ * from the description above it because one is a claim about the feature and
+ * the other is a measurement of today.
+ */
+.mix-strength {
+  padding-top: 0.35rem;
+  border-top: 1px dashed var(--line);
+  font-variant-numeric: tabular-nums;
 }
 
 .switch-row.as-static > svg {

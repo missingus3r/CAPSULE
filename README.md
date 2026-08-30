@@ -78,8 +78,9 @@ Nothing in the design caps how good it gets as people join.
 the network is small, so the protection is small. CAPSULE cannot even measure
 its own anonymity set — there are no accounts and no counters, so there is
 nobody to count — and `capsule network` reports the ceiling instead. The CLI
-prints that number before every mixed send. That part is adoption rather than
-engineering, and the most useful thing you can do about it is run a relay.
+prints that number before every mixed send, and the web app puts it under the
+switch. That part is adoption rather than engineering, and the most useful thing
+you can do about it is run a relay.
 
 ### Everything else on the map
 
@@ -177,11 +178,12 @@ page was opened from — `localhost` and `127.0.0.1` are the same machine but
 different origins. Open the app at the address the dev server prints, or set
 `CAPSULE_CORS_ORIGIN` on the relay. The relay logs the origin it refused.
 
-Storage **without expiry** is off unless the operator turns it on, which is why
-the "no expiry" option can show as unavailable:
+Storage **without expiry** is on by default and capped at a gigabyte. If the
+"no expiry" option shows as unavailable, the relay either has it turned off or
+never answered `/v1/config` at all:
 
 ```bash
-CAPSULE_ALLOW_PERSISTENT_CAPSULES=true npm run dev:relay
+CAPSULE_ALLOW_PERSISTENT_CAPSULES=false npm run dev:relay   # to refuse them
 ```
 
 ---
@@ -327,9 +329,10 @@ node apps/cli/dist/index.js --mix --mix-hops 4 --mix-delay 15000 send ./report.p
 node apps/cli/dist/index.js --tor --mix send ./report.pdf
 ```
 
-The CLI prints how much protection the live network actually offers **before
-every mixed send**, and calls a four-node network what it is. Design and limits:
-[docs/MIXNET.md](docs/MIXNET.md).
+The web app has the same thing as a switch beside anonymous mode, and both it
+and the CLI print how much protection the live network actually offers **before
+every mixed send** — a four-node network is called what it is rather than sold
+as anonymity. Design and limits: [docs/MIXNET.md](docs/MIXNET.md).
 
 ### Survive a relay disappearing
 
@@ -380,7 +383,7 @@ apps/
 packages/
   protocol/   Capsule format, .capsule names, bridges, offline files, vectors
   sdk/        Relay client, discovery, transfers, sites and bridge transport
-  mixnet/     Sphinx packets, mix client and path selection (Node only)
+  mixnet/     Sphinx packets, mix client and path selection
   lan/        Finding a relay on a local network with no internet (Node only)
 docs/         Protocol, threat model, mixnet, sites, censorship, offline, page
 infra/        Container deployment files
