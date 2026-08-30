@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { asArrayBuffer, fromBase64Url, randomBytes } from "@capsule/protocol";
 import type {
   RelayCreateRequest,
   RelayCreateResponse,
@@ -78,7 +78,9 @@ const DEFAULTS = {
 };
 
 function hex(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("hex");
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 function hostOf(url: string): string {
@@ -204,7 +206,7 @@ export class MixClient {
       },
     ];
 
-    const mailboxToken = new Uint8Array(randomBytes(NODE_ID_BYTES));
+    const mailboxToken = randomBytes(NODE_ID_BYTES);
     const { block, secrets } = createReplyBlock(replyPath, mailboxToken);
 
     const message = encodeRequest({
@@ -241,7 +243,7 @@ export class MixClient {
     const response = await this.request(url, {
       method: "POST",
       headers: { "Content-Type": "application/capsule-mix" },
-      body: Buffer.from(packet),
+      body: asArrayBuffer(packet),
       ...(signal ? { signal } : {}),
     });
     if (!response.ok) {
@@ -266,7 +268,7 @@ export class MixClient {
       if (response.ok) {
         const body = (await response.json()) as { messages?: string[] };
         const first = body.messages?.[0];
-        if (first) return new Uint8Array(Buffer.from(first, "base64url"));
+        if (first) return fromBase64Url(first);
       }
       await new Promise((resolve) => setTimeout(resolve, interval));
       interval = Math.min(interval * 1.5, 3_000);
@@ -278,7 +280,7 @@ export class MixClient {
 }
 
 function asJson<T>(data: Uint8Array): T {
-  return JSON.parse(Buffer.from(data).toString("utf8")) as T;
+  return JSON.parse(new TextDecoder().decode(data)) as T;
 }
 
 function failure(data: Uint8Array): Error {
@@ -338,7 +340,7 @@ export class MixRelayTransport implements RelayTransport {
   ): Promise<RelayCreateResponse> {
     const data = await this.run(
       MixOp.Create,
-      { data: new Uint8Array(Buffer.from(JSON.stringify(request), "utf8")) },
+      { data: new TextEncoder().encode(JSON.stringify(request)) },
       signal,
     );
     return asJson<RelayCreateResponse>(data);

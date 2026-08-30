@@ -1,9 +1,7 @@
-import {
-  createCipheriv,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { ctr } from "@noble/ciphers/aes.js";
+import { hmac } from "@noble/hashes/hmac.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { randomBytes, timingSafeEquals } from "@capsule/protocol";
 import { basePoint, derive, multiply, randomScalar } from "./group.js";
 import { lionessDecrypt, lionessEncrypt } from "./lioness.js";
 
@@ -45,8 +43,14 @@ export const HEADER_BYTES = 32 + BETA_BYTES + MAC_BYTES;
 export const PAYLOAD_BYTES = 65_536;
 export const PACKET_BYTES = HEADER_BYTES + PAYLOAD_BYTES;
 
+/**
+ * CTR from a zero counter. Each key here is derived once, for one packet and
+ * one hop, so the counter never has to vary.
+ */
+const ZERO_IV = new Uint8Array(16);
+
 /** Plaintext framing inside the body: magic, length, then the message. */
-const MAGIC = Buffer.from("CAPSULEMIX1", "utf8");
+const MAGIC = new TextEncoder().encode("CAPSULEMIX1");
 const ENVELOPE_BYTES = MAGIC.byteLength + 4;
 export const MAX_MESSAGE_BYTES = PAYLOAD_BYTES - ENVELOPE_BYTES;
 
@@ -108,10 +112,7 @@ export function nodeIdFor(publicKey: Uint8Array): Uint8Array {
 }
 
 function stream(key: Uint8Array, byteLength: number): Uint8Array {
-  const cipher = createCipheriv("aes-256-ctr", key, Buffer.alloc(16));
-  return new Uint8Array(
-    Buffer.concat([cipher.update(Buffer.alloc(byteLength)), cipher.final()]),
-  );
+  return ctr(key, ZERO_IV).encrypt(new Uint8Array(byteLength));
 }
 
 function xorInto(target: Uint8Array, source: Uint8Array): Uint8Array {
@@ -122,7 +123,7 @@ function xorInto(target: Uint8Array, source: Uint8Array): Uint8Array {
 }
 
 function mac(key: Uint8Array, data: Uint8Array): Uint8Array {
-  return new Uint8Array(createHmac("sha256", key).update(data).digest());
+  return hmac(sha256, key, data);
 }
 
 interface HopKeys {
@@ -232,10 +233,10 @@ export function buildHeader(
       destination.command,
       (path[last] as MixHop).delayMs,
       destination.id,
-      new Uint8Array(randomBytes(MAC_BYTES)),
+      randomBytes(MAC_BYTES),
     ),
   );
-  tail.set(new Uint8Array(randomBytes(tailBytes - BLOCK_BYTES)), BLOCK_BYTES);
+  tail.set(randomBytes(tailBytes - BLOCK_BYTES), BLOCK_BYTES);
   xorInto(
     tail,
     stream(
@@ -283,7 +284,7 @@ export function frameMessage(message: Uint8Array): Uint8Array {
   if (message.byteLength > MAX_MESSAGE_BYTES) {
     throw new Error(`A mix message cannot exceed ${MAX_MESSAGE_BYTES} bytes`);
   }
-  const body = new Uint8Array(randomBytes(PAYLOAD_BYTES));
+  const body = randomBytes(PAYLOAD_BYTES);
   body.set(MAGIC, 0);
   new DataView(body.buffer).setUint32(
     MAGIC.byteLength,
@@ -296,10 +297,8 @@ export function frameMessage(message: Uint8Array): Uint8Array {
 
 export function readMessage(body: Uint8Array): Uint8Array | undefined {
   if (body.byteLength !== PAYLOAD_BYTES) return undefined;
-  const magic = Buffer.from(body.subarray(0, MAGIC.byteLength));
-  if (magic.byteLength !== MAGIC.byteLength || !timingSafeEqual(magic, MAGIC)) {
-    return undefined;
-  }
+  const magic = body.subarray(0, MAGIC.byteLength);
+  if (!timingSafeEquals(magic, MAGIC)) return undefined;
   const length = new DataView(
     body.buffer,
     body.byteOffset,
@@ -381,7 +380,7 @@ export function processPacket(
   const keys = hopKeys(secret);
 
   const expected = mac(keys.macKey, header.beta);
-  if (!timingSafeEqual(Buffer.from(expected), Buffer.from(header.gamma))) {
+  if (!timingSafeEquals(expected, header.gamma)) {
     throw new Error("Mix packet failed authentication");
   }
 
@@ -451,7 +450,7 @@ export function createReplyBlock(
     command: MixCommand.Mailbox,
     id: mailboxToken,
   });
-  const sealKey = new Uint8Array(randomBytes(32));
+  const sealKey = randomBytes(32);
   return {
     block: {
       firstHopId: (path[0] as MixHop).id,

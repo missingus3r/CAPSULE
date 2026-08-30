@@ -1,4 +1,6 @@
-import { createCipheriv, createHmac } from "node:crypto";
+import { ctr } from "@noble/ciphers/aes.js";
+import { hmac } from "@noble/hashes/hmac.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { derive } from "./group.js";
 
 /**
@@ -23,14 +25,18 @@ import { derive } from "./group.js";
 
 const KEY_BYTES = 32;
 
+/**
+ * CTR from a zero counter. Every invocation uses a key derived once for this
+ * packet and this round, so the counter never has to vary.
+ */
+const ZERO_IV = new Uint8Array(16);
+
 export const LIONESS_MINIMUM_BYTES = KEY_BYTES + 1;
 
 function streamXor(key: Uint8Array, target: Uint8Array): void {
-  const cipher = createCipheriv("aes-256-ctr", key, Buffer.alloc(16));
-  const keystream = Buffer.concat([
-    cipher.update(Buffer.alloc(target.byteLength)),
-    cipher.final(),
-  ]);
+  const keystream = ctr(key, ZERO_IV).encrypt(
+    new Uint8Array(target.byteLength),
+  );
   for (let index = 0; index < target.byteLength; index += 1) {
     target[index] = (target[index] as number) ^ (keystream[index] as number);
   }
@@ -41,7 +47,7 @@ function hashXor(
   source: Uint8Array,
   target: Uint8Array,
 ): void {
-  const digest = createHmac("sha256", key).update(source).digest();
+  const digest = hmac(sha256, key, source);
   for (let index = 0; index < KEY_BYTES; index += 1) {
     target[index] = (target[index] as number) ^ (digest[index] as number);
   }

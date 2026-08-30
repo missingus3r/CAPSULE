@@ -1,3 +1,4 @@
+import { fromBase64Url } from "@capsule/protocol";
 import type { RelayInfo, RelayPublicConfig } from "@capsule/sdk";
 import {
   MixClient,
@@ -58,9 +59,7 @@ export interface MixNetworkStrength {
 
 function toDirectoryNode(relay: RelayInfo): MixDirectoryNode | undefined {
   if (!relay.mixPublicKey) return undefined;
-  const publicKey = new Uint8Array(
-    Buffer.from(relay.mixPublicKey, "base64url"),
-  );
+  const publicKey = fromBase64Url(relay.mixPublicKey);
   if (publicKey.byteLength !== 32) return undefined;
   return { nodeId: nodeIdFor(publicKey), url: relay.url, publicKey };
 }
