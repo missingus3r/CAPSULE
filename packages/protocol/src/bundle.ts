@@ -264,3 +264,82 @@ export function unpackSite(bytes: Uint8Array): SiteBundle {
 export function siteBundleSize(files: readonly SiteFile[]): number {
   return files.reduce((total, file) => total + file.bytes.byteLength, 0);
 }
+
+/**
+ * The optional file a site uses to say things about itself.
+ *
+ * It lives inside the bundle rather than in the signed record, and that is the
+ * whole design. A record's signed message is a fixed list of fields under the
+ * `CAPSULE/site-record/v1` label: adding one would make records that older
+ * clients cannot verify, and a client that cannot verify a record refuses the
+ * site entirely — a resolution failure in exchange for a line of metadata. Put
+ * outside the signature instead, anyone could set it on somebody else's behalf.
+ *
+ * Inside the bundle it inherits the chain that is already there: the record
+ * signs the capability, the capability locates those exact bytes, and AES-GCM
+ * authenticates them. So the file is as forgeable as the pages are, which is to
+ * say not at all, and no version of anything had to change.
+ */
+export const SITE_MANIFEST_FILE = "capsule.json";
+
+export interface SiteManifest {
+  /**
+   * Whether the author wants this site listed by an index.
+   *
+   * Absent means no. An indexer must treat a site that says nothing as one
+   * that did not ask to be listed, the same way it treats one that says
+   * `false`: publishing something openly is not the same as asking for it to
+   * be catalogued.
+   */
+  index: boolean;
+  /** One line for a search result. Untrusted text; render it as text. */
+  description?: string;
+  /** BCP 47 tag, for an index that groups by language. */
+  lang?: string;
+}
+
+const MAX_DESCRIPTION_LENGTH = 300;
+const MAX_LANG_LENGTH = 35;
+
+/**
+ * Reads the manifest out of a bundle, defensively.
+ *
+ * Every field comes from a stranger who holds a key, so a malformed or hostile
+ * file must produce "this site did not opt in" rather than an exception or an
+ * over-long string in somebody's search results.
+ */
+export function readSiteManifest(bundle: SiteBundle): SiteManifest {
+  const file = bundle.get(SITE_MANIFEST_FILE);
+  if (!file) return { index: false };
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(file.bytes));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { index: false };
+    }
+    const value = parsed as Record<string, unknown>;
+    const description =
+      typeof value.description === "string"
+        ? value.description.slice(0, MAX_DESCRIPTION_LENGTH)
+        : undefined;
+    const lang =
+      typeof value.lang === "string"
+        ? value.lang.slice(0, MAX_LANG_LENGTH)
+        : undefined;
+    return {
+      index: value.index === true,
+      ...(description ? { description } : {}),
+      ...(lang ? { lang } : {}),
+    };
+  } catch {
+    return { index: false };
+  }
+}
+
+/** Serialises a manifest into the file a bundle carries. */
+export function siteManifestFile(manifest: SiteManifest): SiteFile {
+  return {
+    path: SITE_MANIFEST_FILE,
+    type: siteContentType(SITE_MANIFEST_FILE),
+    bytes: new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
+  };
+}

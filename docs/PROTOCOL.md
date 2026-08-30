@@ -1074,6 +1074,38 @@ chunk encryption, mirrors and `k`-of-`n` sharing all work unchanged. The
 padding sits after the last file and the index says where each one ends, so
 unpacking does not need to know how much padding there was.
 
+#### 17.3.1 `capsule.json`, what a site says about itself
+
+An optional entry at the root of a bundle:
+
+```json
+{
+  "index": true,
+  "description": "One line, at most 300 characters",
+  "lang": "en"
+}
+```
+
+| Field         | Rule                                                              |
+| ------------- | ----------------------------------------------------------------- |
+| `index`       | `true` opts the site in to being listed. Anything else means no.  |
+| `description` | Optional, truncated at 300 characters. Untrusted; render as text. |
+| `lang`        | Optional BCP 47 tag, truncated at 35 characters.                  |
+
+**A site that carries no `capsule.json`, or a malformed one, has not opted in.**
+An index must treat silence as a refusal: publishing something openly is not
+the same as asking for it to be catalogued.
+
+This lives in the bundle rather than in the record on purpose. The record's
+signed message is the fixed field list in §17.2 under the
+`CAPSULE/site-record/v1` label; adding a field would produce records that
+existing clients cannot verify, and a client that cannot verify a record
+refuses the site — a resolution failure traded for a line of metadata. Kept
+outside the signature entirely, anyone could set it on somebody else's behalf.
+Inside the bundle it inherits the chain that already exists: the record signs
+the capability, the capability locates those exact bytes, and AES-GCM
+authenticates them. Nothing needed a new version.
+
 ### 17.4 The relay's HTTP API
 
 | Method and path         | Response                                                                                    |

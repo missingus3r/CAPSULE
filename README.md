@@ -204,6 +204,12 @@ node apps/cli/dist/index.js site publish ./www --key site.capsulekey --ttl 7d
 node apps/cli/dist/index.js site publish ./www --key site.capsulekey
 ```
 
+Or do the whole thing from the web app: the **Publish** tab takes a folder or a
+`.zip`, packs and encrypts it in the page, and hands you the address. A new name
+downloads its key file before it is used for anything — the key _is_ the name —
+and the browser keeps a signing handle that cannot be read back out, so the next
+version is one click.
+
 A relay refuses a TTL longer than its own ceiling — seven days out of the box,
 raised with `CAPSULE_MAX_TTL_SECONDS`. The record survives a restart of the
 relay; a site published to a relay running an older version than this does not.

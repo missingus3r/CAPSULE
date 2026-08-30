@@ -50,6 +50,25 @@ what stopped being true. The format follows
 - `examples/site/`, a small `.capsule` site to publish against a local relay.
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
+- **A site can be published from the web app.** The **Publish** tab takes a
+  folder or a `.zip`, packs and encrypts it in the page, and announces the
+  signed record — the same `publishSite` the CLI calls, given its files from a
+  `FileList` instead of a directory walk, and routed through the mix network
+  like everything else. The zip reader is a hundred lines over
+  `DecompressionStream` rather than a dependency inside the page that handles a
+  signing key; ZIP64, encrypted entries and unusual compression methods are
+  refused by name instead of dropping files silently, and `.DS_Store`,
+  `__MACOSX/` and friends are left out with a count shown.
+- **`capsule.json`, an opt-in to being indexed.** A switch in the publish form
+  writes it into the bundle. Nothing indexes CAPSULE yet; when something does,
+  the rule is that **a site which says nothing has not opted in**, because
+  publishing openly is not the same as asking to be catalogued. It lives in the
+  bundle rather than the record deliberately: the record's signed message is a
+  fixed field list, so adding to it would make records existing clients cannot
+  verify — and a client that cannot verify a record refuses the site entirely.
+  Inside the bundle it is covered by the same signature chain as the pages, and
+  no version of anything had to change. Specified in
+  [docs/PROTOCOL.md](docs/PROTOCOL.md) §17.3.1.
 - **The extension routes `.capsule` reads through the mix network, by
   default.** Opening a site used to tell the relay holding it which address
   asked for which name — the gap [docs/SITES.md](docs/SITES.md) §7 called the
@@ -82,6 +101,13 @@ what stopped being true. The format follows
   of routing at all. The mailbox now moves to another relay whenever the
   destination is the provider and there is anywhere else to put it. Found by
   the integration test written for the extension's path, not by reading.
+- **Site keys in the browser are stored as handles, not as bytes.** Creating a
+  name downloads its `.capsulekey` before the key is used for anything, and
+  what the browser keeps afterwards is the non-extractable `CryptoKey` that
+  `loadSiteIdentity` produces, in IndexedDB by structured clone so the flag
+  survives. It can sign the next version and cannot be exported by the page or
+  by anything else reaching the origin. Publishing from another machine needs
+  the backup file, which is the point of handing it over first.
 - **Mix routing is on by default in the web app**, not an option to discover.
   The protection worth defaulting to is the one that holds in a small network:
   the relay storing a capsule does not learn who sent it.

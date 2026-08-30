@@ -145,6 +145,65 @@ A relay can **stay silent**, not lie. That is why the client asks several and
 keeps the highest sequence that verifies: for silence to be worth anything,
 they would all have to be silent.
 
+## 5b. Publishing from the web app
+
+The same publish the CLI does, from a page. A folder picker or a `.zip` becomes
+the `SiteFile[]` that `publishSite` already takes — the CLI builds that array by
+walking a directory, the browser builds it from a `FileList`, and everything
+after that point is identical code: the same bundle, the same encryption, the
+same signed record, and the mix network underneath when it is available.
+
+The zip reader is a hundred lines rather than a dependency: the central
+directory is walked by hand and each entry inflated with `DecompressionStream`,
+which the browser already has. ZIP64, encrypted entries and unusual compression
+methods are refused by name rather than producing a bundle with files silently
+missing. Files an operating system added — `.DS_Store`, `__MACOSX/`,
+`Thumbs.db` — are dropped, and the interface says how many, because a bundle
+cannot be edited after it is published.
+
+A wrapper directory is stripped when _every_ file shares it, so a zip of
+`mysite/` publishes with `index.html` at the root rather than one level down. A
+site with no `index.html` at the top is refused before anything is encrypted:
+the name would resolve to nothing.
+
+### 5b.1 The key
+
+A site key **is** the name. There is no registrar to appeal to, so the web app
+does two things and neither is optional:
+
+- **The backup leaves first.** Creating a name downloads its `.capsulekey`
+  before that key is used for anything at all.
+- **What stays behind cannot be read.** The browser keeps the `CryptoKey` that
+  `loadSiteIdentity` produces, which Web Crypto marks non-extractable and
+  usable only for signing, held in IndexedDB by structured clone so the flag
+  survives. Publishing the next version is one click; what sits at rest is a
+  handle that can sign and cannot be exported — not by the page, not by
+  anything else that reaches this origin.
+
+Publishing from another machine needs the file. That is the trade, and it is
+the honest one: a key that exists only in a browser profile is one cleared
+cache away from a name nobody can ever publish under again.
+
+### 5b.2 Asking to be indexed
+
+The publish form has a switch that writes `capsule.json` into the bundle:
+
+```json
+{ "index": true, "description": "One line for a search result", "lang": "en" }
+```
+
+Nothing indexes CAPSULE yet. When something does, the rule it must follow is in
+[PROTOCOL.md](./PROTOCOL.md) §17.3.1: **a site that says nothing has not opted
+in.** Publishing openly is not the same as asking to be catalogued, and an
+index that treats silence as consent is doing something the author did not ask
+for.
+
+It lives in the bundle rather than the record because the record's signed
+message is a fixed field list — adding to it would make records older clients
+cannot verify, and a client that cannot verify a record refuses the site
+entirely. Inside the bundle it is covered by the same signature chain as the
+pages, and no version of anything had to change.
+
 ## 6. The extension
 
 `http://<name>.capsule/` does not resolve in DNS and never will. The extension

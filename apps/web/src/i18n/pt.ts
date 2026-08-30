@@ -158,6 +158,47 @@ export const pt: Messages = {
   "privacy.details.body":
     "O relay vê o seu endereço IP no momento da conexão, embora não o guarde. O modo anônimo remove os metadados do arquivo, esconde o nome e preenche o tamanho até uma categoria, mas não esconde o seu endereço. O roteamento por mixes esconde: o pedido viaja por vários relays e aquele que guarda a cápsula nunca sabe quem pediu. Nenhum dos dois esconde que você usa CAPSULE — para isso a CLI tem {flag}. A cifragem não protege um dispositivo infectado nem impede que quem recebe guarde uma cópia.",
 
+  "mode.publish": "Publicar",
+  "publish.title": "Publicar um site",
+  "publish.sub":
+    "Uma pasta vira um endereço que ninguém emitiu e que ninguém pode tirar de você.",
+  "publish.step1.label": "O site",
+  "publish.step1.hint":
+    "Uma pasta com um index.html na raiz, ou um zip disso. É empacotado e cifrado aqui, antes de qualquer coisa sair.",
+  "publish.pickFolder": "Escolher uma pasta",
+  "publish.pickZip": "Escolher um .zip",
+  "publish.gathered": "{files} arquivos, {size}, prontos para empacotar.",
+  "publish.skipped": "{count} ficaram de fora por serem arquivos do sistema.",
+  "publish.step2.label": "O nome",
+  "publish.step2.hint": "Um nome novo, ou um cuja chave este navegador já tem.",
+  "publish.newName": "Um nome novo",
+  "publish.importKey": "Importar um arquivo .capsulekey",
+  "publish.step3.label": "Como aparece",
+  "publish.step3.hint": "Tudo opcional, e tudo público depois de publicado.",
+  "publish.titlePlaceholder": "Título, o que a aba mostra",
+  "publish.listed": "Permitir que um índice liste este site",
+  "publish.listedDetail":
+    "Escreve a permissão dentro do próprio site. Ainda não há nada que indexe a CAPSULE; quando houver, precisa tratar um site que não diz nada como um que disse não.",
+  "publish.descriptionPlaceholder": "Uma linha para um resultado de busca",
+  "publish.keyWarning":
+    "O arquivo de chave é baixado antes de publicar. Ele é o nome: se você perder, ninguém pode devolver, nem nós.",
+  "publish.keyReused":
+    "Assinado com a chave que este navegador tem para esse nome. Ela assina e não pode ser lida de volta.",
+  "publish.go": "Empacotar, cifrar e publicar",
+  "publish.working": "Publicando",
+  "publish.workingDetail":
+    "Empacotando o bundle, cifrando, e assinando o record que aponta para ele.",
+  "publish.done": "Publicado",
+  "publish.doneDetail": "Versão {version}, anunciada a {relays} relay(s).",
+  "publish.address": "O endereço",
+  "publish.copy": "Copiar",
+  "publish.copied": "Copiado",
+  "publish.keptKey":
+    "Este navegador guardou um handle de assinatura para o nome, então a próxima versão é um clique. O arquivo de backup continua sendo a única forma de publicar de outro lugar.",
+  "publish.again": "Publicar outro",
+  "publish.error.missingKey":
+    "Este navegador não tem mais essa chave. Importe o arquivo .capsulekey.",
+
   "extension.eyebrow": "A outra metade",
   "extension.title": "Ler um site .capsule",
   "extension.body":

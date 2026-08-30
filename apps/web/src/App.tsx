@@ -36,6 +36,7 @@ import {
   Layers,
   Link2,
   LockKeyhole,
+  Globe,
   PackageOpen,
   Puzzle,
   RotateCcw,
@@ -47,6 +48,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DropZone } from "./components/DropZone";
+import { PublishSite } from "./components/PublishSite";
 import { ProgressState } from "./components/ProgressState";
 import { CATALOGUES, LOCALES, useI18n, useT, type MessageKey } from "./i18n";
 import {
@@ -61,7 +63,7 @@ import {
   type DisplayMetadata,
 } from "./lib/ui";
 
-type Mode = "send" | "receive";
+type Mode = "send" | "receive" | "publish";
 type SendStage = "form" | "uploading" | "success" | "error";
 type ReceiveStage = "empty" | "downloading" | "ready" | "error";
 
@@ -727,10 +729,8 @@ export default function App() {
       <main className="workspace">
         <section className="main-panel" aria-labelledby="main-title">
           <div className="panel-intro">
-            <h1 id="main-title">
-              {mode === "send" ? t("send.title") : t("receive.title")}
-            </h1>
-            <p>{mode === "send" ? t("send.sub") : t("receive.sub")}</p>
+            <h1 id="main-title">{t(`${mode}.title` as MessageKey)}</h1>
+            <p>{t(`${mode}.sub` as MessageKey)}</p>
           </div>
 
           <div
@@ -764,7 +764,27 @@ export default function App() {
                 />
               ) : null}
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "publish"}
+              className={mode === "publish" ? "active" : ""}
+              onClick={() => selectMode("publish")}
+            >
+              <Globe size={17} />
+              {t("mode.publish")}
+            </button>
           </div>
+
+          {mode === "publish" ? (
+            <PublishSite
+              relayUrl={relayUrl}
+              ttlSeconds={ttlSeconds}
+              {...(mixTransport?.transport
+                ? { transport: mixTransport.transport }
+                : {})}
+            />
+          ) : null}
 
           {mode === "send" ? (
             <div className="flow" role="tabpanel">

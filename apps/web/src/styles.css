@@ -2004,3 +2004,57 @@ footer > span {
   color: var(--danger);
   font-size: 0.79rem;
 }
+
+/* --- Publishing a site ---------------------------------------------------- */
+
+.publish-pickers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.publish-pickers .picker {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 1rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.publish-pickers .picker:hover {
+  border-color: var(--forest);
+  background: var(--paper-strong, var(--paper));
+}
+
+.publish-summary {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.publish-summary small {
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
+@media (max-width: 620px) {
+  .publish-pickers {
+    grid-template-columns: 1fr;
+  }
+}

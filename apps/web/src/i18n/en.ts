@@ -166,6 +166,48 @@ export const en = {
   "privacy.details.body":
     "The relay sees your IP address at the moment you connect, though it does not keep it. Anonymous mode removes the file's metadata, hides the name and pads the size to a category, but it does not hide your address. Mix routing does: the request travels through several relays and the one storing the capsule never learns who asked. Neither hides that you use CAPSULE at all — the CLI has {flag} for that. Encryption does not protect an infected device, nor stop whoever receives the file from keeping a copy.",
 
+  "mode.publish": "Publish",
+  "publish.title": "Publish a site",
+  "publish.sub":
+    "A folder becomes an address nobody issued and nobody can take back.",
+  "publish.step1.label": "The site",
+  "publish.step1.hint":
+    "A folder with an index.html at the top, or a zip of one. It is packed and encrypted here, before anything leaves.",
+  "publish.pickFolder": "Choose a folder",
+  "publish.pickZip": "Choose a .zip",
+  "publish.gathered": "{files} files, {size}, ready to pack.",
+  "publish.skipped": "{count} left out as system files.",
+  "publish.step2.label": "The name",
+  "publish.step2.hint":
+    "A new name, or one this browser already holds the key for.",
+  "publish.newName": "A new name",
+  "publish.importKey": "Import a .capsulekey file",
+  "publish.step3.label": "How it is listed",
+  "publish.step3.hint": "All optional, and all public once published.",
+  "publish.titlePlaceholder": "Title, shown in the browser tab",
+  "publish.listed": "Allow indexes to list this site",
+  "publish.listedDetail":
+    "Writes an opt-in into the site itself. Nothing indexes CAPSULE yet; when something does, it must treat a site that says nothing as one that said no.",
+  "publish.descriptionPlaceholder": "One line for a search result",
+  "publish.keyWarning":
+    "The key file downloads before publishing. It is the name: lose it and nobody, including us, can give it back.",
+  "publish.keyReused":
+    "Signed with the key this browser holds for that name. It can sign and cannot be read back out.",
+  "publish.go": "Pack, encrypt and publish",
+  "publish.working": "Publishing",
+  "publish.workingDetail":
+    "Packing the bundle, encrypting it, and signing the record that points at it.",
+  "publish.done": "Published",
+  "publish.doneDetail": "Version {version}, announced to {relays} relay(s).",
+  "publish.address": "The address",
+  "publish.copy": "Copy",
+  "publish.copied": "Copied",
+  "publish.keptKey":
+    "This browser kept a signing handle for the name, so the next version is one click. The backup file is still the only way to publish from anywhere else.",
+  "publish.again": "Publish another",
+  "publish.error.missingKey":
+    "This browser no longer holds that key. Import the .capsulekey file.",
+
   "extension.eyebrow": "The other half",
   "extension.title": "Reading a .capsule site",
   "extension.body":
