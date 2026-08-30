@@ -50,6 +50,17 @@ what stopped being true. The format follows
 - `examples/site/`, a small `.capsule` site to publish against a local relay.
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
+- **An index running in production, and the link to it in the app.**
+  `nubiyua5tkgc54mklml3xr4piafhgtqcvdy6gjscxddu7pepv3iyqiyb.capsule`
+  is published by the genesis operator and rebuilt daily by a systemd timer,
+  with a seven-day TTL so one failed run is not an index that vanishes. The web
+  app links to it beside send, receive and publish, saying that opening it
+  needs the extension. Hardcoding this name is safe in a way a relay address is
+  not: a `.capsule` name is a public key and its record is signed, so it can be
+  seized from nobody — there is nothing extra to pin.
+- **The relay's root redirects to the project page** instead of answering 404.
+  It is an exact-match location: everything under `/v1` still reaches the
+  relay, which was checked rather than assumed.
 - **A genesis relay, pinned.**
   `https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M`
   ships as the default seed, so a fresh checkout reaches the network without

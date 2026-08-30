@@ -238,6 +238,15 @@ path can be seen working before anybody prepares a folder.
 capsule index --seed https://relay.example.org --key search.capsulekey --ttl 7d
 ```
 
+One is already running and refreshed daily by the genesis operator:
+
+```
+http://nubiyua5tkgc54mklml3xr4piafhgtqcvdy6gjscxddu7pepv3iyqiyb.capsule/
+```
+
+The web app links to it beside send, receive and publish; opening it needs the
+extension, like any `.capsule` address.
+
 It reads every name the relays admit to holding, keeps the ones carrying a
 `capsule.json` that asks to be listed, and publishes the result as a `.capsule`
 site of its own. Being listed is a decision the author makes: **a site that says

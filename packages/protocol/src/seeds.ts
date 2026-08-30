@@ -201,3 +201,19 @@ export async function verifyRelayIdentity(
     return "unsupported-runtime";
   }
 }
+
+/**
+ * A directory of sites that asked to be listed, published as a `.capsule`
+ * site of its own.
+ *
+ * Safe to hardcode in a way a relay address is not: a `.capsule` name is a
+ * public key, and the record under it is signed by the matching private one.
+ * Whoever holds this address cannot be impersonated by seizing anything, only
+ * by holding the key — so unlike a seed there is nothing extra to pin.
+ *
+ * What it can do is show less than it has, which is why it is a directory and
+ * not an authority: a name that never appears here still resolves for anybody
+ * who has it.
+ */
+export const DEFAULT_INDEX_SITE =
+  "nubiyua5tkgc54mklml3xr4piafhgtqcvdy6gjscxddu7pepv3iyqiyb.capsule";

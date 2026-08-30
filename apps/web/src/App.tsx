@@ -15,6 +15,7 @@ import {
   type MixNetworkStrength,
 } from "@capsule/mixnet";
 import {
+  DEFAULT_INDEX_SITE,
   defaultSeedOrigins,
   decodeShareCapability,
   encodeOwnerCapability,
@@ -144,7 +145,8 @@ const EXTENSION_INSTALL_URL =
  * decision to operate, and a link to an address that resolves to nothing is
  * worse than no link.
  */
-const CAPSULE_INDEX_NAME = import.meta.env.VITE_CAPSULE_INDEX?.trim() ?? "";
+const CAPSULE_INDEX_NAME =
+  import.meta.env.VITE_CAPSULE_INDEX?.trim() || DEFAULT_INDEX_SITE;
 
 function getPublicAppUrl(): string {
   const configured = import.meta.env.VITE_PUBLIC_APP_URL?.trim();
