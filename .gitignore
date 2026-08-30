@@ -17,3 +17,8 @@ release
 
 # A site key file is the site: whoever copies it can replace the pages.
 *.capsulekey
+
+# Chrome writes the extension signing key next to the packed folder.
+# It is a private key: it must never be committed.
+*.pem
+*.crx
