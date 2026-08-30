@@ -6,6 +6,8 @@ import { basename, dirname, resolve } from "node:path";
 import { Readable } from "node:stream";
 import {
   combineShares,
+  decodeBridgeLine,
+  bridgeOrigin,
   decodeOwnerCapability,
   isPublicRelayOrigin,
   decodeShare,
@@ -18,9 +20,12 @@ import {
 } from "@capsule/protocol";
 import {
   CapsuleRelayClient,
+  createBridgeFetch,
+  type RelayTransportFactory,
   deleteCapsule,
   discoverRelays,
   downloadCapsule,
+  operatorHint,
   resumeUpload,
   selectRelays,
   uploadCapsule,
@@ -41,10 +46,12 @@ import { Command } from "commander";
 import { collectRepeated, humanBytes, parseTtl } from "./options.js";
 import { readPassphrase } from "./passphrase.js";
 import { createProxiedFetch, parseProxyUrl } from "./proxy.js";
+import { registerOfflineCommands } from "./offline.js";
 import { registerSiteCommands } from "./site.js";
 
 interface GlobalOptions {
   json?: boolean;
+  bridge?: string;
   proxy?: string;
   tor?: boolean;
   retries?: string;
@@ -67,6 +74,10 @@ program
     "route every relay request through a SOCKS5 proxy, e.g. socks5h://127.0.0.1:9050",
   )
   .option("--tor", `shorthand for --proxy ${TOR_DEFAULT_PROXY}`)
+  .option(
+    "--bridge <line>",
+    "reach the network through an unlisted relay, using a capsule-bridge: line somebody gave you",
+  )
   .option("--retries <count>", "retries per relay request", "3")
   .option(
     "--mix",
@@ -131,12 +142,46 @@ async function openMixNetwork(seeds: RelaySeed[]): Promise<MixNetwork> {
   return network;
 }
 
+/**
+ * The bridge line, if one was given. A bridge is an unlisted relay: it is not
+ * in anybody's peer list and it answers everyone without the line like an
+ * ordinary web server, which is what makes it usable where the public relays
+ * are blocked.
+ */
+function bridge(): ReturnType<typeof decodeBridgeLine> | undefined {
+  const line = program.opts<GlobalOptions>().bridge;
+  return line ? decodeBridgeLine(line) : undefined;
+}
+
+/** Which transport a transfer should use. Only the mix network replaces it. */
+function relayTransport(
+  mixNetwork?: MixNetwork,
+): { transport: RelayTransportFactory } | Record<string, never> {
+  return mixNetwork ? { transport: mixNetwork.transportFor } : {};
+}
+
+/** Where a relay-less command should point when only a bridge is known. */
+function defaultRelay(configured: string): string {
+  const descriptor = bridge();
+  return descriptor && configured.includes("localhost")
+    ? bridgeOrigin(descriptor)
+    : configured;
+}
+
 function transport(): FetchLike | undefined {
   const options = program.opts<GlobalOptions>();
   const proxyUrl =
     options.proxy ?? (options.tor ? TOR_DEFAULT_PROXY : undefined);
-  if (!proxyUrl) return undefined;
-  return createProxiedFetch(parseProxyUrl(proxyUrl));
+  const proxied = proxyUrl
+    ? createProxiedFetch(parseProxyUrl(proxyUrl))
+    : undefined;
+
+  // The bridge wraps whatever is underneath it, so `--tor --bridge` stacks the
+  // way you would expect: Tor carries the connection, the bridge is what the
+  // connection reaches.
+  const descriptor = bridge();
+  if (!descriptor) return proxied;
+  return createBridgeFetch(descriptor, proxied);
 }
 
 function retryPolicy(): { retry: { attempts: number } } {
@@ -206,6 +251,10 @@ async function readTicket(path: string): Promise<UploadTicket | undefined> {
   }
 }
 
+registerOfflineCommands(program, {
+  json: () => program.opts<GlobalOptions>().json === true,
+});
+
 registerSiteCommands(program, {
   json: () => program.opts<GlobalOptions>().json === true,
   transport,
@@ -216,13 +265,81 @@ registerSiteCommands(program, {
 });
 
 program
+  .command("network")
+  .description("Measure what the live network can actually offer")
+  .option(
+    "--seed <url>",
+    "relay used to discover the network (repeatable)",
+    collectRepeated,
+    [] as string[],
+  )
+  .action(async (options: { seed: string[] }) => {
+    const globalOptions = program.opts<GlobalOptions>();
+    const fetchImpl = transport();
+    const seeds = (
+      options.seed.length > 0
+        ? options.seed
+        : [process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787"]
+    ).map(parseSeed);
+
+    const relays = await discoverRelays({
+      seeds,
+      ...discoveryScope(seeds),
+      ...(fetchImpl ? { fetchImpl } : {}),
+    });
+    const operators = new Set(relays.map((relay) => operatorHint(relay.url)));
+    const mixes = relays.filter((relay) => relay.mixPublicKey);
+    const mixOperators = new Set(mixes.map((relay) => operatorHint(relay.url)));
+
+    if (globalOptions.json) {
+      process.stdout.write(
+        `${JSON.stringify(
+          {
+            relays: relays.length,
+            operators: operators.size,
+            mixNodes: mixes.length,
+            mixOperators: mixOperators.size,
+          },
+          null,
+          2,
+        )}
+`,
+      );
+      return;
+    }
+
+    process.stdout.write(`Relays reachable      ${relays.length}\n`);
+    process.stdout.write(`Apparent operators    ${operators.size}\n`);
+    process.stdout.write(`Mix nodes             ${mixes.length}\n`);
+    process.stdout.write(`Mix operators         ${mixOperators.size}\n\n`);
+
+    // The number people actually want is the anonymity set: how many senders a
+    // message could have come from. CAPSULE cannot report it, and the reason is
+    // the point of the project: there are no accounts, no sessions and no
+    // counters, so there is nothing to count. What is measurable is the
+    // network's capacity to provide anonymity, which is an upper bound on it.
+    process.stdout.write(
+      "This measures the network, not your anonymity set.\n\n" +
+        "The anonymity set is how many people a message could have come from,\n" +
+        "and CAPSULE cannot measure it: there are no accounts and no counters,\n" +
+        "so there is nobody to count. What is above is the ceiling, not the\n" +
+        "number. With few operators the ceiling is low whatever the traffic is.\n",
+    );
+    if (mixOperators.size < 3) {
+      process.stderr.write(
+        `\nWith ${mixOperators.size} mix operator(s), a path can be watched end to end by one party.\n`,
+      );
+    }
+  });
+
+program
   .command("send")
   .alias("create")
   .description("Encrypt and upload a file")
   .argument("<file>", "path to the file")
   .option(
     "--relay <url>",
-    "relay base URL",
+    "relay base URL; defaults to the bridge when --bridge is given",
     process.env.CAPSULE_RELAY_URL ?? "http://localhost:8787",
   )
   .option(
@@ -297,6 +414,7 @@ program
         resume?: string;
       },
     ) => {
+      commandOptions.relay = defaultRelay(commandOptions.relay);
       const absolutePath = resolve(file);
       const fileStat = await stat(absolutePath);
       if (!fileStat.isFile())
@@ -419,14 +537,10 @@ program
         ...(dataShards !== undefined
           ? { replication: { mode: "shards" as const, dataShards } }
           : {}),
-        ...(mixNetwork
-          ? {
-              transport: mixNetwork.transportFor,
-              // A chunk has to fit one packet, and every packet on the network
-              // is the same size whatever it carries.
-              chunkSize: MIX_CHUNK_SIZE,
-            }
-          : {}),
+        ...relayTransport(mixNetwork),
+        // A chunk has to fit one packet, and every packet on the network is
+        // the same size whatever it carries.
+        ...(mixNetwork ? { chunkSize: MIX_CHUNK_SIZE } : {}),
         ...(fetchImpl ? { fetchImpl } : {}),
         ...retryPolicy(),
         ...(commandOptions.resume
@@ -530,7 +644,7 @@ program
         : undefined;
       const downloaded = await downloadCapsule({
         capability,
-        ...(mixNetwork ? { transport: mixNetwork.transportFor } : {}),
+        ...relayTransport(mixNetwork),
         ...(fetchImpl ? { fetchImpl } : {}),
         ...retryPolicy(),
         ...progressReporter("Receiving", ["decrypting", "complete"]),
@@ -586,7 +700,7 @@ program
       ? await openMixNetwork([capability.relayUrl])
       : undefined;
     const result = await deleteCapsule(capability, {
-      ...(mixNetwork ? { transport: mixNetwork.transportFor } : {}),
+      ...relayTransport(mixNetwork),
       ...(fetchImpl ? { fetchImpl } : {}),
       ...retryPolicy(),
     });

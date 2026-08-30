@@ -203,3 +203,52 @@ describe("CAPSULE protocol", () => {
     );
   });
 });
+
+describe("manifest padding", () => {
+  const base = (filename: string, note?: string): CapsuleMetadata => ({
+    version: CAPSULE_PROTOCOL_VERSION,
+    filename,
+    mimeType: "application/octet-stream",
+    byteLength: 1000,
+    chunkSize: 1000,
+    chunkCount: 1,
+    createdAt: "2026-08-30T00:00:00.000Z",
+    expiresAt: null,
+    ...(note ? { note } : {}),
+  });
+
+  it("gives every manifest the same length, whatever the file is called", async () => {
+    const lengths = new Set<number>();
+    for (const [filename, note] of [
+      ["x.txt", undefined],
+      ["Ana Pereira - passport scan 2019.jpg", undefined],
+      ["y.bin", "a".repeat(300)],
+    ] as Array<[string, string | undefined]>) {
+      const secrets = createCapsuleSecrets();
+      const ciphertext = await encryptMetadata(base(filename, note), secrets);
+      lengths.add(ciphertext.byteLength);
+    }
+    // AES-GCM does not hide length, so without padding the ciphertext would
+    // measure the filename and the note.
+    expect(lengths.size).toBe(1);
+  });
+
+  it("does not let the padding reach whoever opens the capsule", async () => {
+    const secrets = createCapsuleSecrets();
+    const metadata = base("report.pdf", "for review");
+    const decrypted = await decryptMetadata(
+      await encryptMetadata(metadata, secrets),
+      secrets,
+    );
+    expect(decrypted).toEqual(metadata);
+    expect(Object.keys(decrypted)).not.toContain("p");
+  });
+
+  it("still round-trips a manifest large enough to need a bigger class", async () => {
+    const secrets = createCapsuleSecrets();
+    const metadata = base("big-note.bin", "n".repeat(4000));
+    const ciphertext = await encryptMetadata(metadata, secrets);
+    expect(ciphertext.byteLength).toBeGreaterThan(4096);
+    expect(await decryptMetadata(ciphertext, secrets)).toEqual(metadata);
+  });
+});

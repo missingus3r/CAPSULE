@@ -1,80 +1,79 @@
-# Sitios `.capsule`
+# `.capsule` sites
 
-**Estado:** implementado y funcionando; sin auditoría externa
-**Fecha:** 2026-08-30
+**Status:** implemented and working; no external audit
+**Date:** 2026-08-30
 
-## 1. Lo primero: qué protege y qué no
+## 1. First: what it protects and what it does not
 
-Un sitio `.capsule` es **público**. Cualquiera que consiga el registro puede
-leer la página, y los registros circulan entre relays a propósito para que el
-nombre resuelva en cualquier lado. Si algo tiene que ser privado, no se publica
-como sitio: se manda como cápsula, con su enlace.
+A `.capsule` site is **public**. Anyone who obtains the record can read the
+page, and records circulate between relays on purpose so that the name resolves
+anywhere. If something has to be private it is not published as a site: it is
+sent as a capsule, with its link.
 
-Lo que un sitio `.capsule` sí garantiza:
+What a `.capsule` site does guarantee:
 
-- **Nadie puede reemplazar tus páginas** salvo quien tenga tu clave, porque el
-  nombre _es_ la clave.
-- **Nadie puede entregarte una versión vieja** sin que el navegador lo note.
-- **El visitante no le cuenta a nadie qué leyó**, porque la página no puede
-  hacer ninguna petición de red.
-- **El relay no sabe qué está guardando**: recibe una cápsula cifrada, con
-  relleno a clase de tamaño y un nombre de archivo neutro.
+- **Nobody can replace your pages** except whoever holds your key, because the
+  name _is_ the key.
+- **Nobody can hand you an older version** without the browser noticing.
+- **The visitor tells nobody what they read**, because the page cannot make any
+  network request.
+- **The relay does not know what it is storing**: it receives an encrypted
+  capsule, padded to a size class, under a neutral filename.
 
-Lo que no garantiza:
+What it does not guarantee:
 
-- **Que el sitio siga existiendo.** Vive en relays que alguien mantiene. Si
-  vencen las cápsulas o desaparecen los relays, el nombre resuelve a nada.
-- **Que publicar sea anónimo por sí solo.** El relay ve la dirección de quien
-  sube, salvo que se use `--mix` o `--tor`.
-- **Que nadie sepa que visitaste el sitio.** El relay al que le preguntás ve
-  que preguntaste por ese nombre. Con `--mix` no; desde la extensión, todavía
-  sí (ver §7).
+- **That the site keeps existing.** It lives on relays somebody maintains. If
+  the capsules expire or the relays disappear, the name resolves to nothing.
+- **That publishing is anonymous by itself.** The relay sees the address of
+  whoever uploads, unless `--mix`, `--tor` or `--bridge` is used.
+- **That nobody knows you visited.** The relay you ask sees that you asked
+  about that name. With `--mix` it does not; from the extension, it still does
+  (see §7).
 
-## 2. El nombre
+## 2. The name
 
 ```
-<52 caracteres base32>.capsule
+<56 base32 characters>.capsule
 ```
 
-Más precisamente: 35 bytes en base32 sin relleno, que son la clave pública
-Ed25519 (32), dos bytes de suma de verificación y un byte de versión. Da 56
-caracteres más `.capsule`.
+More precisely: 35 bytes in base32 with no padding, being the Ed25519 public
+key (32), two checksum bytes and one version byte. That gives 56 characters
+plus `.capsule`.
 
 ```
 6dijvuvwrd5jqp4efjbb4hwcsmtsf6sgi3at4jeto63k7x5fkbwat2yb.capsule
 ```
 
-Es feo y no se recuerda. Ese es el precio de que nadie tenga que emitirlo. Es
-la misma decisión que tomó Tor con las direcciones onion v3, y por las mismas
-razones: un nombre legible necesita un registro, un registro necesita un
-registrador, y un registrador es alguien a quien presionar.
+It is ugly and unmemorable. That is the price of nobody having to issue it. It
+is the same decision Tor made for onion v3 addresses, for the same reason: a
+readable name needs a registry, a registry needs a registrar, and a registrar
+is somebody who can be leaned on.
 
-La suma de verificación no protege contra nada: sirve para que un nombre mal
-tipeado falle en el navegador en vez de resolver a un sitio distinto.
+The checksum protects against nothing. It exists so that a mistyped name fails
+in the browser instead of resolving to a different site.
 
-- Codificación: alfabeto RFC 4648 en minúsculas, sin relleno. Los bits
-  sobrantes del último carácter deben ser cero, así que un nombre tiene una
-  sola escritura posible.
-- Suma: `SHA-256("CAPSULE/site-name/v1" ‖ clave ‖ versión)[0..2]`.
+- Encoding: the RFC 4648 alphabet in lowercase, no padding. The leftover bits
+  of the final character must be zero, so a name has exactly one spelling.
+- Checksum: `SHA-256("CAPSULE/site-name/v1" ‖ key ‖ version)[0..2]`.
 
-## 3. El registro
+## 3. The record
 
-Un registro dice «la versión N de este nombre es esta capacidad»:
+A record says "version N of this name is this capability":
 
 ```json
 {
   "version": 1,
-  "name": "<nombre>.capsule",
+  "name": "<name>.capsule",
   "sequence": 7,
   "publishedAt": "2026-08-30T16:39:44.940Z",
   "capability": "capsule=eyJ2ZXJzaW9uIjoz...",
-  "title": "Opcional, 120 caracteres",
+  "title": "Optional, 120 characters",
   "signature": "<base64url, 64 bytes>"
 }
 ```
 
-Se firma este texto exacto, con los campos separados por saltos de línea y
-ninguno pudiendo contenerlos:
+This exact text is what gets signed, fields separated by newlines and none of
+them able to contain one:
 
 ```
 CAPSULE/site-record/v1
@@ -83,94 +82,94 @@ CAPSULE/site-record/v1
 <sequence>
 <publishedAt>
 <capability>
-<title o vacío>
+<title, or empty>
 ```
 
-Reglas que aplican tanto el relay como el cliente:
+Rules the relay and the client both apply:
 
-- La firma se verifica contra la clave que está **dentro del nombre**. No hay
-  otra fuente de verdad.
-- `sequence` sólo puede subir. Un relay guarda el más alto que vio; un
-  navegador guarda el más alto que aceptó.
-- Un registro con fecha más de 10 minutos en el futuro se rechaza; uno de más
-  de 90 días, también, para que un registro viejo no quede circulando para
-  siempre.
+- The signature is verified against the key that is **inside the name**. There
+  is no other source of truth.
+- `sequence` may only go up. A relay keeps the highest it has seen; a browser
+  keeps the highest it has accepted.
+- A record dated more than ten minutes in the future is refused; so is one more
+  than ninety days old, so that a stale record does not circulate forever.
 
-## 4. El paquete
+## 4. The bundle
 
-El sitio entero es una sola cápsula. El formato es deliberadamente aburrido:
+The whole site is a single capsule. The format is deliberately boring:
 
 ```
 "CAPSITE1"        8 bytes
-largo del índice  uint32 big-endian
-índice            JSON UTF-8
-archivos          concatenados, en el orden del índice
+index length      uint32 big-endian
+index             UTF-8 JSON
+files             concatenated, in index order
 ```
 
-El índice es `{ "v":1, "entries":[ {"path","type","offset","length"} ] }`.
+The index is `{ "v":1, "entries":[ {"path","type","offset","length"} ] }`.
 
-**No hay descarga parcial y es a propósito.** Si el visitante pidiera archivo
-por archivo, el relay aprendería qué páginas leyó. Bajar el sitio entero cuesta
-más ancho de banda y compra que el patrón de lectura no exista.
+**There is no partial download, and that is on purpose.** If a visitor asked
+for one file at a time, the relay would learn which pages they read.
+Downloading the whole site costs more bandwidth and buys the absence of a
+reading pattern.
 
-Sobre esto se aplica todo lo que ya hace una cápsula: cifrado extremo a
-extremo, relleno a clase de tamaño, espejos, reparto `k` de `n` y ruteo por la
-red de mezcla. No hizo falta cambiar nada del formato v3.
+Everything a capsule already does applies on top: end-to-end encryption,
+size-class padding, mirrors, `k`-of-`n` sharing and mix routing. Nothing in the
+v3 format had to change.
 
-## 5. Los relays
+## 5. The relays
 
-Tres endpoints, todos opcionales (`CAPSULE_SITES_ENABLED=false` los apaga):
+Three endpoints, all optional (`CAPSULE_SITES_ENABLED=false` turns them off):
 
-| Endpoint                | Qué hace                                                                                                                                 |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `PUT /v1/sites/:name`   | Acepta un registro si verifica y su secuencia avanza. `202` si lo guardó, `200` si ya tenía uno igual o más nuevo, `400` si no verifica. |
-| `GET /v1/sites/:name`   | Devuelve el registro, o `404`.                                                                                                           |
-| `GET /v1/sites?limit=n` | Lista registros recientes, para el chismorreo entre relays.                                                                              |
+| Endpoint                | What it does                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PUT /v1/sites/:name`   | Accepts a record if it verifies and its sequence moves forward. `202` if stored, `200` if it already had an equal or newer one, `400` if it does not verify. |
+| `GET /v1/sites/:name`   | Returns the record, or `404`.                                                                                                                                |
+| `GET /v1/sites?limit=n` | Lists recent records, for gossip between relays.                                                                                                             |
 
-Los relays se pasan registros entre sí en cada ronda de sincronización, con un
-tope por ronda (`CAPSULE_SITE_GOSSIP_LIMIT`, 200 por omisión) y un tope total
-(`CAPSULE_MAX_SITES`, 5000). Sin esto, un nombre sólo resolvería en los relays
-a los que su autor lo anunció, y habría que decirle a cada visitante cuáles
-son — que es un registro con pasos extra.
+Relays pass records to each other on every sync round, capped per round
+(`CAPSULE_SITE_GOSSIP_LIMIT`, 200 by default) and in total
+(`CAPSULE_MAX_SITES`, 5000). Without this a name would only resolve at the
+relays its author announced to, and every visitor would have to be told which
+those are — which is a registry with extra steps.
 
-Un relay puede **callarse**, no mentir. Por eso el cliente le pregunta a varios
-y se queda con la secuencia más alta que verifique: para que callarse sirva de
-algo, tendrían que callarse todos.
+A relay can **stay silent**, not lie. That is why the client asks several and
+keeps the highest sequence that verifies: for silence to be worth anything,
+they would all have to be silent.
 
-## 6. La extensión
+## 6. The extension
 
-`http://<nombre>.capsule/` no resuelve por DNS y nunca va a hacerlo. La
-extensión intercepta la navegación con una regla de `declarativeNetRequest`
-antes de que el navegador resuelva nada, y la convierte en una página propia
-con la dirección original en el **fragmento** — que no viaja a ningún servidor,
-igual que en un enlace de cápsula.
+`http://<name>.capsule/` does not resolve in DNS and never will. The extension
+intercepts the navigation with a `declarativeNetRequest` rule before the
+browser resolves anything, and turns it into a page of its own with the
+original address in the **fragment** — which never travels to any server, the
+same as in a capsule link.
 
-Después:
+Then:
 
-1. Parsea el nombre. Si no parsea, se termina ahí: no hay búsqueda, ni
-   «¿quisiste decir?».
-2. Pregunta a los relays configurados y verifica cada respuesta.
-3. Compara la secuencia con la más alta que este navegador aceptó para el
-   nombre. Si es menor, muestra un error en vez de la página.
-4. Baja la cápsula, la descifra y desempaqueta el paquete.
-5. Reconstruye la página y la entrega a un marco aislado.
+1. It parses the name. If it does not parse, it stops there: no search, no
+   "did you mean".
+2. It asks the configured relays and verifies every answer.
+3. It compares the sequence with the highest this browser has accepted for the
+   name. If it is lower, it shows an error instead of the page.
+4. It downloads the capsule, decrypts it and unpacks the bundle.
+5. It rebuilds the page and hands it to an isolated frame.
 
-### 6.1 Cómo se reconstruye una página
+### 6.1 How a page is rebuilt
 
-El contenido de un sitio no es confiable: lo escribió quien tenga una clave y
-llegó por relays que nadie avala. Así que el documento no se muestra, se
-rehace:
+A site's content is not trusted: it was written by whoever holds a key and
+arrived through relays nobody vouches for. So the document is not displayed, it
+is remade:
 
-- Cada referencia que resuelve dentro del paquete se convierte en un `data:`
-  URL — hojas de estilo, imágenes, fuentes, `srcset`, `url()` dentro del CSS.
-- Cada referencia que apunta afuera se elimina.
-- Los enlaces internos apuntan a la propia página del visor, así que navegar
-  actualiza la barra de direcciones y el historial funciona.
-- Un enlace que sale de CAPSULE se convierte en una confirmación: se muestra a
-  dónde va y hace falta un segundo clic.
-- `<base>` y `<meta http-equiv="refresh">` se borran: el primero desharía todas
-  las reescrituras y el segundo es una navegación que nadie pidió.
-- Se inserta una política al principio del `<head>`:
+- Every reference that resolves inside the bundle becomes a `data:` URL —
+  stylesheets, images, fonts, `srcset`, `url()` inside CSS.
+- Every reference pointing outside is removed.
+- Internal links point back at the viewer's own page, so navigating updates the
+  address bar and history works.
+- A link that leaves CAPSULE becomes a confirmation: it shows where it goes and
+  takes a second click.
+- `<base>` and `<meta http-equiv="refresh">` are deleted: the first would undo
+  every rewrite and the second is a navigation nobody asked for.
+- A policy is inserted at the very top of the `<head>`:
 
 ```
 default-src 'none'; img-src data:; media-src data:; font-src data:;
@@ -178,47 +177,48 @@ style-src 'unsafe-inline' data:; script-src 'none'; frame-src 'none';
 connect-src 'none'; form-action 'none'; base-uri 'none'
 ```
 
-### 6.2 Los scripts, y por qué están apagados
+### 6.2 Scripts, and why they are off
 
-Por omisión el marco va con `sandbox="allow-top-navigation-by-user-activation"`
-y **sin** `allow-scripts`. Sin scripts, lo único que puede navegar el marco es
-un clic real sobre un enlace que escribió el reconstructor. Con eso la garantía
-es absoluta: la página no puede hacer ni una petición de red.
+By default the frame carries
+`sandbox="allow-top-navigation-by-user-activation"` and **no**
+`allow-scripts`. With no scripts, the only thing that can navigate the frame is
+a real click on a link the rebuilder wrote. That makes the guarantee absolute:
+the page cannot make a single network request.
 
-Se pueden habilitar por sitio, con una advertencia visible. Un script sí puede
-llevar el marco a una dirección externa, y eso revelaría la IP del visitante a
-esa dirección. La política sigue impidiendo `fetch`, imágenes y fuentes
-externas, pero una navegación no es una petición sujeta a CSP y no hay
-directiva que la cubra desde que `navigate-to` quedó fuera del estándar.
+They can be enabled per site, with a visible warning. A script _can_ take the
+frame to an external address, and that would reveal the visitor's IP to it. The
+policy still blocks `fetch`, external images and external fonts, but a
+navigation is not a request subject to CSP and no directive covers it since
+`navigate-to` left the standard.
 
-Nunca se usa `allow-same-origin`. El marco vive en un origen opaco; si
-compartiera el origen de la extensión, el sitio tendría acceso a `chrome.*`.
+`allow-same-origin` is never used. The frame lives in an opaque origin; if it
+shared the extension's origin the site would have access to `chrome.*`.
 
-### 6.3 Permisos
+### 6.3 Permissions
 
-La extensión pide `declarativeNetRequest` y `storage`, y **ningún** permiso de
-host de entrada. El acceso a un relay se pide cuando alguien lo agrega en la
-configuración, para ese origen y nada más, y se devuelve cuando lo quita. Una
-extensión que puede leer cualquier sitio es una extensión que hay que confiar
-mucho más de lo necesario.
+The extension asks for `declarativeNetRequest` and `storage`, and **no** host
+permission at all up front. Access to a relay is requested when somebody adds
+it in the settings, for that origin and nothing else, and given back when they
+remove it. An extension that can read any site is an extension that has to be
+trusted far more than necessary.
 
-## 7. Lo que falta
+## 7. What is missing
 
-**El visitante todavía se expone al relay.** La extensión consulta relays
-directamente desde el navegador. El relay ve una dirección IP preguntando por
-un nombre. La CLI puede ir por la red de mezcla; la extensión no, porque
-requiere Node. Es la carencia más importante de esta versión.
+**The visitor is still exposed to the relay.** The extension queries relays
+directly from the browser, so a relay sees an IP address asking about a name.
+The CLI can go through the mix network; the extension cannot, because that
+requires Node. This is the most important gap in this version.
 
-**No hay caché entre sesiones.** El paquete se guarda en
-`chrome.storage.session`, que vive en memoria y se borra al cerrar el
-navegador. Es lo correcto para la privacidad y significa volver a bajar el
-sitio cada vez.
+**No cache between sessions.** The bundle is kept in
+`chrome.storage.session`, which lives in memory and is cleared when the browser
+closes. That is the right thing for privacy and it means downloading the site
+again each time.
 
-**Sólo Chromium.** La extensión es MV3 con `declarativeNetRequest`. Firefox
-necesita un puerto; Safari, otro.
+**Chromium only.** The extension is MV3 with `declarativeNetRequest`. Firefox
+needs a port; Safari, another.
 
-**El tamaño es un límite real.** Un sitio se baja entero. La CLI corta en 64
-MiB y en la práctica un sitio útil está por debajo de unos pocos MiB.
+**Size is a real limit.** A site is downloaded whole. The CLI caps it at 64
+MiB, and in practice a useful site is well under a few MiB.
 
-**Nada de esto está auditado.** El reconstructor de páginas es un límite de
-seguridad escrito a mano y probado con los casos que se nos ocurrieron.
+**None of this is audited.** The page rebuilder is a hand-written security
+boundary, tested against the cases we thought of.

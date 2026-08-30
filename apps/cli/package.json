@@ -17,7 +17,8 @@
     "@capsule/mixnet": "1.2.0",
     "@capsule/protocol": "1.2.0",
     "@capsule/sdk": "1.2.0",
-    "commander": "^14.0.0"
+    "commander": "^14.0.0",
+    "@capsule/lan": "1.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

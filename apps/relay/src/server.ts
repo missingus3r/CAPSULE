@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, {
   type FastifyInstance,
+  type FastifyReply,
   type FastifyRequest,
   type FastifyServerOptions,
 } from "fastify";
@@ -14,6 +15,7 @@ import {
   notFound,
   payloadTooLarge,
 } from "./errors.js";
+import { RelayBridge, loadBridgeKey } from "./bridge.js";
 import { loadRelayIdentity, type RelayIdentity } from "./identity.js";
 import { MixNode, type MixPeer } from "./mix.js";
 import { PeerDirectory, type RelayAnnouncement } from "./peers.js";
@@ -32,6 +34,12 @@ import {
   type MixRequest,
   type MixResponse,
 } from "@capsule/mixnet";
+import {
+  encodeBridgeLine,
+  randomBridgeKey,
+  toBase64Url,
+  fromBase64Url,
+} from "@capsule/protocol";
 
 const RELAY_API_VERSION = 1;
 const RELAY_SOFTWARE = "capsule-relay/1.2.0";
@@ -191,14 +199,102 @@ export async function buildRelayServer(
   const logger = config.ipBlind
     ? blindLogger(fastifyOptions.logger)
     : fastifyOptions.logger;
-  const app = Fastify({
+  // --- Bridge mode -----------------------------------------------------------
+  //
+  // Built before the server, because the URL rewriter that hides every route
+  // behind the secret prefix has to exist by the time Fastify starts routing.
+  const bridge = config.bridgeMode
+    ? await RelayBridge.create({
+        key: fromBase64Url(
+          await loadBridgeKey(config.storageDir, config.bridgeKey),
+        ),
+        decoyFile: config.bridgeDecoyFile,
+      })
+    : undefined;
+  const DECOY_ROUTE = "/__capsule_decoy";
+
+  const serverOptions: FastifyServerOptions = {
     ...fastifyOptions,
     ...(logger !== undefined ? { logger } : {}),
     bodyLimit: Math.max(config.maxManifestBytes * 2, 64 * 1024),
     trustProxy: false,
-  });
+  };
+  if (bridge) {
+    // Everything addressed to the secret prefix loses it and is routed
+    // normally. Everything else — including a probe for `/v1/info` — is sent
+    // to the decoy, which is all this server appears to be.
+    serverOptions.rewriteUrl = function rewriteUrl(request): string {
+      const url = request.url ?? "/";
+      const inner = bridge.unwrap(url);
+      if (inner === undefined) {
+        return `${DECOY_ROUTE}?to=${encodeURIComponent(url)}`;
+      }
+      return inner;
+    };
+  }
 
-  const peers = new PeerDirectory(config, identity, {
+  const app = Fastify(serverOptions);
+
+  if (bridge) {
+    /**
+     * Everything that is not an authenticated request under the secret prefix
+     * ends up here. It answers the way an unconfigured web server answers: a
+     * page at the root, a plain 404 everywhere else. No CAPSULE header, no
+     * JSON, no hint that a relay is running on this address.
+     */
+    const sendDecoy = (reply: FastifyReply, original: string): void => {
+      const path = original.split("?")[0] ?? "/";
+      if (path === "/" || path === "/index.html") {
+        void reply
+          .status(200)
+          .header("Content-Type", bridge.decoyContentType)
+          .send(bridge.decoyBody);
+        return;
+      }
+      void reply
+        .status(404)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .send(
+          "<!doctype html><title>404 Not Found</title><h1>Not Found</h1>\n",
+        );
+    };
+
+    app.all<{ Querystring: { to?: string } }>(
+      DECOY_ROUTE,
+      async (request, reply) => {
+        sendDecoy(reply, request.query.to ?? "/");
+      },
+    );
+
+    /**
+     * The prefix alone is not enough. Prefixes leak — into proxy logs, into a
+     * screenshot, into somebody's history — and a censor who has one would
+     * otherwise be able to confirm what this server is. Every real request
+     * carries an authenticator over its own method and path, and a request
+     * without one is answered exactly like a request to a path that does not
+     * exist.
+     */
+    app.addHook("onRequest", async (request, reply) => {
+      const url = request.url;
+      if (url.startsWith(DECOY_ROUTE)) return;
+      const authorized = await bridge.authorize(
+        request.method,
+        url,
+        request.headers.cookie,
+      );
+      if (!authorized) {
+        sendDecoy(reply, url);
+        return reply;
+      }
+      return undefined;
+    });
+  }
+
+  // A bridge learns the network but never announces itself into it. An
+  // announced bridge appears in somebody's `/v1/peers`, and a bridge in a peer
+  // list is not a bridge.
+  const peerConfig = bridge ? { ...config, publicUrl: undefined } : config;
+  const peers = new PeerDirectory(peerConfig, identity, {
     ...(runtime.fetchImpl ? { fetchImpl: runtime.fetchImpl } : {}),
     log: (message, details) => app.log.info(details ?? {}, message),
   });
@@ -207,15 +303,18 @@ export async function buildRelayServer(
   const sites = new SiteDirectory({ maxSites: config.maxSites });
 
   const isAllowedOrigin = originMatcher(config.corsOrigins);
-  await app.register(cors, {
-    origin(origin, callback) {
-      callback(null, isAllowedOrigin(origin));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Authorization", "Content-Type"],
-    maxAge: 86_400,
-    strictPreflight: true,
-  });
+  // A bridge answers no cross-origin preflight and advertises no policy: those
+  // headers are a tell, and nothing that talks to a bridge needs them.
+  if (!bridge)
+    await app.register(cors, {
+      origin(origin, callback) {
+        callback(null, isAllowedOrigin(origin));
+      },
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Authorization", "Content-Type"],
+      maxAge: 86_400,
+      strictPreflight: true,
+    });
 
   // Rate limiting needs to tell clients apart without keeping a list of who
   // they are: the address is hashed with a secret that rotates on its own, so
@@ -892,6 +991,7 @@ export async function buildRelayServer(
     app.decorate("capsuleMix", mix);
   }
 
+  app.decorate("capsuleBridge", bridge ?? null);
   app.decorate("capsulePeers", peers);
   app.decorate("capsuleIdentity", identity);
   app.decorate("capsuleStorage", storage);
@@ -913,6 +1013,7 @@ export async function buildRelayServer(
 
 declare module "fastify" {
   interface FastifyInstance {
+    capsuleBridge: RelayBridge | null;
     capsulePeers: PeerDirectory;
     capsuleIdentity: RelayIdentity;
     capsuleStorage: CapsuleStorage;

@@ -1,4 +1,11 @@
-import { RELAY_API_VERSION } from "@capsule/protocol";
+import {
+  RELAY_API_VERSION,
+  bridgeCookie,
+  bridgeOrigin,
+  deriveBridgeSecrets,
+  type BridgeDescriptor,
+  type BridgeSecrets,
+} from "@capsule/protocol";
 import type { FetchLike } from "./network.js";
 
 export interface RelayCreateRequest {
@@ -253,11 +260,26 @@ export class CapsuleRelayClient implements RelayTransport {
   private readonly request: FetchLike;
   private readonly retry: RetryPolicy;
 
+  /**
+   * Reached through a bridge instead of directly. Every request then travels
+   * under the bridge's secret path prefix and carries an authenticator, and to
+   * anyone watching the address it is traffic to an ordinary web server.
+   */
+  private readonly bridge: BridgeDescriptor | undefined;
+  private bridgeSecrets: Promise<BridgeSecrets> | undefined;
+
   constructor(
     relayUrl: string,
-    options: { fetchImpl?: FetchLike; retry?: Partial<RetryPolicy> } = {},
+    options: {
+      fetchImpl?: FetchLike;
+      retry?: Partial<RetryPolicy>;
+      bridge?: BridgeDescriptor;
+    } = {},
   ) {
-    this.relayUrl = normalizeRelayUrl(relayUrl);
+    this.bridge = options.bridge;
+    this.relayUrl = options.bridge
+      ? bridgeOrigin(options.bridge)
+      : normalizeRelayUrl(relayUrl);
     if (!options.fetchImpl && typeof globalThis.fetch !== "function") {
       throw new Error("No fetch implementation is available");
     }
@@ -266,6 +288,35 @@ export class CapsuleRelayClient implements RelayTransport {
     this.request =
       options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
     this.retry = { ...DEFAULT_RETRY_POLICY, ...options.retry };
+  }
+
+  /**
+   * Turns a relay path into the URL actually requested.
+   *
+   * Direct, that is the relay plus the path. Through a bridge, the path moves
+   * under a secret prefix and the request gains a session cookie authenticating
+   * its own method and path — so a cookie seen on one request cannot be
+   * replayed onto another, and a censor who learns the prefix still cannot make
+   * the bridge answer.
+   */
+  private async address(
+    path: string,
+    init: RequestInit,
+  ): Promise<{ url: string; init: RequestInit }> {
+    if (!this.bridge) return { url: `${this.relayUrl}${path}`, init };
+    this.bridgeSecrets ??= deriveBridgeSecrets(this.bridge.key);
+    const secrets = await this.bridgeSecrets;
+    const cookie = await bridgeCookie(secrets, init.method ?? "GET", path);
+    return {
+      url: `${this.relayUrl}/${secrets.pathPrefix}${path}`,
+      init: {
+        ...init,
+        // A cookie, not a header of our own: `Authorization` already carries
+        // the capsule's bearer token, and a bespoke header would be one string
+        // a censor could match on every bridge at once.
+        headers: { ...(init.headers ?? {}), Cookie: cookie.header },
+      },
+    };
   }
 
   /**
@@ -290,8 +341,9 @@ export class CapsuleRelayClient implements RelayTransport {
         await delay(backoff / 2 + Math.random() * (backoff / 2), signal);
       }
       try {
-        const response = await this.request(`${this.relayUrl}${path}`, {
-          ...init,
+        const addressed = await this.address(path, init);
+        const response = await this.request(addressed.url, {
+          ...addressed.init,
           ...requestSignal(signal),
         });
         if (response.ok) return response;

@@ -11,10 +11,12 @@ import {
 } from "./erasure.js";
 
 export * from "./address.js";
+export * from "./bridge.js";
 export * from "./bundle.js";
 export * from "./bytes.js";
 export * from "./erasure.js";
 export * from "./gf256.js";
+export * from "./offline.js";
 export * from "./recovery.js";
 export * from "./shamir.js";
 export * from "./site.js";
@@ -262,6 +264,36 @@ export async function decryptChunk(
   }
 }
 
+/** Manifest size classes. The smallest holds an ordinary manifest with room. */
+const MANIFEST_CLASSES = [512, 1024, 2048, 4096, 8192, 16_384];
+/** Field the filler goes in. Readers ignore fields they do not know. */
+const MANIFEST_FILLER_FIELD = "p";
+
+/**
+ * Rounds the manifest up to a size class before encrypting it.
+ *
+ * AES-GCM does not hide length, so without this the ciphertext of the manifest
+ * measures the filename and the note. A capsule called `x.txt` and one called
+ * `Ana Pereira - pasaporte.jpg` would be visibly different to the relay, even
+ * with both of them unreadable.
+ *
+ * This is not an option, and that is the point. An anonymity feature some
+ * people switch on splits everyone into those who did and those who did not,
+ * and each group is smaller than the whole. Uniformity only works when it is
+ * not a choice.
+ */
+function padManifest(metadata: CapsuleMetadata): string {
+  const withEmptyFiller = JSON.stringify({
+    ...metadata,
+    [MANIFEST_FILLER_FIELD]: "",
+  });
+  const target =
+    MANIFEST_CLASSES.find((size) => size >= withEmptyFiller.length) ??
+    Math.ceil(withEmptyFiller.length / 1024) * 1024;
+  const filler = "-".repeat(Math.max(0, target - withEmptyFiller.length));
+  return JSON.stringify({ ...metadata, [MANIFEST_FILLER_FIELD]: filler });
+}
+
 export async function encryptMetadata(
   metadata: CapsuleMetadata,
   secrets: CapsuleSecrets,
@@ -270,7 +302,7 @@ export async function encryptMetadata(
   if (metadata.version !== secretsVersion(secrets)) {
     throw new Error("Capsule metadata and secrets declare different versions");
   }
-  return encryptChunk(textEncoder.encode(JSON.stringify(metadata)), 0, secrets);
+  return encryptChunk(textEncoder.encode(padManifest(metadata)), 0, secrets);
 }
 
 export async function decryptMetadata(
@@ -280,7 +312,11 @@ export async function decryptMetadata(
   const plaintext = await decryptChunk(ciphertext, 0, secrets);
   const parsed: unknown = JSON.parse(textDecoder.decode(plaintext));
   assertCapsuleMetadata(parsed);
-  return parsed;
+  // The filler is dropped here so nothing downstream ever sees it. A manifest
+  // written before manifests were padded simply has none.
+  const { [MANIFEST_FILLER_FIELD]: _filler, ...metadata } =
+    parsed as unknown as Record<string, unknown>;
+  return metadata as unknown as CapsuleMetadata;
 }
 
 export function assertCapsuleMetadata(

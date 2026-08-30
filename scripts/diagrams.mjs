@@ -22,14 +22,17 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const out = join(root, "docs/diagrams");
 
+// White, grey and black. Emphasis comes from weight and contrast rather than
+// hue, which also means the diagrams survive being printed or read by someone
+// who does not see colour.
 const T = {
-  ground: "#f3efe6",
-  paper: "#fffdf8",
-  ink: "#18352f",
-  muted: "#6b7772",
-  accent: "#ef7959",
-  line: "#d5cec0",
-  lineStrong: "#b9b1a0",
+  ground: "#f2f2f2",
+  paper: "#ffffff",
+  ink: "#3a3a3a",
+  muted: "#8a8a8a",
+  accent: "#000000",
+  line: "#dcdcdc",
+  lineStrong: "#9e9e9e",
 };
 
 // Single quotes inside the stacks: these end up in double-quoted XML
@@ -132,7 +135,8 @@ function node({ x, y, w, h, eyebrow, name, sub, accent = false }) {
   const stroke = accent ? T.accent : T.line;
   let svg =
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" ` +
-    `fill="${T.paper}" stroke="${stroke}" stroke-width="${accent ? 1.5 : 1}" />`;
+    `fill="${accent ? "#ebebeb" : T.paper}" stroke="${stroke}" ` +
+    `stroke-width="${accent ? 2 : 1}" />`;
   const cx = x + w / 2;
   let cursor = y + 20;
   if (eyebrow) {
@@ -308,7 +312,7 @@ function capsuleFlow() {
     body: arrows + nodes,
     legend: [
       "Solid — ciphertext, over the network",
-      "Coral — the key, out of band",
+      "Black — the key, out of band",
       "The relay never holds both",
     ],
   });
@@ -438,7 +442,7 @@ function mixNetwork() {
       "back along a second path the relay cannot see, into a mailbox the client polls.",
     body: arrows + nodes,
     legend: [
-      "Coral — the two ends, which never meet",
+      "Black — the two ends, which never meet",
       "Dashed — the reply, along a path the sender chose",
       "Each hop waits a random time before forwarding",
     ],
@@ -588,7 +592,7 @@ function capsuleSite() {
     legend: [
       "Top — publishing, once per update",
       "Bottom — visiting, every time",
-      "Coral — the only thing that has to be trusted: the key",
+      "Black — the only thing that has to be trusted: the key",
     ],
   });
 }

@@ -11,7 +11,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build:libs": "npm run build -w @capsule/protocol && npm run build -w @capsule/sdk && npm run build -w @capsule/mixnet",
+    "build:libs": "npm run build -w @capsule/protocol && npm run build -w @capsule/sdk && npm run build -w @capsule/mixnet && npm run build -w @capsule/lan",
     "build": "npm run build:libs && npm run build -w @capsule/relay && npm run build -w @capsule/cli && npm run build -w @capsule/web && npm run build -w @capsule/extension",
     "dev": "npm run build:libs && concurrently -k -n relay,web -c cyan,magenta \"npm run dev -w @capsule/relay\" \"npm run dev -w @capsule/web\"",
     "dev:relay": "npm run build:libs && npm run dev -w @capsule/relay",

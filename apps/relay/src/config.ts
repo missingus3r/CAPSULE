@@ -35,6 +35,21 @@ export interface RelayConfig {
   announceWorkBits: number;
   /** Relays kept per apparent operator, so one domain cannot fill the list. */
   maxPeersPerOperator: number;
+  /**
+   * Runs as a bridge: unlisted, reachable only with the bridge line, and
+   * indistinguishable from an ordinary web server to anyone without it.
+   */
+  bridgeMode: boolean;
+  /** base64url 32 bytes. Generated and persisted when bridge mode is on. */
+  bridgeKey: string | undefined;
+  /** File served to everyone who is not an authenticated client. */
+  bridgeDecoyFile: string | undefined;
+  /**
+   * Announces this relay on the local network so a client with no internet,
+   * no DNS and no seed list can still find it. Off by default: a beacon tells
+   * everyone on the wire that CAPSULE is running here.
+   */
+  lanBeacon: boolean;
   /** Serves and gossips `.capsule` site records. */
   sitesEnabled: boolean;
   /** Site records held before the oldest is dropped. */
@@ -302,6 +317,11 @@ export function loadRelayConfig(
       "CAPSULE_ALLOW_PRIVATE_PEERS",
       false,
     ),
+    lanBeacon: booleanFromEnvironment(environment, "CAPSULE_LAN", false),
+    bridgeMode: booleanFromEnvironment(environment, "CAPSULE_BRIDGE", false),
+    bridgeKey: (environment.CAPSULE_BRIDGE_KEY ?? "").trim() || undefined,
+    bridgeDecoyFile:
+      (environment.CAPSULE_BRIDGE_DECOY ?? "").trim() || undefined,
     sitesEnabled: booleanFromEnvironment(
       environment,
       "CAPSULE_SITES_ENABLED",

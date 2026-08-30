@@ -1,265 +1,266 @@
-# La red de mezcla de CAPSULE
+# CAPSULE's mix network
 
-**Estado:** implementada y funcionando; sin auditoría externa
-**Fecha:** 2026-08-30
-**Alcance:** relays como nodos de mezcla, CLI como cliente
+**Status:** implemented and working; no external audit
+**Date:** 2026-08-30
+**Scope:** relays as mix nodes, the CLI as client
 
-## 1. Lo primero, porque cambia todo lo demás
+## 1. First, because it changes everything else
 
-**El anonimato de una red viene, sobre todo, del tamaño del conjunto en el que
-te escondés.** Si en una red hay diez personas, un observador que sabe que el
-mensaje salió de esa red ya redujo el problema a diez. Ninguna criptografía
-arregla eso: no es una propiedad del código, es una propiedad de cuánta gente
-lo usa y de cuántos operadores distintos sostienen los nodos.
+**A network's anonymity comes, above all, from the size of the set you are
+hiding in.** If ten people use a network, an observer who knows a message came
+out of it has already narrowed the problem to ten. No cryptography fixes that:
+it is not a property of the code, it is a property of how many people use it
+and how many separate operators run the nodes.
 
-Tor tiene millones de usuarios y miles de relays repartidos en jurisdicciones
-distintas. Esta red empieza con vos. Por eso la CLI te dice, cada vez que la
-usás, cuántos nodos y cuántos operadores aparentes hay:
+Tor has millions of users and thousands of relays spread across jurisdictions.
+This network starts with you. That is why the CLI tells you, every single time
+you use it, how many nodes and how many apparent operators there are:
 
 ```
 Mix network: 4 mixes across 1 apparent operators, 3 hops each way.
 Enough to keep the storing relay from seeing you, and not enough for anything more.
 ```
 
-Esa frase no es humildad decorativa. Con cuatro nodos de un solo operador, lo
-que ganás es concreto y acotado: **el relay que guarda tu cápsula no ve tu
-dirección**. Nada más. Si el operador de esos cuatro nodos es la misma persona,
-esa persona ve las dos puntas.
+That sentence is not decorative modesty. With four nodes under one operator,
+what you gain is concrete and bounded: **the relay that stores your capsule does
+not see your address.** Nothing more. If those four nodes are run by one person,
+that person sees both ends.
 
-Todo lo que sigue describe cómo está construido lo que sí hace.
+Everything that follows describes how the part it _does_ do is built.
 
-## 2. Por qué no es simplemente Tor
+## 2. Why this is not simply Tor
 
-Tor está diseñado para navegar: una persona esperando una página web no tolera
-un segundo de más. Esa restricción define su arquitectura y también su
-debilidad más conocida y menos reparable: **como los paquetes salen tan rápido
-como entran, quien observe las dos puntas puede emparejarlos por tiempo**. Es
-correlación de tráfico de punta a punta, y para un sistema de baja latencia no
-tiene solución.
+Tor is designed for browsing: a person waiting for a web page will not tolerate
+an extra second. That constraint defines its architecture and also its
+best-known, least-fixable weakness: **because packets leave as fast as they
+arrive, anyone watching both ends can pair them up by timing.** That is
+end-to-end traffic correlation, and for a low-latency system it has no
+solution.
 
-Transferir un archivo no tiene esa restricción. Un archivo puede tardar
-minutos. Eso habilita defensas que Tor no puede usar:
+Transferring a file has no such constraint. A file can take minutes. That
+enables defences Tor cannot use:
 
-|                                        | Tor                                     | Esta red                                                |
-| -------------------------------------- | --------------------------------------- | ------------------------------------------------------- |
-| Latencia                               | Milisegundos                            | Segundos a minutos, por diseño                          |
-| Mezcla real (retardos, reordenamiento) | No puede                                | Sí: cada salto retiene el paquete un tiempo aleatorio   |
-| Tamaño de paquete                      | Celdas de 514 B sobre un flujo continuo | Un tamaño único, siempre, extremo a extremo             |
-| Tráfico de cobertura                   | Limitado                                | Cada nodo emite bucles indistinguibles del tráfico real |
-| Nodos de salida                        | Ve el tráfico en claro si no hay TLS    | **No existen**: el destino es el propio relay           |
-| Directorio                             | Autoridades de directorio firmantes     | Gossip entre pares, sin autoridad                       |
-| Conjunto de anonimato                  | Millones                                | El que tengas                                           |
-| Resistencia a censura                  | Puentes, transportes conectables        | Nada                                                    |
-| Análisis independiente                 | 20 años                                 | Ninguno                                                 |
+|                                  | Tor                                  | This network                                               |
+| -------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| Latency                          | Milliseconds                         | Seconds to minutes, by design                              |
+| Real mixing (delays, reordering) | Cannot                               | Yes: each hop holds the packet a random time               |
+| Packet size                      | 514 B cells over a continuous stream | One size, always, end to end                               |
+| Cover traffic                    | Limited                              | Every node emits loops indistinguishable from real traffic |
+| Exit nodes                       | Sees plaintext traffic without TLS   | **None**: the destination is the relay itself              |
+| Directory                        | Signing directory authorities        | Peer gossip, no authority                                  |
+| Anonymity set                    | Millions                             | Whatever you have                                          |
+| Censorship resistance            | Bridges, pluggable transports        | Bridges since 1.3; no pluggable transports                 |
+| Independent analysis             | 20 years                             | None                                                       |
 
-Las dos últimas filas son la razón por la que **esto no reemplaza a Tor**, y por
-la que la CLI permite usar los dos a la vez:
-
-```bash
-capsule --tor --mix send archivo.pdf --relay https://relay.example
-```
-
-Tor oculta de tu proveedor de Internet que estás usando CAPSULE. La red de
-mezcla oculta de los relays quién sos. Son problemas distintos y se resuelven
-en capas distintas.
-
-## 3. Cómo funciona
-
-### 3.1 El paquete
-
-Cada paquete es un paquete Sphinx (Danezis y Goldberg, 2009) de **65 920 bytes,
-siempre**, lleve lo que lleve. Un chunk de cápsula, una operación de control o
-un bucle de relleno son del mismo tamaño y del mismo aspecto.
-
-El formato exacto está en [PROTOCOL.md](./PROTOCOL.md) §16. Tres propiedades
-importan:
-
-- **La cabecera se enmascara en cada salto.** Cada nodo deriva un secreto con
-  su clave privada y el punto efímero del paquete, pela un bloque de ruteo y
-  transforma el punto para el siguiente. El paquete que sale de un nodo no se
-  parece en nada al que entró.
-- **El relleno tapa lo que se peló.** El bloque consumido se reemplaza por
-  bytes pseudoaleatorios que el remitente calculó de antemano, así que la
-  cabecera no encoge y un nodo no puede deducir cuán lejos está del origen ni
-  cuánto falta.
-- **El cuerpo es un cifrado de bloque ancho.** Cambiar un bit en cualquier
-  parte aleatoriza los 64 KiB enteros. Eso anula el ataque de marcado: un nodo
-  no puede marcar un paquete para reconocerlo después, porque la marca destruye
-  el contenido y el destino lo rechaza.
-
-### 3.2 El camino
-
-Un envío usa **dos caminos distintos**, elegidos de nuevo en cada petición:
-
-```
-cliente → mezcla A → mezcla B → relay que guarda la cápsula
-                                        ↓ (bloque de respuesta)
-buzón del proveedor ← mezcla D ← mezcla C
-```
-
-El relay de destino **es el último salto**, no hay nodo de salida. Esto es una
-diferencia real con el ruteo cebolla para la web: no existe una parte que vea
-la petición en claro sin ser, además, la parte a la que iba dirigida. El relay
-aprende qué operación de cápsula se pidió —que aprendería igual— y no aprende
-de quién.
-
-La respuesta viaja por un **bloque de respuesta de un solo uso** que el cliente
-arma y le entrega al relay dentro del pedido. El relay puede contestar y no
-puede saber a dónde va la respuesta: sólo sabe a qué primer salto entregarla.
-
-### 3.3 Los retardos
-
-Cada salto retiene el paquete un tiempo tomado de una distribución exponencial
-que elige el remitente. Eso es lo que rompe la correlación temporal: la cantidad
-de paquetes que un nodo está reteniendo en un momento dado no depende de cuándo
-llegaron, así que emparejar entradas con salidas por tiempo deja de funcionar.
-
-El costo es real y se paga en segundos:
-
-| Media por salto   | 3 saltos, ida y vuelta | 200 KB medidos |
-| ----------------- | ---------------------- | -------------- |
-| 0 ms              | inmediato              | ~1 s           |
-| 200 ms            | ~1,2 s por petición    | ~10 s          |
-| 2 s (por omisión) | ~12 s por petición     | ~90 s          |
-| 30 s              | ~3 min por petición    | ~25 min        |
-
-Un nodo acota lo que un remitente puede pedirle (`CAPSULE_MIX_MAX_DELAY_MS`),
-para que nadie inmovilice su cola.
-
-### 3.4 El buzón
-
-Un cliente detrás de NAT no puede recibir conexiones, así que el último salto
-de la respuesta la deja en un **buzón** en un relay que el cliente elige como
-proveedor, y el cliente lo consulta.
-
-Esto tiene una consecuencia que hay que decir claramente: **tu proveedor sabe
-que existís**. Ve una dirección consultando un buzón. No ve qué pediste ni a
-quién, pero sabe que alguien está usando la red desde ahí. Es inherente a un
-cliente que no se puede llamar, no es un descuido. Elegí un proveedor con el
-que estés cómodo, o poné Tor por debajo.
-
-### 3.5 El tráfico de cobertura
-
-Cada nodo se envía paquetes a sí mismo por caminos aleatorios, a intervalos.
-Terminan en un salto que los descarta. Para cualquiera que mire un enlace entre
-dos nodos, son idénticos a los paquetes reales.
-
-Sin esto, un enlace que sólo transporta tráfico real le dice a un observador
-exactamente cuándo hay tráfico real. Con esto, no le dice nada.
-
-## 4. Cómo usarla
-
-### 4.1 Como cliente
+The last two rows are why **this does not replace Tor**, and why the CLI lets
+you use both at once:
 
 ```bash
-# Enviar por la red, con los valores por omisión (3 saltos, 2 s por salto)
-capsule --mix send informe.pdf --relay https://relay.example
-
-# Más lento y más difícil de correlacionar
-capsule --mix --mix-hops 4 --mix-delay 15000 send informe.pdf
-
-# Recibir por la red
-capsule --mix receive "<enlace>"
-
-# Borrar por la red
-capsule --mix delete "<capability de retiro>"
-
-# Elegir vos el proveedor del buzón
-capsule --mix --mix-provider https://relay-de-confianza.example send informe.pdf
-
-# Con Tor por debajo: el ISP no ve CAPSULE, los relays no te ven a vos
-capsule --tor --mix send informe.pdf
+capsule --tor --mix send file.pdf --relay https://relay.example
 ```
 
-La CLI imprime siempre el tamaño real de la red antes de enviar. Si dice
-`single-node`, no estás obteniendo anonimato de ningún tipo y te lo dice así.
+Tor hides from your internet provider that you are using CAPSULE. The mix
+network hides from the relays who you are. Those are different problems, solved
+in different layers.
 
-### 4.2 Como operador de un nodo
+## 3. How it works
 
-Un relay es un nodo de mezcla por omisión. No hay nada que instalar aparte del
-relay:
+### 3.1 The packet
+
+Every packet is a Sphinx packet (Danezis and Goldberg, 2009) of **65,920 bytes,
+always**, whatever it carries. A capsule chunk, a control operation and a
+filler loop are the same size and look the same.
+
+The exact format is in [PROTOCOL.md](./PROTOCOL.md) §16. Three properties
+matter:
+
+- **The header is blinded at every hop.** Each node derives a secret from its
+  private key and the packet's ephemeral point, peels one routing block, and
+  transforms the point for the next. The packet leaving a node looks nothing
+  like the one that arrived.
+- **Filler covers what was peeled.** The consumed block is replaced with
+  pseudorandom bytes the sender computed in advance, so the header never
+  shrinks and a node cannot tell how far it is from the origin or how much is
+  left.
+- **The body is a wide-block cipher.** Flipping one bit anywhere randomises all
+  64 KiB. That defeats tagging: a node cannot mark a packet to recognise it
+  later, because the mark destroys the content and the destination rejects it.
+
+### 3.2 The path
+
+A send uses **two different paths**, chosen fresh for every request:
+
+```
+client → mix A → mix B → relay that stores the capsule
+                                 ↓ (reply block)
+provider mailbox ← mix D ← mix C
+```
+
+The destination relay **is the last hop**; there is no exit node. This is a
+real difference from onion routing for the web: no party ever sees the request
+in the clear without also being the party it was addressed to. The relay learns
+which capsule operation was requested — which it would learn anyway — and does
+not learn from whom.
+
+The reply travels via a **single-use reply block** the client builds and hands
+to the relay inside the request. The relay can answer and cannot know where the
+answer goes: it only knows which first hop to give it to.
+
+### 3.3 The delays
+
+Each hop holds the packet for a time drawn from an exponential distribution the
+sender chooses. That is what breaks timing correlation: how many packets a node
+is holding at any moment does not depend on when they arrived, so pairing
+arrivals with departures by time stops working.
+
+The cost is real and it is paid in seconds:
+
+| Mean per hop  | 3 hops, round trip | 200 KB measured |
+| ------------- | ------------------ | --------------- |
+| 0 ms          | immediate          | ~1 s            |
+| 200 ms        | ~1.2 s per request | ~10 s           |
+| 2 s (default) | ~12 s per request  | ~90 s           |
+| 30 s          | ~3 min per request | ~25 min         |
+
+A node caps what a sender may ask of it (`CAPSULE_MIX_MAX_DELAY_MS`), so nobody
+can freeze its queue.
+
+### 3.4 The mailbox
+
+A client behind NAT cannot receive connections, so the last hop of the reply
+leaves it in a **mailbox** on a relay the client picks as its provider, and the
+client polls it.
+
+This has a consequence worth stating plainly: **your provider knows you exist.**
+It sees an address polling a mailbox. It does not see what you asked or of
+whom, but it knows somebody is using the network from there. That is inherent
+to a client that cannot be dialled; it is not an oversight. Pick a provider you
+are comfortable with, or put Tor underneath.
+
+### 3.5 The cover traffic
+
+Every node sends packets to itself along random paths, at intervals. They end
+at a hop that discards them. To anyone watching a link between two nodes, they
+are identical to real packets.
+
+Without this, a link that carries only real traffic tells an observer exactly
+when there is real traffic. With it, it tells them nothing.
+
+## 4. Using it
+
+### 4.1 As a client
 
 ```bash
-CAPSULE_MIX_ENABLED=true              # por omisión
-CAPSULE_MIX_COVER_INTERVAL_MS=30000   # cada cuánto emite un bucle
-CAPSULE_MIX_MAX_DELAY_MS=300000       # tope al retardo que puede pedir un remitente
-CAPSULE_MIX_MAX_QUEUED=2048           # paquetes que puede estar reteniendo
-CAPSULE_MIX_MAILBOX_TTL_MS=3600000    # cuánto guarda una respuesta sin reclamar
-CAPSULE_MIX_RATE_LIMIT_MAX=12000      # el tráfico de mezcla no es tráfico de API
+# Send through the network, with the defaults (3 hops, 2 s per hop)
+capsule --mix send report.pdf --relay https://relay.example
+
+# Slower and harder to correlate
+capsule --mix --mix-hops 4 --mix-delay 15000 send report.pdf
+
+# Receive through the network
+capsule --mix receive "<link>"
+
+# Delete through the network
+capsule --mix delete "<owner capability>"
+
+# Choose the mailbox provider yourself
+capsule --mix --mix-provider https://relay-you-trust.example send report.pdf
+
+# With Tor underneath: the ISP does not see CAPSULE, the relays do not see you
+capsule --tor --mix send report.pdf
 ```
 
-Lo que tu nodo ve, y por lo tanto lo que asumís:
+The CLI always prints the real size of the network before sending. If it says
+`single-node`, you are getting no anonymity of any kind, and it says so.
 
-- la dirección del nodo anterior y la del siguiente, nada más;
-- que un paquete pasó, no de quién venía ni a dónde iba;
-- si sos el destino: la operación de cápsula, igual que en una petición directa;
-- si sos proveedor: que alguien consulta un buzón desde una dirección.
+### 4.2 As a node operator
 
-Lo que tu nodo **no** puede ver: el contenido de un paquete que no es para él,
-la longitud del camino, su posición en el camino, ni la relación entre el
-paquete que entró y el que salió.
+A relay is a mix node by default. There is nothing to install beyond the relay:
 
-## 5. Lo que esta red no hace
+```bash
+CAPSULE_MIX_ENABLED=true              # the default
+CAPSULE_MIX_COVER_INTERVAL_MS=30000   # how often it emits a loop
+CAPSULE_MIX_MAX_DELAY_MS=300000       # cap on the delay a sender may ask for
+CAPSULE_MIX_MAX_QUEUED=2048           # packets it may be holding
+CAPSULE_MIX_MAILBOX_TTL_MS=3600000    # how long an unclaimed reply is kept
+CAPSULE_MIX_RATE_LIMIT_MAX=12000      # mix traffic is not API traffic
+```
 
-Ordenado por lo que más importa.
+What your node sees, and therefore what you take on:
 
-**No te protege si el conjunto de anonimato es chico.** Ya está dicho arriba y
-es lo primero por una razón. Cuatro nodos de un operador no son una red
-anónima; son una forma de que un relay no vea tu IP.
+- the address of the previous hop and of the next one, and nothing else;
+- that a packet passed through, not where it came from or where it went;
+- if you are the destination: the capsule operation, the same as in a direct
+  request;
+- if you are a provider: that somebody polls a mailbox from an address.
 
-**No resiste a un observador global pasivo.** Alguien que vea todos los enlaces
-puede, con suficiente tráfico y tiempo, hacer análisis estadístico de flujos.
-Los retardos y el relleno lo encarecen mucho; no lo impiden. Un adversario así
-está fuera del modelo.
+What your node **cannot** see: the contents of a packet not addressed to it,
+the length of the path, its own position in the path, or the relationship
+between the packet that came in and the one that went out.
 
-**No resiste un ataque n−1 activo.** Un adversario que controle los nodos
-alrededor del tuyo y pueda bloquear todo el tráfico ajeno puede aislar tu
-paquete. Los bucles de cobertura y la elección aleatoria de camino encarecen
-esto; no está resuelto y es un problema abierto en la literatura.
+## 5. What this network does not do
 
-**No resiste Sybil por sí sola.** La prueba de trabajo en los anuncios y el
-tope por operador aparente encarecen inventar nodos. Un adversario con recursos
-puede levantar muchos igual. Un directorio grande no es evidencia de
-independencia: fijate quién opera los relays, no cuántos hay.
+In order of what matters most.
 
-**No oculta que estás usando CAPSULE.** Tu proveedor de Internet ve conexiones
-a un relay. Para eso está Tor debajo.
+**It does not protect you when the anonymity set is small.** Said above and
+first for a reason. Four nodes under one operator are not an anonymity network;
+they are a way for a relay not to see your IP.
 
-**No funciona en el navegador todavía.** La aplicación web sigue hablando
-directo con su relay. La red necesita X25519 en Web Crypto, que recién está
-llegando a los navegadores; hasta entonces, `--mix` es sólo de la CLI y decir
-lo contrario sería falso.
+**It does not resist a global passive observer.** Somebody who sees every link
+can, with enough traffic and time, do statistical flow analysis. Delays and
+padding make that much more expensive; they do not prevent it. Such an
+adversary is outside the model.
 
-**No tiene análisis formal ni auditoría.** Las construcciones son publicadas y
-se usan como están especificadas, pero _esta_ composición no fue revisada por
-nadie de afuera. Las pruebas verifican propiedades concretas —indistinguibilidad
-entre saltos, resistencia al marcado, rechazo de repeticiones— y eso no es lo
-mismo que una revisión criptográfica.
+**It does not resist an active n−1 attack.** An adversary who controls the
+nodes around yours and can suppress everyone else's traffic can isolate your
+packet. Cover loops and random path selection make this expensive; it is not
+solved, and it is an open problem in the literature.
 
-## 6. Cómo saber si te está sirviendo
+**It does not resist Sybil on its own.** Proof of work on announcements and the
+cap per apparent operator make inventing nodes expensive. A resourced adversary
+can still stand up many. A large directory is not evidence of independence:
+look at who operates the relays, not how many there are.
 
-Tres preguntas, en orden:
+**It does not hide that you are using CAPSULE.** Your internet provider sees
+connections to a relay. That is what Tor underneath, or a bridge, is for — see
+[CENSORSHIP.md](./CENSORSHIP.md).
 
-1. **¿De quién te querés esconder?** Si es del relay que guarda el archivo,
-   esta red sirve hoy. Si es de tu proveedor de Internet, necesitás Tor. Si es
-   de alguien que ve toda la red, esto no alcanza y probablemente nada de lo
-   que puedas instalar alcance.
-2. **¿Cuántos operadores distintos hay?** No cuántos nodos: cuántas personas u
-   organizaciones distintas. Con uno solo, el camino es decorativo.
-3. **¿Podés esperar?** Si necesitás que el archivo llegue ya, bajá los retardos
-   y aceptá que la mezcla deja de mezclar. La honestidad acá es la misma:
-   `--mix-delay 0` es un proxy de tres saltos, no una red de mezcla.
+**It does not work in the browser yet.** The web app and the extension still
+talk directly to their relays. The network needs X25519 in Web Crypto, which is
+only now arriving in browsers; until then `--mix` is CLI-only, and saying
+otherwise would be false.
 
-## 7. Referencias
+**It has no formal analysis and no audit.** The constructions are published and
+used as specified, but _this_ composition has not been reviewed by anyone
+outside. The tests verify concrete properties — indistinguishability between
+hops, tagging resistance, replay rejection — and that is not the same thing as
+a cryptographic review.
+
+## 6. How to tell whether it is helping you
+
+Three questions, in order:
+
+1. **Who are you hiding from?** If it is the relay storing the file, this
+   network helps today. If it is your internet provider, you need Tor. If it is
+   somebody who sees the whole network, this is not enough and probably nothing
+   you can install is.
+2. **How many separate operators are there?** Not how many nodes: how many
+   distinct people or organisations. With one, the path is decorative.
+   `capsule network` prints this.
+3. **Can you wait?** If you need the file to arrive now, lower the delays and
+   accept that the mixing stops mixing. The honesty here is the same:
+   `--mix-delay 0` is a three-hop proxy, not a mix network.
+
+## 7. References
 
 - George Danezis, Ian Goldberg. _Sphinx: A Compact and Provably Secure Mix
   Format._ IEEE S&P, 2009.
 - Ania Piotrowska et al. _The Loopix Anonymity System._ USENIX Security, 2017.
-  De acá vienen los retardos exponenciales, los bucles de cobertura y el modelo
-  de proveedor con buzón.
+  The exponential delays, the cover loops and the provider/mailbox model come
+  from here.
 - Ross Anderson, Eli Biham. _Two Practical and Provably Secure Block Ciphers:
-  BEAR and LION._ FSE, 1996. El cifrado de bloque ancho del cuerpo.
+  BEAR and LION._ FSE, 1996. The wide-block cipher used for the body.
 - Roger Dingledine, Nick Mathewson, Paul Syverson. _Tor: The Second-Generation
-  Onion Router._ USENIX Security, 2004. Vale leerlo sobre todo por la sección
-  de lo que Tor decide **no** resolver, que es de donde sale la mitad de este
-  diseño.
+  Onion Router._ USENIX Security, 2004. Worth reading above all for the section
+  on what Tor deliberately does **not** solve, which is where half of this
+  design comes from.
