@@ -418,19 +418,102 @@ interface CrawlResult {
   seen: number;
   skipped: number;
   failed: number;
+  /** Names taken from the cache without downloading anything. */
+  reused: number;
+}
+
+/**
+ * What the last run learned, so the next one does not learn it again.
+ *
+ * A bundle has no partial download by design, so finding out whether a site
+ * asked to be listed costs the whole site. Doing that hourly for every name on
+ * the network would spend bandwidth to re-read files nobody touched. A record
+ * carries a sequence number that only moves when its author publishes again,
+ * which is exactly the signal needed: same name and same sequence means the
+ * same bundle, and the answer from last time still holds.
+ *
+ * The cache is a convenience and never a source of truth. Losing it costs one
+ * slow run, and every entry is still verified the ordinary way when its
+ * sequence moves.
+ */
+interface CachedEntry {
+  sequence: number;
+  /** Whether that version opted in. `false` is worth caching too. */
+  listed: boolean;
+  listing?: Listing;
+}
+
+interface IndexCache {
+  version: 1;
+  entries: Record<string, CachedEntry>;
+  /** When the index was last published, so a quiet network still refreshes. */
+  publishedAt?: string;
+  /** What was published, to tell a real change from a re-run. */
+  fingerprint?: string;
+}
+
+const EMPTY_CACHE: IndexCache = { version: 1, entries: {} };
+
+async function readCache(path: string | undefined): Promise<IndexCache> {
+  if (!path) return { ...EMPTY_CACHE };
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as IndexCache;
+    if (parsed?.version !== 1 || typeof parsed.entries !== "object") {
+      return { ...EMPTY_CACHE };
+    }
+    return { ...parsed, entries: parsed.entries ?? {} };
+  } catch {
+    // No cache, or one this version cannot read. A slow run is the whole cost.
+    return { ...EMPTY_CACHE };
+  }
+}
+
+async function writeCache(
+  path: string | undefined,
+  cache: IndexCache,
+): Promise<void> {
+  if (!path) return;
+  try {
+    await mkdir(dirname(resolve(path)), { recursive: true });
+    await writeFile(resolve(path), `${JSON.stringify(cache, null, 2)}
+`);
+  } catch {
+    // Failing to write it costs the next run its shortcut and nothing else.
+  }
+}
+
+/** What the published page depends on, so an unchanged network is detectable. */
+function fingerprintOf(listings: Listing[]): string {
+  return listings
+    .map((listing) => `${listing.name}@${listing.sequence}`)
+    .sort()
+    .join(",");
 }
 
 async function crawl(
   records: CapsuleSiteRecord[],
+  cache: IndexCache,
   fetchImpl: FetchLike | undefined,
-  onProgress: (name: string) => void,
+  onProgress: (name: string, cached: boolean) => void,
 ): Promise<CrawlResult> {
   const listings: Listing[] = [];
+  const entries: Record<string, CachedEntry> = {};
   let skipped = 0;
   let failed = 0;
+  let reused = 0;
 
   for (const record of records) {
-    onProgress(record.name);
+    const held = cache.entries[record.name];
+    if (held && held.sequence === record.sequence) {
+      onProgress(record.name, true);
+      entries[record.name] = held;
+      if (held.listed && held.listing) listings.push(held.listing);
+      else skipped += 1;
+      reused += 1;
+      continue;
+    }
+
+    onProgress(record.name, false);
     try {
       const bundle = await fetchSiteBundle(
         decodeShareCapability(record.capability),
@@ -438,10 +521,11 @@ async function crawl(
       );
       const manifest = readSiteManifest(bundle);
       if (!manifest.index) {
+        entries[record.name] = { sequence: record.sequence, listed: false };
         skipped += 1;
         continue;
       }
-      listings.push({
+      const listing: Listing = {
         name: record.name,
         title: clean(record.title, MAX_TITLE),
         description: clean(manifest.description, MAX_DESCRIPTION),
@@ -452,15 +536,24 @@ async function crawl(
           (sum, file) => sum + file.bytes.byteLength,
           0,
         ),
-      });
+      };
+      entries[record.name] = {
+        sequence: record.sequence,
+        listed: true,
+        listing,
+      };
+      listings.push(listing);
     } catch {
       // A capsule that expired, a relay that went away, a bundle that will not
-      // unpack: none of those is a reason to abandon the whole run.
+      // unpack: none of those is a reason to abandon the whole run. It is also
+      // not cached, so the next run tries again.
       failed += 1;
     }
   }
 
-  return { listings, seen: records.length, skipped, failed };
+  // Only names still on the network survive, so the cache cannot outgrow it.
+  cache.entries = entries;
+  return { listings, seen: records.length, skipped, failed, reused };
 }
 
 export function registerIndexerCommands(
@@ -490,6 +583,15 @@ export function registerIndexerCommands(
     .option("--ttl <duration>", "how long the relay keeps the index", "7d")
     .option("--sequence <n>", "version number for the published index")
     .option("--limit <n>", "records to ask each relay for", "500")
+    .option(
+      "--cache <path>",
+      "remembers which names were already read, so an unchanged site is not downloaded again",
+    )
+    .option(
+      "--refresh-after <hours>",
+      "republish even when nothing changed, so the record does not expire",
+      "12",
+    )
     .action(
       async (options: {
         seed: string[];
@@ -499,6 +601,8 @@ export function registerIndexerCommands(
         ttl: string;
         sequence?: string;
         limit: string;
+        cache?: string;
+        refreshAfter: string;
       }) => {
         const json = context.json();
         const fetchImpl = context.transport();
@@ -529,14 +633,25 @@ export function registerIndexerCommands(
           );
         }
 
-        const result = await crawl(records, fetchImpl, (name) => {
-          if (!json) process.stderr.write(`  ${name}\n`);
-        });
+        const cache = await readCache(options.cache);
+        const result = await crawl(
+          records,
+          cache,
+          fetchImpl,
+          (name, cached) => {
+            if (!json) {
+              process.stderr.write(`  ${name}${cached ? " (unchanged)" : ""}\n`);
+            }
+          },
+        );
 
         const builtAt = new Date().toISOString();
         const files = generateSite(result.listings, builtAt);
 
         if (!options.key) {
+          // Writing the site out is still a run: what it learned is worth
+          // keeping, or a `--cache` on this path would do nothing at all.
+          await writeCache(options.cache, cache);
           const out = resolve(options.out ?? "./capsule-index");
           for (const file of files) {
             const target = join(out, file.path);
@@ -555,6 +670,37 @@ export function registerIndexerCommands(
           return;
         }
 
+        /**
+         * A republish that changes nothing still costs a capsule, a record and
+         * a round of gossip, so it happens only when the directory actually
+         * moved. The exception is the TTL: a record nobody refreshes expires,
+         * and an index that expires is worse than one that is slightly stale.
+         */
+        const fingerprint = fingerprintOf(result.listings);
+        const publishedAt = cache.publishedAt
+          ? Date.parse(cache.publishedAt)
+          : Number.NaN;
+        const refreshAfterMs =
+          (Number.parseInt(options.refreshAfter, 10) || 12) * 3_600_000;
+        const stale =
+          Number.isNaN(publishedAt) || Date.now() - publishedAt > refreshAfterMs;
+
+        if (cache.fingerprint === fingerprint && !stale) {
+          await writeCache(options.cache, cache);
+          if (json) {
+            process.stdout.write(
+              `${JSON.stringify({ ...result, published: false, reason: "unchanged" }, null, 2)}
+`,
+            );
+            return;
+          }
+          process.stdout.write(
+            `Nothing changed: ${result.listings.length} listed, ${result.reused} read from cache. Not republishing.
+`,
+          );
+          return;
+        }
+
         const keyFile = JSON.parse(
           await readFile(resolve(options.key), "utf8"),
         ) as SiteIdentityFile;
@@ -569,6 +715,10 @@ export function registerIndexerCommands(
           title: "CAPSULE index",
           ...(fetchImpl ? { fetchImpl } : {}),
         });
+
+        cache.publishedAt = new Date().toISOString();
+        cache.fingerprint = fingerprint;
+        await writeCache(options.cache, cache);
 
         if (json) {
           process.stdout.write(
