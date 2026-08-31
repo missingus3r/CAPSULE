@@ -116,6 +116,39 @@ describe("rendering a page", () => {
     expect(html).not.toContain('href="https://example.test/x"');
   });
 
+  it("gives an outbound link the new tab it asked for, and nothing else one", () => {
+    // The confirmation still stands in front of both: what `_blank` changes is
+    // which tab the reader ends up reading it in. Anything that did not ask
+    // goes to the top context, because the frame must never be what navigates.
+    const bundle = bundleOf(
+      file(
+        "index.html",
+        '<a href="https://a.test/" target="_blank">new</a>' +
+          '<a href="https://b.test/">same</a>' +
+          '<a href="https://c.test/" target="evil">named</a>',
+      ),
+    );
+    const { html } = render(bundle);
+
+    expect(html).toContain('target="_blank"');
+    expect((html.match(/target="_blank"/gu) ?? []).length).toBe(1);
+    expect((html.match(/target="_top"/gu) ?? []).length).toBe(2);
+    // A named target would be a handle onto this tab from another document.
+    expect(html).not.toContain('target="evil"');
+    // Opening a tab never hands it a window.opener or a referrer.
+    expect((html.match(/rel="noreferrer noopener"/gu) ?? []).length).toBe(3);
+  });
+
+  it("keeps an internal link in the same tab even when it asks for a new one", () => {
+    const bundle = bundleOf(
+      file("index.html", '<a href="a.html" target="_blank">next</a>'),
+      file("a.html", "<p>a</p>"),
+    );
+    const { html } = render(bundle);
+    expect(html).toContain('target="_top"');
+    expect(html).not.toContain('target="_blank"');
+  });
+
   it("drops scripts unless the visitor turned them on for this site", () => {
     const bundle = bundleOf(
       file(

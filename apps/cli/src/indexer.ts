@@ -83,6 +83,116 @@ function clean(value: string | undefined, limit: number): string {
   // Control characters and newlines would break a listing out of its own row.
   return value.replace(CONTROL_CHARACTERS, " ").trim().slice(0, limit);
 }
+/** Entries per page. Paging is HTML files, so this works with no scripts. */
+const PAGE_SIZE = 50;
+
+/**
+ * The index reads in three languages without running anything.
+ *
+ * A `.capsule` page cannot execute a script unless the visitor allows it for
+ * that site, so choosing a language at runtime is not available. Each language
+ * is a directory of its own instead, and the switcher is three links. English
+ * sits at the root because something has to.
+ */
+const LOCALES = ["en", "es", "pt"] as const;
+type Locale = (typeof LOCALES)[number];
+
+interface Strings {
+  title: string;
+  listed: string;
+  built: string;
+  snapshot: string;
+  empty: string;
+  optIn: string;
+  filterPlaceholder: string;
+  filterHint: string;
+  filterScope: string;
+  published: string;
+  opensNewTab: string;
+  page: string;
+  previous: string;
+  next: string;
+  footer: string;
+  language: string;
+}
+
+const STRINGS: Record<Locale, Strings> = {
+  en: {
+    title: "CAPSULE index",
+    listed: "site(s) that asked to be listed",
+    built: "Indexed",
+    snapshot:
+      "This page is itself a .capsule site, so it cannot query anything: what you see is a snapshot from when it was built, not a live search.",
+    empty:
+      'Nothing has asked to be listed yet. A site appears here when it carries a capsule.json saying "index": true.',
+    optIn:
+      "Being listed is something a site asks for. This index only holds sites whose author put an opt-in inside the site itself; a site that says nothing is treated as one that said no, whether or not a relay will admit to holding it. Nothing here was crawled into against the wishes of whoever published it.",
+    filterPlaceholder: "Filter this page…",
+    filterHint:
+      "There is no search box because scripts are off, which is the default and the reason this page cannot watch you. Allowing scripts for this site turns the list into a filter you can type in. Nothing is sent anywhere either way: the filter only hides rows that are already on the page.",
+    filterScope: "The filter covers this page only, not the other pages.",
+    published: "Published",
+    opensNewTab: "opens in a new tab",
+    page: "Page",
+    previous: "Previous",
+    next: "Next",
+    footer:
+      "Every address opens in a browser with the CAPSULE extension. Nothing on this page can reach the network, including this list.",
+    language: "Language",
+  },
+  es: {
+    title: "Índice de CAPSULE",
+    listed: "sitio(s) que pidieron ser listados",
+    built: "Indexado",
+    snapshot:
+      "Esta página es ella misma un sitio .capsule, así que no puede consultar nada: lo que ves es una foto de cuando se construyó, no una búsqueda en vivo.",
+    empty:
+      'Todavía nadie pidió ser listado. Un sitio aparece acá cuando lleva un capsule.json que dice "index": true.',
+    optIn:
+      "Ser listado es algo que un sitio pide. Este índice sólo tiene sitios cuyo autor puso el permiso adentro del propio sitio; a uno que no dice nada se lo trata como a uno que dijo que no, admita o no un relay que lo tiene. Nada de lo que está acá fue rastreado en contra de quien lo publicó.",
+    filterPlaceholder: "Filtrar esta página…",
+    filterHint:
+      "No hay caja de búsqueda porque los scripts están apagados, que es el default y la razón por la que esta página no te puede mirar. Si le permitís scripts a este sitio, la lista se convierte en un filtro donde podés escribir. En ninguno de los dos casos se manda nada a ningún lado: el filtro sólo esconde filas que ya están en la página.",
+    filterScope: "El filtro cubre sólo esta página, no las otras.",
+    published: "Publicado",
+    opensNewTab: "abre en una pestaña nueva",
+    page: "Página",
+    previous: "Anterior",
+    next: "Siguiente",
+    footer:
+      "Cada dirección abre en un navegador con la extensión CAPSULE. Nada en esta página puede alcanzar la red, esta lista incluida.",
+    language: "Idioma",
+  },
+  pt: {
+    title: "Índice da CAPSULE",
+    listed: "site(s) que pediram para ser listados",
+    built: "Indexado",
+    snapshot:
+      "Esta página é ela mesma um site .capsule, então não consegue consultar nada: o que você vê é um retrato de quando foi construída, não uma busca ao vivo.",
+    empty:
+      'Ninguém pediu para ser listado ainda. Um site aparece aqui quando carrega um capsule.json dizendo "index": true.',
+    optIn:
+      "Ser listado é algo que um site pede. Este índice só tem sites cujo autor colocou a permissão dentro do próprio site; um que não diz nada é tratado como um que disse não, admita ou não um relay que o tem. Nada aqui foi rastreado contra a vontade de quem publicou.",
+    filterPlaceholder: "Filtrar esta página…",
+    filterHint:
+      "Não há caixa de busca porque os scripts estão desligados, que é o padrão e a razão de esta página não poder observar você. Permitir scripts para este site transforma a lista num filtro onde você pode digitar. Em nenhum dos casos algo é enviado a lugar nenhum: o filtro apenas esconde linhas que já estão na página.",
+    filterScope: "O filtro cobre apenas esta página, não as outras.",
+    published: "Publicado",
+    opensNewTab: "abre em uma nova aba",
+    page: "Página",
+    previous: "Anterior",
+    next: "Próxima",
+    footer:
+      "Cada endereço abre em um navegador com a extensão CAPSULE. Nada nesta página consegue alcançar a rede, incluindo esta lista.",
+    language: "Idioma",
+  },
+};
+
+const LANGUAGE_NAMES: Record<Locale, string> = {
+  en: "English",
+  es: "Español",
+  pt: "Português",
+};
 
 const STYLE = `:root{color-scheme:light dark}
 *{box-sizing:border-box}
@@ -90,18 +200,26 @@ body{margin:0;padding:2.5rem 1.25rem 4rem;font:16px/1.6 system-ui,-apple-system,
 main{max-width:52rem;margin:0 auto}
 h1{margin:0 0 .35rem;font-size:1.9rem;letter-spacing:-.02em}
 .lede{margin:0 0 .35rem;color:#5a6b65}
-.built{margin:0 0 2rem;font-size:.82rem;color:#8b9691}
-.filter{width:100%;padding:.7rem .9rem;margin-bottom:1.5rem;border:1px solid rgba(27,62,54,.22);border-radius:.75rem;background:#fffdf8;font:inherit}
+.built{margin:0 0 1.25rem;font-size:.82rem;color:#8b9691}
+.langs{margin:0 0 1.75rem;font-size:.82rem;color:#8b9691}
+.langs a{color:#5a6b65;margin-right:.6rem}
+.langs strong{margin-right:.6rem;color:#18352f}
+.filter{width:100%;padding:.7rem .9rem;margin-bottom:.5rem;border:1px solid rgba(27,62,54,.22);border-radius:.75rem;background:#fffdf8;font:inherit}
+.hint{margin:0 0 1.5rem;padding:.9rem 1.1rem;border-left:3px solid rgba(27,62,54,.22);background:#fffdf8;font-size:.86rem;color:#5a6b65}
 ul{margin:0;padding:0;list-style:none}
 li{padding:1.1rem 0;border-top:1px solid rgba(27,62,54,.13)}
 li a{color:#18352f;font-size:1.02rem;font-weight:650;text-decoration:none;overflow-wrap:anywhere}
 li a:hover{text-decoration:underline}
 .addr{display:block;margin:.2rem 0;font-family:ui-monospace,monospace;font-size:.72rem;color:#8b9691;overflow-wrap:anywhere}
 .desc{margin:.35rem 0 0;color:#5a6b65;font-size:.92rem}
+.meta{margin:.3rem 0 0;font-size:.74rem;color:#8b9691}
 .empty,.note{padding:1.4rem;border:1px dashed rgba(27,62,54,.22);border-radius:.9rem;color:#5a6b65;font-size:.9rem}
 .note{margin-top:2.5rem;background:#fffdf8}
+.pager{display:flex;gap:1rem;align-items:center;margin-top:1.75rem;font-size:.88rem}
+.pager a{color:#18352f}
+.pager span{color:#8b9691}
 footer{margin-top:2rem;color:#8b9691;font-size:.8rem}
-@media(prefers-color-scheme:dark){body{background:#12201d;color:#e8efec}li a{color:#e8efec}.filter{background:#18302b;color:#e8efec}.note{background:#18302b}}`;
+@media(prefers-color-scheme:dark){body{background:#12201d;color:#e8efec}li a,.pager a,.langs strong{color:#e8efec}.filter{background:#18302b;color:#e8efec}.note,.hint{background:#18302b}}`;
 
 /**
  * Filtering happens over the list that is already on the page.
@@ -109,12 +227,16 @@ footer{margin-top:2rem;color:#8b9691;font-size:.8rem}
  * The rebuilder strips every `<script>` when a visitor has not allowed them,
  * so a page whose data lived in a script tag would show nothing at all. Here
  * the listing is the HTML: with scripts off it is a complete directory, and
- * with them on this reveals a box that hides the rows that do not match.
+ * with them on this reveals a box that hides the rows that do not match. It
+ * also removes the paragraph explaining how to get the box, which is only
+ * useful to somebody who does not have it.
  */
 const SCRIPT = `(function(){
   var box = document.getElementById("filter");
   if (!box) return;
   box.hidden = false;
+  var hint = document.getElementById("hint");
+  if (hint) hint.textContent = hint.getAttribute("data-scope") || "";
   var rows = Array.prototype.slice.call(document.querySelectorAll("li[data-haystack]"));
   var count = document.getElementById("count");
   box.addEventListener("input", function(){
@@ -129,74 +251,120 @@ const SCRIPT = `(function(){
   });
 })();`;
 
-function renderPage(listings: Listing[], builtAt: string): string {
-  const rows = listings
+function formatDate(iso: string, locale: Locale): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
+      date,
+    );
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+/** The file name of a page. Pages of one language share a directory. */
+function pageFile(page: number): string {
+  return page === 1 ? "index.html" : `page-${page}.html`;
+}
+
+/** `index.html`, `page-2.html`, and the same under a language directory. */
+function pagePath(locale: Locale, page: number): string {
+  const file = pageFile(page);
+  return locale === "en" ? file : `${locale}/${file}`;
+}
+
+/** A link from one generated page to another, relative to the bundle. */
+function relativeTo(from: Locale, to: string): string {
+  return from === "en" ? to : `../${to}`;
+}
+
+function renderPage(
+  listings: Listing[],
+  builtAt: string,
+  locale: Locale,
+  page: number,
+  pageCount: number,
+): string {
+  const s = STRINGS[locale];
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = listings.slice(start, start + PAGE_SIZE);
+  const asset = (name: string) => relativeTo(locale, name);
+
+  const rows = slice
     .map((listing) => {
       const haystack = escapeHtml(
         `${listing.title} ${listing.description} ${listing.name}`.toLowerCase(),
       );
       const address = `http://${listing.name}/`;
+      const published = formatDate(listing.publishedAt, locale);
       return `      <li data-haystack="${haystack}">
-        <a href="${escapeHtml(address)}">${escapeHtml(listing.title || listing.name)}</a>
-        <code class="addr">${escapeHtml(listing.name)}</code>
+        <a href="${escapeHtml(address)}" target="_blank" rel="noreferrer noopener">${escapeHtml(listing.title || listing.name)}</a>
+        <code class="addr">${escapeHtml(address)}</code>
         ${listing.description ? `<p class="desc">${escapeHtml(listing.description)}</p>` : ""}
+        <p class="meta">${escapeHtml(s.published)} ${escapeHtml(published)} · ${escapeHtml(s.opensNewTab)}</p>
       </li>`;
     })
     .join("\n");
 
+  const langs = LOCALES.map((option) =>
+    option === locale
+      ? `<strong>${escapeHtml(LANGUAGE_NAMES[option])}</strong>`
+      : `<a href="${escapeHtml(relativeTo(locale, pagePath(option, 1)))}">${escapeHtml(LANGUAGE_NAMES[option])}</a>`,
+  ).join("");
+
+  const pager =
+    pageCount > 1
+      ? `      <nav class="pager" aria-label="${escapeHtml(s.page)}">
+        ${page > 1 ? `<a href="${escapeHtml(pageFile(page - 1))}">← ${escapeHtml(s.previous)}</a>` : ""}
+        <span>${escapeHtml(s.page)} ${page} / ${pageCount}</span>
+        ${page < pageCount ? `<a href="${escapeHtml(pageFile(page + 1))}">${escapeHtml(s.next)} →</a>` : ""}
+      </nav>`
+      : "";
+
   return `<!doctype html>
-<html lang="en">
+<html lang="${locale}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CAPSULE index</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>${escapeHtml(s.title)}</title>
+    <link rel="stylesheet" href="${escapeHtml(asset("style.css"))}" />
   </head>
   <body>
     <main>
-      <h1>CAPSULE index</h1>
+      <h1>${escapeHtml(s.title)}</h1>
       <p class="lede">
-        <span id="count">${listings.length}</span> site(s) that asked to be
-        listed.
+        <span id="count">${listings.length}</span> ${escapeHtml(s.listed)}
       </p>
       <p class="built">
-        Built ${escapeHtml(builtAt)}. This page is itself a .capsule site, so it
-        cannot query anything: what you see is a snapshot from when it was
-        built, not a live search.
+        ${escapeHtml(s.built)} ${escapeHtml(formatDate(builtAt, locale))}. ${escapeHtml(s.snapshot)}
       </p>
+      <p class="langs" aria-label="${escapeHtml(s.language)}">${langs}</p>
 
       <input
         id="filter"
         class="filter"
         type="search"
         hidden
-        placeholder="Filter this list…"
-        aria-label="Filter this list"
+        placeholder="${escapeHtml(s.filterPlaceholder)}"
+        aria-label="${escapeHtml(s.filterPlaceholder)}"
       />
-
-${
-  listings.length > 0
-    ? `      <ul>\n${rows}\n      </ul>`
-    : `      <p class="empty">
-        Nothing has asked to be listed yet. A site appears here when it carries
-        a capsule.json saying <code>"index": true</code>.
-      </p>`
-}
-
-      <p class="note">
-        Being listed is something a site asks for. This index only holds sites
-        whose author put an opt-in inside the site itself; a site that says
-        nothing is treated as one that said no, whether or not a relay will
-        admit to holding it. Nothing here was crawled into against the wishes
-        of whoever published it.
+      <p class="hint" id="hint" data-scope="${escapeHtml(s.filterScope)}">
+        ${escapeHtml(s.filterHint)}
       </p>
 
-      <footer>
-        Every address opens in a browser with the CAPSULE extension. Nothing on
-        this page can reach the network, including this list.
-      </footer>
+${
+  slice.length > 0
+    ? `      <ul>\n${rows}\n      </ul>`
+    : `      <p class="empty">${escapeHtml(s.empty)}</p>`
+}
+${pager}
+
+      <p class="note">${escapeHtml(s.optIn)}</p>
+
+      <footer>${escapeHtml(s.footer)}</footer>
     </main>
-    <script src="search.js"></script>
+    <script src="${escapeHtml(asset("search.js"))}"></script>
   </body>
 </html>
 `;
@@ -204,12 +372,23 @@ ${
 
 export function generateSite(listings: Listing[], builtAt: string): SiteFile[] {
   const encoder = new TextEncoder();
-  return [
-    {
-      path: "index.html",
-      type: siteContentType("index.html"),
-      bytes: encoder.encode(renderPage(listings, builtAt)),
-    },
+  const pageCount = Math.max(1, Math.ceil(listings.length / PAGE_SIZE));
+  const files: SiteFile[] = [];
+
+  for (const locale of LOCALES) {
+    for (let page = 1; page <= pageCount; page += 1) {
+      const path = pagePath(locale, page);
+      files.push({
+        path,
+        type: siteContentType(path),
+        bytes: encoder.encode(
+          renderPage(listings, builtAt, locale, page, pageCount),
+        ),
+      });
+    }
+  }
+
+  files.push(
     {
       path: "style.css",
       type: siteContentType("style.css"),
@@ -229,7 +408,9 @@ export function generateSite(listings: Listing[], builtAt: string): SiteFile[] {
         `${JSON.stringify({ index: false, description: "A directory of .capsule sites that asked to be listed." }, null, 2)}\n`,
       ),
     },
-  ];
+  );
+
+  return files;
 }
 
 interface CrawlResult {

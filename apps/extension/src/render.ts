@@ -226,7 +226,14 @@ export function renderSitePage(options: RenderOptions): RenderedPage {
     if (isExternal(href)) {
       externalLinks.push(href);
       anchor.setAttribute("href", externalLink(href));
-      anchor.setAttribute("target", "_top");
+      // A page that asked for a new tab gets one; anything else goes to the
+      // top context, because the frame itself must never be the thing that
+      // navigates. `_blank` is not the loose option here: the pair below is
+      // set either way, so the opened tab gets no `window.opener` and no
+      // referrer, and the destination still passes through the confirmation
+      // that names where it goes.
+      const wants = (anchor.getAttribute("target") ?? "").toLowerCase();
+      anchor.setAttribute("target", wants === "_blank" ? "_blank" : "_top");
       anchor.setAttribute("rel", "noreferrer noopener");
       continue;
     }

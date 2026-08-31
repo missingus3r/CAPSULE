@@ -807,6 +807,8 @@ export default function App() {
                 className="mode-link"
                 href={`http://${CAPSULE_INDEX_NAME}/`}
                 title={t("mode.searchNeedsExtension")}
+                target="_blank"
+                rel="noreferrer noopener"
               >
                 <Search size={17} aria-hidden="true" />
                 {t("mode.search")}
