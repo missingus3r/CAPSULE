@@ -27,8 +27,7 @@ export const REALTIME_PAGE = `<!doctype html>
         background: var(--bg); color: var(--ink);
         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
       }
-      main { width: 100%; max-width: 34rem; text-align: center }
-      h1 { margin: 0 0 2.25rem; font-size: 1.05rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--muted) }
+      main { width: 100%; max-width: 34rem; text-align: center; padding-top: 1rem }
       .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem }
       .card { padding: 1.75rem 1rem; border: 1px solid var(--line); border-radius: 1.15rem; background: var(--card) }
       .n { font-size: clamp(2.6rem, 12vw, 3.6rem); font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em }
@@ -38,7 +37,7 @@ export const REALTIME_PAGE = `<!doctype html>
       .caveat { margin: 2rem 0 0; font-size: .78rem; line-height: 1.62; color: var(--muted); text-align: left }
       .since { margin: 1rem 0 0; font-size: .7rem; color: var(--faint); font-variant-numeric: tabular-nums }
       .off { color: var(--accent) }
-      .dot { display: inline-block; width: .42rem; height: .42rem; margin-right: .45rem; border-radius: 50%; background: var(--accent); vertical-align: middle; animation: pulse 2s ease-in-out infinite }
+      .dot { display: inline-block; width: .4rem; height: .4rem; margin: 0 .5rem .5rem 0; border-radius: 50%; background: var(--accent); vertical-align: middle; animation: pulse 2s ease-in-out infinite }
       @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
       @media (prefers-reduced-motion: reduce) { .dot { animation: none } }
       @media (max-width: 26rem) { .pair { grid-template-columns: 1fr } }
@@ -46,10 +45,9 @@ export const REALTIME_PAGE = `<!doctype html>
   </head>
   <body>
     <main>
-      <h1><span class="dot" aria-hidden="true"></span>Right now</h1>
       <div class="pair">
         <div class="card">
-          <div class="n" id="clients">&ndash;</div>
+          <div class="n" id="clients"><span class="dot" aria-hidden="true"></span>&ndash;</div>
           <div class="k">addresses</div>
           <div class="sub" id="clients-note"></div>
           <div class="peak">peak <b id="clients-peak">&ndash;</b></div>

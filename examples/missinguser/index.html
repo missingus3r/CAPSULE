@@ -18,8 +18,8 @@
         />
         <h1>missinguser</h1>
         <p class="bio">
-          Notes on what this network can do, written from inside it. This page
-          has no DNS record, no certificate and no hosting bill.
+          Notes on what CAPSULE can do. This page has no domain, no certificate
+          and no host. It is served by the network it talks about.
         </p>
       </header>
 
@@ -34,52 +34,46 @@
           height="900"
         />
 
-        <p>Because I got tired of the answer being "trust us".</p>
+        <p>I built CAPSULE because I did not want to trust anyone.</p>
         <p>
-          Every service I used to send a file encrypted it in transit and at
-          rest, and every one of them kept the ability to read it. That ability
-          is the part that gets subpoenaed, breached, scanned and sold. The
-          interesting question was never whether something is encrypted. It is
-          who holds the key.
+          Every service I used to send a file said it was encrypted. All of them
+          could still read my files. That is the part that gets leaked, scanned
+          and sold. So the question is not whether something is encrypted. The
+          question is who has the key.
         </p>
         <p>
-          Publishing has the same shape. A domain is rented, a certificate is
-          issued, a host serves the bytes. Three parties, any of whom can be
-          leaned on to make a page disappear or say something else, and all
-          three send an invoice. I wanted an address nobody sold me and nobody
-          can take back.
+          Putting a page online works the same way. You rent a domain. You get a
+          certificate. Someone hosts the bytes. Three companies, and any of them
+          can take your page down. All three send a bill.
         </p>
         <p>
-          So the rule underneath all of this is a small one: a server should be
-          able to hold your data without being able to read it, and the thing
-          that unlocks it should never travel the same road. Files are encrypted
-          before they leave. The key rides in the part of a link that browsers
-          never send to a server. A relay holds bytes it cannot open, for a time
-          it did not choose, with no account attached.
+          I wanted something simpler. A server should be able to hold my file
+          without being able to open it. So the file is encrypted before it
+          leaves my machine, and the key never goes to the server. It travels in
+          the part of a link that browsers do not send. The relay stores bytes
+          it cannot read. There is no account.
         </p>
         <p>
-          I care about this because information wants to move and the current
-          arrangement charges rent at every step. Not only in money. In
-          permission. Somebody decides whether your page stays up, whether your
-          file is allowed, whether your name is still yours next year. Removing
-          that somebody is not a feature. It is the whole point.
+          I care about this because information should move freely. Right now it
+          does not. Someone decides if your page stays up, if your file is
+          allowed, if your name is still yours next year. I wanted to remove
+          that someone.
         </p>
         <p>
-          What is honest to say today: the network is small, so the protection
-          is small. A mix path across relays one person operates protects
-          nobody, and right now that is close to what exists. The design does
-          not cap how good it gets as people join, and nothing else about it
-          matters until they do.
+          I should be honest about where it is. The network is small, so the
+          protection is small. Mixing traffic through relays that one person
+          runs protects nobody, and that is close to what exists today. It gets
+          better when more people run relays. Nothing else fixes it.
         </p>
         <p>
-          That is why this page is here rather than in a README. It is the thing
-          working, and you are reading it through the network it describes.
+          That is why this is a page and not a README. It works, and you are
+          reading it through the thing it describes.
         </p>
       </article>
 
       <footer>
         <p>
-          Run a relay and the number goes up. The code, and every claim in it:
+          Run a relay and it gets better. The code:
           <a href="https://github.com/missingus3r/CAPSULE"
             >github.com/missingus3r/CAPSULE</a
           >
