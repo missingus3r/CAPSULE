@@ -7,7 +7,7 @@ files with no account and no identity attached, and stay reachable when the
 Internet is not. If you already pay to be online, what is inside it should not
 be for sale.
 
-📄 [Full showcase page](https://missingus3r.github.io/CAPSULE/) · 🔒 [Threat model](docs/THREAT_MODEL.md) · 📊 [Compared to 21 other networks](docs/COMPARISON.md)
+📄 [Live site](https://68.211.136.69.sslip.io/) · 🔒 [Threat model](docs/THREAT_MODEL.md) · 📊 [Compared to 21 other networks](docs/COMPARISON.md)
 
 ---
 
