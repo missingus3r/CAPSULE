@@ -167,6 +167,16 @@ export const en = {
     "The relay sees your IP address at the moment you connect, though it does not keep it. Anonymous mode removes the file's metadata, hides the name and pads the size to a category, but it does not hide your address. Mix routing does: the request travels through several relays and the one storing the capsule never learns who asked. Neither hides that you use CAPSULE at all: the CLI has {flag} for that. Encryption does not protect an infected device, nor stop whoever receives the file from keeping a copy.",
 
   "mode.publish": "Publish",
+  "conn.checking": "Looking for a relay…",
+  "conn.offline": "Not connected to any relay",
+  "conn.offlineDetail":
+    "Nothing can be sent or opened until one answers. Tried {host}. It may be down, or refusing the address this page was opened from.",
+  "conn.one": "Connected to 1 relay",
+  "conn.oneDetail":
+    "Sending and receiving work. Mix routing has nothing to route through: one relay sees both ends. Reaching {host}.",
+  "conn.many": "Connected to {count} relays",
+  "conn.manyDetail": "Sending, receiving and mix routing are all available.",
+
   "mode.search": "Search",
   "mode.searchNeedsExtension":
     "Opens a .capsule address, which needs the CAPSULE extension installed.",

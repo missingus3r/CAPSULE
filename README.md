@@ -116,6 +116,35 @@ verified: [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ---
 
+## For an agent
+
+If you use Claude Code, Codex or anything like them, one line does each of
+these. **Read the repository before running it** is the first one on purpose:
+you are about to run code from a stranger on the internet, and an agent is good
+at telling you what it does before it does it.
+
+**Check whether this is safe to run**
+
+```
+Audit https://github.com/missingus3r/CAPSULE before I run anything: read the build scripts, the postinstall hooks and the network calls, tell me every host it contacts and every file it writes outside the repo, and say plainly whether you would run it.
+```
+
+**Install the client and send a file**
+
+```
+Clone https://github.com/missingus3r/CAPSULE, run npm install and npm run build, then send me a test file with the CLI and give me the share link. Do not start a relay: the default one is already configured.
+```
+
+**Run a relay and join the network**
+
+```
+Clone https://github.com/missingus3r/CAPSULE and run a CAPSULE relay on this machine as a systemd service. Read docs/RUN_A_RELAY.md first, set CAPSULE_PUBLIC_URL to an address others can reach, point CAPSULE_PEERS at the genesis relay, and tell me what the relay can see about the people who use it.
+```
+
+The last clause of each is the point. An agent that reports what a relay
+observes, or what a build script touches, is more useful than one that just
+finishes.
+
 ## Get started
 
 Requires **Node.js 22 or newer**. Nothing else: no database, no account, no

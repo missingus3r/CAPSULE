@@ -38,6 +38,7 @@ import {
   KeyRound,
   Layers,
   Link2,
+  Loader2,
   LockKeyhole,
   Globe,
   PackageOpen,
@@ -49,6 +50,7 @@ import {
   Shuffle,
   TriangleAlert,
   Waypoints,
+  WifiOff,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { discoverySeeds, rememberRelays } from "./lib/seeds";
@@ -216,6 +218,75 @@ function LanguageSwitcher() {
           {option.toUpperCase()}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Whether this browser can reach the network, said plainly.
+ *
+ * Somebody who cannot send a file needs to know that before they pick one, not
+ * after the upload fails, and somebody reaching exactly one relay should know
+ * that mixing has nothing to mix through. Three states rather than two: asking
+ * is not the same as failing, and telling somebody they are disconnected while
+ * the first request is still open would be a lie that fixes itself.
+ */
+function ConnectionStatus({
+  reachable,
+  relayCount,
+  relayUrl,
+}: {
+  reachable: boolean | undefined;
+  relayCount: number;
+  relayUrl: string;
+}) {
+  const t = useT();
+  const host = (() => {
+    try {
+      return new URL(relayUrl).host;
+    } catch {
+      return relayUrl;
+    }
+  })();
+
+  if (reachable === undefined) {
+    return (
+      <div className="connection is-checking" role="status">
+        <Loader2 size={16} className="spin" aria-hidden="true" />
+        <span>
+          <strong>{t("conn.checking")}</strong>
+        </span>
+      </div>
+    );
+  }
+
+  if (!reachable) {
+    return (
+      <div className="connection is-offline" role="alert">
+        <WifiOff size={16} aria-hidden="true" />
+        <span>
+          <strong>{t("conn.offline")}</strong>
+          <small>{t("conn.offlineDetail", { host })}</small>
+        </span>
+      </div>
+    );
+  }
+
+  const alone = relayCount <= 1;
+  return (
+    <div
+      className={alone ? "connection is-alone" : "connection is-online"}
+      role="status"
+    >
+      <Server size={16} aria-hidden="true" />
+      <span>
+        <strong>
+          {alone ? t("conn.one") : t("conn.many", { count: relayCount })}
+        </strong>
+        <small>
+          {alone ? t("conn.oneDetail", { host }) : t("conn.manyDetail")}
+        </small>
+      </span>
     </div>
   );
 }
@@ -406,6 +477,15 @@ export default function App() {
   const [relayConfig, setRelayConfig] = useState<RelayPublicConfig | null>(
     null,
   );
+  /**
+   * Whether the configured relay answered.
+   *
+   * Separate from `relayConfig` because that starts null and stays null on
+   * failure, so it cannot tell "still asking" from "did not answer" — and
+   * showing somebody "not connected" while the first request is in flight is
+   * its own kind of wrong.
+   */
+  const [reachable, setReachable] = useState<boolean | undefined>(undefined);
   const [network, setNetwork] = useState<RelayInfo[]>([]);
   const [sendStage, setSendStage] = useState<SendStage>("form");
   const [sendProgress, setSendProgress] = useState(0);
@@ -437,10 +517,14 @@ export default function App() {
     new CapsuleRelayClient(relayUrl)
       .config()
       .then((config) => {
-        if (!cancelled) setRelayConfig(config);
+        if (cancelled) return;
+        setRelayConfig(config);
+        setReachable(true);
       })
       .catch(() => {
-        if (!cancelled) setRelayConfig(null);
+        if (cancelled) return;
+        setRelayConfig(null);
+        setReachable(false);
       });
     discoverRelays({
       // The configured relay first, then ones remembered from earlier visits,
@@ -778,6 +862,12 @@ export default function App() {
             <h1 id="main-title">{t(`${mode}.title` as MessageKey)}</h1>
             <p>{t(`${mode}.sub` as MessageKey)}</p>
           </div>
+
+          <ConnectionStatus
+            reachable={reachable}
+            relayCount={network.length}
+            relayUrl={relayUrl}
+          />
 
           <div
             className="mode-tabs"

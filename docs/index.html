@@ -392,6 +392,55 @@
         border-top: 1px dashed var(--line-2);
         color: var(--ink-3);
       }
+      .agent-prompts {
+        display: grid;
+        gap: 14px;
+        margin: 34px auto 0;
+        max-width: 840px;
+        text-align: left;
+      }
+      .agent-prompt {
+        border: 1px solid var(--line-2);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .agent-prompt-head {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .agent-prompt-what {
+        color: var(--ink);
+        font-size: 12.5px;
+        font-weight: 700;
+      }
+      .agent-prompt-copy {
+        padding: 5px 12px;
+        border: 1px solid var(--line-2);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--ink-2);
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.04em;
+      }
+      .agent-prompt-copy:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .agent-prompt-text {
+        margin: 0;
+        padding: 14px 16px;
+        color: var(--ink-2);
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.62;
+      }
       .figcap {
         font-family: var(--mono);
         font-size: 11px;
@@ -1076,7 +1125,8 @@
         <a href="#mix">05 Mix</a>
         <a href="#compare">06 Compared</a>
         <a href="#run">07 Run it</a>
-        <a href="#stack">08 Stack</a>
+        <a href="#agents">08 Agents</a>
+        <a href="#stack">09 Stack</a>
       </div>
       <button class="modebtn" id="mode" type="button">Light</button>
     </nav>
@@ -1805,8 +1855,67 @@
       </p>
     </section>
 
+    <section id="agents" class="wrap">
+      <div class="kicker">08: For an agent</div>
+      <h2>One line, and something else <b>does the reading</b></h2>
+      <p class="body">
+        If you use Claude Code, Codex or anything like them, each of these is a
+        single line to paste. The first one is first on purpose: you are about
+        to run code from a stranger on the internet, and an agent is good at
+        telling you what it does before it does it.
+      </p>
+
+      <div class="agent-prompts">
+        <div class="agent-prompt">
+          <div class="agent-prompt-head">
+            <span class="agent-prompt-what">Check whether this is safe to run</span>
+            <button class="agent-prompt-copy" type="button" data-copy>Copy</button>
+          </div>
+          <p class="agent-prompt-text">
+            Audit https://github.com/missingus3r/CAPSULE before I run anything:
+            read the build scripts, the postinstall hooks and the network calls,
+            tell me every host it contacts and every file it writes outside the
+            repo, and say plainly whether you would run it.
+          </p>
+        </div>
+
+        <div class="agent-prompt">
+          <div class="agent-prompt-head">
+            <span class="agent-prompt-what">Install the client and send a file</span>
+            <button class="agent-prompt-copy" type="button" data-copy>Copy</button>
+          </div>
+          <p class="agent-prompt-text">
+            Clone https://github.com/missingus3r/CAPSULE, run npm install and
+            npm run build, then send me a test file with the CLI and give me the
+            share link. Do not start a relay: the default one is already
+            configured.
+          </p>
+        </div>
+
+        <div class="agent-prompt">
+          <div class="agent-prompt-head">
+            <span class="agent-prompt-what">Run a relay and join the network</span>
+            <button class="agent-prompt-copy" type="button" data-copy>Copy</button>
+          </div>
+          <p class="agent-prompt-text">
+            Clone https://github.com/missingus3r/CAPSULE and run a CAPSULE relay
+            on this machine as a systemd service. Read docs/RUN_A_RELAY.md
+            first, set CAPSULE_PUBLIC_URL to an address others can reach, point
+            CAPSULE_PEERS at the genesis relay, and tell me what the relay can
+            see about the people who use it.
+          </p>
+        </div>
+      </div>
+
+      <p class="compare-note">
+        The last clause of each is the point. An agent that reports what a relay
+        observes, or what a build script touches, is more useful than one that
+        just finishes.
+      </p>
+    </section>
+
     <section id="stack" class="wrap">
-      <div class="kicker">08: Stack</div>
+      <div class="kicker">09: Stack</div>
       <h2>Boring choices, on <b>purpose</b></h2>
       <p class="body">
         Nothing here is novel cryptography. Every primitive is one that has been
@@ -2215,6 +2324,28 @@ capsule-id/
         document.addEventListener("keydown", (e) => {
           if (e.key === "Escape") closeAll();
         });
+
+        // Each agent prompt copies its own text. Reading it before pasting
+        // is the point of the section, so the button sits next to the words
+        // rather than replacing them.
+        for (const button of document.querySelectorAll("[data-copy]")) {
+          button.addEventListener("click", async () => {
+            const text = button
+              .closest(".agent-prompt")
+              .querySelector(".agent-prompt-text")
+              .textContent.replace(/\s+/g, " ")
+              .trim();
+            try {
+              await navigator.clipboard.writeText(text);
+              button.textContent = "Copied";
+              setTimeout(() => {
+                button.textContent = "Copy";
+              }, 1600);
+            } catch {
+              button.textContent = "Copy failed";
+            }
+          });
+        }
 
         const copy = document.getElementById("copy");
         copy.addEventListener("click", async () => {

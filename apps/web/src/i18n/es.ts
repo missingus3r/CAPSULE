@@ -160,6 +160,17 @@ export const es: Messages = {
     "El relay ve tu dirección IP en el momento de la conexión, aunque no la guarda. El modo anónimo borra los metadatos del archivo, oculta el nombre y rellena el tamaño hasta una categoría, pero no oculta tu dirección. El ruteo por mixes sí: el pedido viaja por varios relays y el que almacena la cápsula nunca sabe quién la pidió. Ninguno de los dos oculta que usás CAPSULE: para eso la CLI tiene {flag}. El cifrado no protege un dispositivo infectado ni evita que quien recibe guarde una copia.",
 
   "mode.publish": "Publicar",
+  "conn.checking": "Buscando un relay…",
+  "conn.offline": "Sin conexión a ningún relay",
+  "conn.offlineDetail":
+    "No se puede enviar ni abrir nada hasta que alguno responda. Se intentó {host}. Puede estar caído, o rechazando la dirección desde la que abriste esta página.",
+  "conn.one": "Conectado a 1 relay",
+  "conn.oneDetail":
+    "Enviar y recibir funcionan. El ruteo por mixes no tiene por dónde rutear: un solo relay ve las dos puntas. Alcanzando {host}.",
+  "conn.many": "Conectado a {count} relays",
+  "conn.manyDetail":
+    "Enviar, recibir y rutear por mixes están todos disponibles.",
+
   "mode.search": "Buscar",
   "mode.searchNeedsExtension":
     "Abre una dirección .capsule, que necesita la extensión CAPSULE instalada.",

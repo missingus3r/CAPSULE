@@ -62,6 +62,40 @@ describe("App copy", () => {
     expect(screen.getByText("Cifrar e criar link")).toBeInTheDocument();
   });
 
+  it("says it is still looking before it says it failed", async () => {
+    // The stubbed fetch never settles, so this is the state a real page is in
+    // for the first moment. Telling somebody they are disconnected there would
+    // be a lie that corrects itself a second later.
+    renderApp();
+    expect(await screen.findByText("Looking for a relay…")).toBeInTheDocument();
+    expect(screen.queryByText("Not connected to any relay")).toBeNull();
+  });
+
+  it(
+    "says plainly when no relay answered, and why it matters",
+    { timeout: 20_000 },
+    async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => Promise.reject(new Error("refused"))),
+      );
+      renderApp();
+
+      // The SDK retries with backoff before giving up, so the failed state
+      // arrives seconds after the first refusal rather than immediately.
+      expect(
+        await screen.findByText("Not connected to any relay", undefined, {
+          timeout: 15_000,
+        }),
+      ).toBeInTheDocument();
+      // The consequence, not just the state: somebody should not pick a file
+      // first and find out afterwards.
+      expect(
+        screen.getByText(/Nothing can be sent or opened/u),
+      ).toBeInTheDocument();
+    },
+  );
+
   it("offers mix routing, and says when no relay can carry it", async () => {
     renderApp();
 
