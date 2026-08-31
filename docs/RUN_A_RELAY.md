@@ -177,6 +177,24 @@ more than any check.
 Handing out the bare origin instead is trust-on-first-use, which is fine for
 somebody typing it in and wrong for anything that ships with the software.
 
+## 4c. Seeing whether anything is happening
+
+```
+https://your-relay.example/realtime
+```
+
+A page with two numbers and their peaks: addresses that made a request in the
+last five minutes, and relays in your directory. It is there so an operator can
+tell a relay that is carrying traffic from one that is merely running, without
+installing anything.
+
+Read `addresses` as addresses. It is not a user count and cannot become one:
+two devices are two, a household behind one router is one, and anybody using
+the mix network is counted as the relay that forwarded for them. The page holds
+nothing — the relay keeps a salted digest of the address for the length of the
+window, which is the same value rate limiting already keeps, and the salt
+rotates, so a digest cannot be followed from one window into the next.
+
 ## 5. Operational privacy
 
 ```bash

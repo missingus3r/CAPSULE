@@ -660,6 +660,30 @@ The parameter is optional and a relay that predates it simply returns the
 document without those fields. An unpinned lookup does not send one, so nothing
 about ordinary discovery changed.
 
+#### `GET /v1/realtime`
+
+```json
+{
+  "clients": 3,
+  "clientsPeak": 11,
+  "relays": 2,
+  "relaysPeak": 4,
+  "windowSeconds": 300,
+  "since": "2026-08-30T00:00:00.000Z"
+}
+```
+
+`clients` is **distinct addresses that made a `/v1` request in the window, not
+people**: two devices are two, a household behind one router is one, and a
+client routing through the mix network is counted as the relay that forwarded
+for it. The relay holds a salted digest of the address for the length of the
+window — the same value rate limiting already keeps, under a salt that rotates
+— so nothing in it can be turned back into an address or followed from one
+window into the next. Requests to `/v1/realtime` are not counted, so a page
+watching the number is not part of it.
+
+`GET /realtime` serves a page that polls this and draws it.
+
 #### `GET /v1/peers`
 
 Returns `self` and the list of known relays (`url`, `relayId`, `publicKey`,

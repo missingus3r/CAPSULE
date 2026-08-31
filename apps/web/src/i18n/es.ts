@@ -131,12 +131,12 @@ export const es: Messages = {
   "receive.readyTitle": "Lista para guardar",
   "receive.save": "Guardar {filename}",
   "receive.close": "Cerrar esta cápsula",
-  "receive.emptyTitle": "Pegá un enlace CAPSULE",
+  "receive.emptyTitle": "Pegá un enlace o una dirección .capsule",
   "receive.errorTitle": "Revisemos el enlace",
   "receive.emptyDetail":
     "Abrir el enlace completo empieza la descarga sola. También podés pegarlo acá.",
-  "receive.linkLabel": "Enlace privado",
-  "receive.open": "Abrir cápsula",
+  "receive.linkLabel": "Un enlace de cápsula, o una dirección .capsule",
+  "receive.open": "Abrir",
   "receive.hashExplainer":
     "La parte que empieza con {fragment} lleva la llave. El navegador no la manda al relay cuando pide la página.",
 

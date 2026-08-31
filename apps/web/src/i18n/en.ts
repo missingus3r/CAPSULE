@@ -139,12 +139,12 @@ export const en = {
   "receive.readyTitle": "Ready to save",
   "receive.save": "Save {filename}",
   "receive.close": "Close this capsule",
-  "receive.emptyTitle": "Paste a CAPSULE link",
+  "receive.emptyTitle": "Paste a link or a .capsule address",
   "receive.errorTitle": "Let us check the link",
   "receive.emptyDetail":
     "Opening the full link starts the download on its own. You can also paste it here.",
-  "receive.linkLabel": "Private link",
-  "receive.open": "Open capsule",
+  "receive.linkLabel": "A capsule link, or a .capsule address",
+  "receive.open": "Open",
   "receive.hashExplainer":
     "The part starting with {fragment} carries the key. The browser does not send it to the relay when it asks for the page.",
 

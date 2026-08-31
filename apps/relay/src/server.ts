@@ -19,6 +19,8 @@ import { RelayBridge, loadBridgeKey } from "./bridge.js";
 import { loadRelayIdentity, type RelayIdentity } from "./identity.js";
 import { MixNode, type MixPeer } from "./mix.js";
 import { PeerDirectory, type RelayAnnouncement } from "./peers.js";
+import { PresenceCounter } from "./presence.js";
+import { REALTIME_PAGE } from "./realtime-page.js";
 import { SenderQuota } from "./quota.js";
 import { SiteDirectory } from "./sites.js";
 import {
@@ -353,6 +355,19 @@ export async function buildRelayServer(
       .update(request.ip ?? "")
       .digest("base64url");
 
+  /**
+   * Presence is counted from the same salted digest rate limiting uses, so it
+   * holds nothing the relay was not already holding. Only CAPSULE API traffic
+   * counts: the realtime page polls itself, and a page watching a number
+   * should not be part of the number.
+   */
+  const presence = new PresenceCounter();
+  app.addHook("onRequest", async (request) => {
+    const url = request.url ?? "";
+    if (!url.startsWith("/v1/") || url.startsWith("/v1/realtime")) return;
+    presence.see(blindKey(request));
+  });
+
   await app.register(rateLimit, {
     global: true,
     hook: "onRequest",
@@ -452,6 +467,20 @@ export async function buildRelayServer(
     maxChunkBytes: config.maxChunkBytes,
     maxManifestBytes: config.maxManifestBytes,
     maxChunkCount: config.maxChunkCount,
+  });
+
+  app.get("/v1/realtime", async () => presence.snapshot(peers.size));
+
+  /**
+   * A page rather than a document nobody reads: an operator, or anybody at
+   * all, can see whether a relay is carrying traffic without installing
+   * something or parsing JSON.
+   */
+  app.get("/realtime", async (_request, reply) => {
+    reply.header("content-type", "text/html; charset=utf-8");
+    // Nothing here is worth caching for even a second; the point is the now.
+    reply.header("cache-control", "no-store");
+    return REALTIME_PAGE;
   });
 
   app.get("/v1/config", async () => ({

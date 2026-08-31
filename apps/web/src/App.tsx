@@ -20,6 +20,7 @@ import {
   decodeShareCapability,
   encodeOwnerCapability,
   isPublicRelayOrigin,
+  parseSiteName,
   wrapWithPassphrase,
 } from "@capsule/protocol";
 import QRCode from "qrcode";
@@ -700,15 +701,34 @@ export default function App() {
     }
   };
 
+  /**
+   * One field for both kinds of address somebody can be handed.
+   *
+   * A capsule link carries its key in the fragment and is opened here, on the
+   * device. A `.capsule` name is a site, which this page cannot render at all
+   * — it has to be handed to the extension, which is what navigating to the
+   * address does. Asking which of the two it is would be asking somebody to
+   * classify a string they were just given.
+   */
   const handleReceiveSubmit = () => {
     const nextCapability = extractCapability(receiveInput);
-    if (!nextCapability) {
-      setReceiveError("error.badLink");
-      setReceiveStage("error");
+    if (nextCapability) {
+      setMode("receive");
+      void beginDownload(nextCapability);
       return;
     }
-    setMode("receive");
-    void beginDownload(nextCapability);
+
+    void parseSiteName(receiveInput.trim()).then((site) => {
+      if (!site) {
+        setReceiveError("error.badLink");
+        setReceiveStage("error");
+        return;
+      }
+      // A new tab, because leaving the page would lose a capsule that may be
+      // open behind it, and because the address needs the extension: a
+      // visitor without it should land on the failure in a tab of its own.
+      window.open(`http://${site.name}/`, "_blank", "noreferrer");
+    });
   };
 
   const saveReceivedFile = () => {
@@ -1319,7 +1339,7 @@ export default function App() {
                 </>
               )}
             </div>
-          ) : (
+          ) : mode === "receive" ? (
             <div className="flow receive-flow" role="tabpanel">
               {receiveStage === "downloading" ? (
                 <div className="receive-state centered-state">
@@ -1395,7 +1415,7 @@ export default function App() {
                         value={receiveInput}
                         autoComplete="off"
                         spellCheck={false}
-                        placeholder="https://…/#capsule=…"
+                        placeholder="https://…/#capsule=…  ·  ….capsule"
                         onChange={(event) =>
                           setReceiveInput(event.target.value)
                         }
@@ -1433,7 +1453,7 @@ export default function App() {
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </section>
 
         <PrivacyAside relays={network} relayUrl={relayUrl} />
