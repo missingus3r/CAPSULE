@@ -194,32 +194,48 @@ const LANGUAGE_NAMES: Record<Locale, string> = {
   pt: "Português",
 };
 
-const STYLE = `:root{color-scheme:light dark}
+const STYLE = `:root{color-scheme:light dark;--ink:#18352f;--muted:#5a6b65;--faint:#8b9691;--bg:#fffdf8;--line:rgba(27,62,54,.14);--visited:#6b4fa8;--accent:#c2543a}
+@media(prefers-color-scheme:dark){:root{--ink:#e8efec;--muted:#a8b8b2;--faint:#7d8e88;--bg:#12201d;--line:rgba(255,255,255,.11);--visited:#b39ddb;--accent:#ef7959}}
 *{box-sizing:border-box}
-body{margin:0;padding:2.5rem 1.25rem 4rem;font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3efe6;color:#18352f}
-main{max-width:52rem;margin:0 auto}
-h1{margin:0 0 .35rem;font-size:1.9rem;letter-spacing:-.02em}
-.lede{margin:0 0 .35rem;color:#5a6b65}
-.built{margin:0 0 1.25rem;font-size:.82rem;color:#8b9691}
-.langs{margin:0 0 1.75rem;font-size:.82rem;color:#8b9691}
-.langs a{color:#5a6b65;margin-right:.6rem}
-.langs strong{margin-right:.6rem;color:#18352f}
-.filter{width:100%;padding:.7rem .9rem;margin-bottom:.5rem;border:1px solid rgba(27,62,54,.22);border-radius:.75rem;background:#fffdf8;font:inherit}
-.hint{margin:0 0 1.5rem;padding:.9rem 1.1rem;border-left:3px solid rgba(27,62,54,.22);background:#fffdf8;font-size:.86rem;color:#5a6b65}
+body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:15px/1.58 arial,system-ui,-apple-system,sans-serif}
+
+/* The masthead behaves the way a search engine's does: a wordmark, the box,
+   and then results. Nothing else competes for the top of the page. */
+.top{padding:1.6rem 1.5rem 0;border-bottom:1px solid var(--line)}
+.top-in{max-width:44rem;margin:0 auto}
+.brand{display:block;margin:0 0 1rem;font-size:1.35rem;font-weight:700;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
+.brand b{color:var(--accent);font-weight:700}
+.filter{width:100%;max-width:36rem;padding:.72rem 1.1rem;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--ink);font:inherit;box-shadow:0 1px 5px rgba(27,62,54,.06)}
+.filter:focus{outline:none;border-color:rgba(27,62,54,.34);box-shadow:0 1px 9px rgba(27,62,54,.13)}
+.tabs{display:flex;gap:1.25rem;margin:.95rem 0 0;font-size:.8rem;color:var(--faint)}
+.tabs a{color:var(--faint);text-decoration:none;padding-bottom:.7rem}
+.tabs a:hover{color:var(--ink)}
+.tabs strong{color:var(--accent);font-weight:600;padding-bottom:.7rem;border-bottom:3px solid var(--accent)}
+
+main{max-width:44rem;margin:0 auto;padding:1.1rem 1.5rem 4rem}
+.stats{margin:0 0 1.6rem;font-size:.78rem;color:var(--faint)}
+
+/* One result: title link, then the address in green the way a URL line reads,
+   then the snippet. The shape people already know how to skim. */
 ul{margin:0;padding:0;list-style:none}
-li{padding:1.1rem 0;border-top:1px solid rgba(27,62,54,.13)}
-li a{color:#18352f;font-size:1.02rem;font-weight:650;text-decoration:none;overflow-wrap:anywhere}
-li a:hover{text-decoration:underline}
-.addr{display:block;margin:.2rem 0;font-family:ui-monospace,monospace;font-size:.72rem;color:#8b9691;overflow-wrap:anywhere}
-.desc{margin:.35rem 0 0;color:#5a6b65;font-size:.92rem}
-.meta{margin:.3rem 0 0;font-size:.74rem;color:#8b9691}
-.empty,.note{padding:1.4rem;border:1px dashed rgba(27,62,54,.22);border-radius:.9rem;color:#5a6b65;font-size:.9rem}
-.note{margin-top:2.5rem;background:#fffdf8}
-.pager{display:flex;gap:1rem;align-items:center;margin-top:1.75rem;font-size:.88rem}
-.pager a{color:#18352f}
-.pager span{color:#8b9691}
-footer{margin-top:2rem;color:#8b9691;font-size:.8rem}
-@media(prefers-color-scheme:dark){body{background:#12201d;color:#e8efec}li a,.pager a,.langs strong{color:#e8efec}.filter{background:#18302b;color:#e8efec}.note,.hint{background:#18302b}}`;
+li{margin:0 0 1.7rem}
+.addr{display:block;font-size:.78rem;color:var(--muted);overflow-wrap:anywhere}
+li a.title{display:block;margin:.1rem 0 .25rem;font-size:1.24rem;line-height:1.3;font-weight:400;color:#1a5fb4;text-decoration:none;overflow-wrap:anywhere}
+@media(prefers-color-scheme:dark){li a.title{color:#8ab4f8}}
+li a.title:hover{text-decoration:underline}
+li a.title:visited{color:var(--visited)}
+.desc{margin:0;color:var(--muted);font-size:.875rem;line-height:1.58}
+.meta{margin:.15rem 0 0;font-size:.75rem;color:var(--faint)}
+
+.hint{margin:0 0 1.8rem;padding:.85rem 1rem;border:1px solid var(--line);border-radius:.6rem;font-size:.8rem;color:var(--muted)}
+.empty{padding:2.5rem 0;color:var(--muted);font-size:.92rem}
+.note{margin-top:3rem;padding-top:1.4rem;border-top:1px solid var(--line);color:var(--faint);font-size:.78rem;line-height:1.6}
+.pager{display:flex;gap:1.4rem;align-items:center;margin-top:2.4rem;font-size:.85rem}
+.pager a{color:#1a5fb4;text-decoration:none}
+@media(prefers-color-scheme:dark){.pager a{color:#8ab4f8}}
+.pager a:hover{text-decoration:underline}
+.pager span{color:var(--faint)}
+footer{margin-top:2rem;color:var(--faint);font-size:.75rem}`;
 
 /**
  * Filtering happens over the list that is already on the page.
@@ -299,8 +315,8 @@ function renderPage(
       const address = `http://${listing.name}/`;
       const published = formatDate(listing.publishedAt, locale);
       return `      <li data-haystack="${haystack}">
-        <a href="${escapeHtml(address)}" target="_blank" rel="noreferrer noopener">${escapeHtml(listing.title || listing.name)}</a>
-        <code class="addr">${escapeHtml(address)}</code>
+        <span class="addr">${escapeHtml(address)}</span>
+        <a class="title" href="${escapeHtml(address)}" target="_blank" rel="noreferrer noopener">${escapeHtml(listing.title || listing.name)}</a>
         ${listing.description ? `<p class="desc">${escapeHtml(listing.description)}</p>` : ""}
         <p class="meta">${escapeHtml(s.published)} ${escapeHtml(published)} · ${escapeHtml(s.opensNewTab)}</p>
       </li>`;
@@ -331,24 +347,27 @@ function renderPage(
     <link rel="stylesheet" href="${escapeHtml(asset("style.css"))}" />
   </head>
   <body>
-    <main>
-      <h1>${escapeHtml(s.title)}</h1>
-      <p class="lede">
-        <span id="count">${listings.length}</span> ${escapeHtml(s.listed)}
-      </p>
-      <p class="built">
-        ${escapeHtml(s.built)} ${escapeHtml(formatDate(builtAt, locale))}. ${escapeHtml(s.snapshot)}
-      </p>
-      <p class="langs" aria-label="${escapeHtml(s.language)}">${langs}</p>
+    <div class="top">
+      <div class="top-in">
+        <a class="brand" href="${escapeHtml(pageFile(1))}">CAPSULE <b>index</b></a>
+        <input
+          id="filter"
+          class="filter"
+          type="search"
+          hidden
+          placeholder="${escapeHtml(s.filterPlaceholder)}"
+          aria-label="${escapeHtml(s.filterPlaceholder)}"
+        />
+        <nav class="tabs" aria-label="${escapeHtml(s.language)}">${langs}</nav>
+      </div>
+    </div>
 
-      <input
-        id="filter"
-        class="filter"
-        type="search"
-        hidden
-        placeholder="${escapeHtml(s.filterPlaceholder)}"
-        aria-label="${escapeHtml(s.filterPlaceholder)}"
-      />
+    <main>
+      <p class="stats">
+        <span id="count">${listings.length}</span> ${escapeHtml(s.listed)} &middot;
+        ${escapeHtml(s.built)} ${escapeHtml(formatDate(builtAt, locale))}
+      </p>
+
       <p class="hint" id="hint" data-scope="${escapeHtml(s.filterScope)}">
         ${escapeHtml(s.filterHint)}
       </p>
@@ -360,7 +379,7 @@ ${
 }
 ${pager}
 
-      <p class="note">${escapeHtml(s.optIn)}</p>
+      <p class="note">${escapeHtml(s.snapshot)} ${escapeHtml(s.optIn)}</p>
 
       <footer>${escapeHtml(s.footer)}</footer>
     </main>
@@ -475,8 +494,11 @@ async function writeCache(
   if (!path) return;
   try {
     await mkdir(dirname(resolve(path)), { recursive: true });
-    await writeFile(resolve(path), `${JSON.stringify(cache, null, 2)}
-`);
+    await writeFile(
+      resolve(path),
+      `${JSON.stringify(cache, null, 2)}
+`,
+    );
   } catch {
     // Failing to write it costs the next run its shortcut and nothing else.
   }
@@ -640,7 +662,9 @@ export function registerIndexerCommands(
           fetchImpl,
           (name, cached) => {
             if (!json) {
-              process.stderr.write(`  ${name}${cached ? " (unchanged)" : ""}\n`);
+              process.stderr.write(
+                `  ${name}${cached ? " (unchanged)" : ""}\n`,
+              );
             }
           },
         );
@@ -683,7 +707,8 @@ export function registerIndexerCommands(
         const refreshAfterMs =
           (Number.parseInt(options.refreshAfter, 10) || 12) * 3_600_000;
         const stale =
-          Number.isNaN(publishedAt) || Date.now() - publishedAt > refreshAfterMs;
+          Number.isNaN(publishedAt) ||
+          Date.now() - publishedAt > refreshAfterMs;
 
         if (cache.fingerprint === fingerprint && !stale) {
           await writeCache(options.cache, cache);
