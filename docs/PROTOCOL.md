@@ -645,8 +645,8 @@ CAPSULE/relay-challenge/v1
 ```
 
 **A client that pins a relay must ask for this, and must refuse a relay that
-does not answer it.** `relayId` and `publicKey` are both public — anyone can
-fetch them once — so a check that only compares the values a relay sends back
+does not answer it.** `relayId` and `publicKey` are both public, anyone can
+fetch them once, so a check that only compares the values a relay sends back
 is satisfied by whoever read them. Pinning means nothing without the
 signature.
 
@@ -677,8 +677,8 @@ about ordinary discovery changed.
 people**: two devices are two, a household behind one router is one, and a
 client routing through the mix network is counted as the relay that forwarded
 for it. The relay holds a salted digest of the address for the length of the
-window — the same value rate limiting already keeps, under a salt that rotates
-— so nothing in it can be turned back into an address or followed from one
+window, the same value rate limiting already keeps, under a salt that rotates,
+so nothing in it can be turned back into an address or followed from one
 window into the next. Requests to `/v1/realtime` are not counted, so a page
 watching the number is not part of it.
 
@@ -730,8 +730,8 @@ relays; it does not make a relay trustworthy.
 ## 13. Version 3
 
 Version 3 keeps the primitive, the index space, the nonce derivation and the
-manifest of version 2. It adds one thing to the format — erasure coding in the
-capability — and fixes two rules that were previously implicit.
+manifest of version 2. It adds one thing to the format, erasure coding in the
+capability, and fixes two rules that were previously implicit.
 
 ### 13.1 `k`-of-`n` erasure coding
 
@@ -833,7 +833,7 @@ CAPSULE/relay-announce/v2
 
 - The announcement contains exactly `url`, `relayId`, `publicKey`,
   `announcedAt`, `nonce` and `signature`. **Nothing else**: any other data about
-  the relay — its name, its limits — is read from `/v1/info` at the announced
+  the relay, its name, its limits, is read from `/v1/info` at the announced
   address, not from the announcement, so there is nothing worth forging.
 - The proof of work is the number of leading zero bits of `SHA-256(message)`.
   The receiver demands at least as many as it has configured.
@@ -998,7 +998,7 @@ With path `n_0 … n_{k-1}` and ephemeral scalar `x`:
 5. Body: `LIONESS_decrypt(HKDF(s,"payload"), δ)`.
 6. Wait the delay, capped at the node's maximum, and act on the command.
 
-A node always answers the same — `202` — whether it forwarded, delivered or
+A node always answers the same, `202`, whether it forwarded, delivered or
 discarded. A different code would be an oracle about the packet's contents.
 
 ### 16.5 Body
@@ -1164,7 +1164,7 @@ This lives in the bundle rather than in the record on purpose. The record's
 signed message is the fixed field list in §17.2 under the
 `CAPSULE/site-record/v1` label; adding a field would produce records that
 existing clients cannot verify, and a client that cannot verify a record
-refuses the site — a resolution failure traded for a line of metadata. Kept
+refuses the site: a resolution failure traded for a line of metadata. Kept
 outside the signature entirely, anyone could set it on somebody else's behalf.
 Inside the bundle it inherits the chain that already exists: the record signs
 the capability, the capability locates those exact bytes, and AES-GCM
@@ -1235,7 +1235,7 @@ mac = HMAC-SHA-256(
       )
 ```
 
-`path` is the inner path, without the prefix, including any query string —
+`path` is the inner path, without the prefix, including any query string:
 exactly what the server sees after stripping the prefix.
 
 The bridge accepts it only if the timestamp is within ±5 minutes, the MAC

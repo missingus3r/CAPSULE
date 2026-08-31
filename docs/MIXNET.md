@@ -99,7 +99,7 @@ provider mailbox ← mix D ← mix C
 The destination relay **is the last hop**; there is no exit node. This is a
 real difference from onion routing for the web: no party ever sees the request
 in the clear without also being the party it was addressed to. The relay learns
-which capsule operation was requested — which it would learn anyway — and does
+which capsule operation was requested, which it would learn anyway, and does
 not learn from whom.
 
 The reply travels via a **single-use reply block** the client builds and hands
@@ -222,11 +222,11 @@ can still stand up many. A large directory is not evidence of independence:
 look at who operates the relays, not how many there are.
 
 **It does not hide that you are using CAPSULE.** Your internet provider sees
-connections to a relay. That is what Tor underneath, or a bridge, is for — see
+connections to a relay. That is what Tor underneath, or a bridge, is for: see
 [CENSORSHIP.md](./CENSORSHIP.md).
 
 **It needs relays, and most readers have too few.** Every client can use the
-network now — the CLI, the web app and the extension — but a path needs relays
+network now, the CLI, the web app and the extension, but a path needs relays
 the client can reach, and the extension will only use ones the visitor has
 already allowed. With fewer than two it asks directly and says so. That is not
 a bug to fix in code: it is the same adoption problem as §1, arriving where a
@@ -240,8 +240,8 @@ understanding each other.
 
 **It has no formal analysis and no audit.** The constructions are published and
 used as specified, but _this_ composition has not been reviewed by anyone
-outside. The tests verify concrete properties — indistinguishability between
-hops, tagging resistance, replay rejection — and that is not the same thing as
+outside. The tests verify concrete properties, indistinguishability between
+hops, tagging resistance, replay rejection, and that is not the same thing as
 a cryptographic review.
 
 ## 6. How to tell whether it is helping you

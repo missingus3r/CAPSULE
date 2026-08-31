@@ -21,13 +21,13 @@ import type { Command } from "commander";
 import { parseTtl, defaultRelayUrl } from "./options.js";
 
 /**
- * `capsule index` — building a directory of `.capsule` sites.
+ * `capsule index`: building a directory of `.capsule` sites.
  *
  * Three things about this are worth stating before the code, because each one
  * is a constraint somebody will otherwise mistake for a bug.
  *
  * **Being listed is opt in, and silence means no.** A relay will tell anyone
- * the names it holds — that endpoint exists so relays can gossip records — so
+ * the names it holds, that endpoint exists so relays can gossip records, so
  * discovering a site says nothing about permission to catalogue it. The
  * permission is `capsule.json` inside the bundle, and a site that carries none
  * is skipped. Publishing openly is not the same as asking to be indexed.

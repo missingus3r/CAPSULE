@@ -27,7 +27,7 @@ What it does not guarantee:
 - **That publishing is anonymous by itself.** The relay sees the address of
   whoever uploads, unless `--mix`, `--tor` or `--bridge` is used.
 - **That nobody knows you visited.** The relay you ask sees that you asked
-  about that name — unless the request goes through the mix network, which the
+  about that name, unless the request goes through the mix network, which the
   CLI does with `--mix` and the extension does by default when it has enough
   relays to lay a path. When it cannot, it asks directly and says so (see §7).
 
@@ -129,8 +129,8 @@ Three endpoints, all optional (`CAPSULE_SITES_ENABLED=false` turns them off):
 
 A relay keeps its records in `sites.json` inside its data directory, and
 reads them back when it starts. Every restored record goes through the same
-checks an announcement does — the name is re-derived from the key, the
-signature is verified, the age limit applies — so a file edited on disk can no
+checks an announcement does, the name is re-derived from the key, the
+signature is verified, the age limit applies, so a file edited on disk can no
 more insert a record than a lying peer can. An unreadable file is not fatal:
 the relay says so in its log and starts empty, because publishers re-announce
 and gossip refills the directory.
@@ -139,7 +139,7 @@ Relays pass records to each other on every sync round, capped per round
 (`CAPSULE_SITE_GOSSIP_LIMIT`, 200 by default) and in total
 (`CAPSULE_MAX_SITES`, 5000). Without this a name would only resolve at the
 relays its author announced to, and every visitor would have to be told which
-those are — which is a registry with extra steps.
+those are, which is a registry with extra steps.
 
 A relay can **stay silent**, not lie. That is why the client asks several and
 keeps the highest sequence that verifies: for silence to be worth anything,
@@ -148,7 +148,7 @@ they would all have to be silent.
 ## 5b. Publishing from the web app
 
 The same publish the CLI does, from a page. A folder picker or a `.zip` becomes
-the `SiteFile[]` that `publishSite` already takes — the CLI builds that array by
+the `SiteFile[]` that `publishSite` already takes: the CLI builds that array by
 walking a directory, the browser builds it from a `FileList`, and everything
 after that point is identical code: the same bundle, the same encryption, the
 same signed record, and the mix network underneath when it is available.
@@ -157,8 +157,8 @@ The zip reader is a hundred lines rather than a dependency: the central
 directory is walked by hand and each entry inflated with `DecompressionStream`,
 which the browser already has. ZIP64, encrypted entries and unusual compression
 methods are refused by name rather than producing a bundle with files silently
-missing. Files an operating system added — `.DS_Store`, `__MACOSX/`,
-`Thumbs.db` — are dropped, and the interface says how many, because a bundle
+missing. Files an operating system added, `.DS_Store`, `__MACOSX/`,
+`Thumbs.db`, are dropped, and the interface says how many, because a bundle
 cannot be edited after it is published.
 
 A wrapper directory is stripped when _every_ file shares it, so a zip of
@@ -177,7 +177,7 @@ does two things and neither is optional:
   `loadSiteIdentity` produces, which Web Crypto marks non-extractable and
   usable only for signing, held in IndexedDB by structured clone so the flag
   survives. Publishing the next version is one click; what sits at rest is a
-  handle that can sign and cannot be exported — not by the page, not by
+  handle that can sign and cannot be exported, not by the page, not by
   anything else that reaches this origin.
 
 Publishing from another machine needs the file. That is the trade, and it is
@@ -199,7 +199,7 @@ index that treats silence as consent is doing something the author did not ask
 for.
 
 It lives in the bundle rather than the record because the record's signed
-message is a fixed field list — adding to it would make records older clients
+message is a fixed field list: adding to it would make records older clients
 cannot verify, and a client that cannot verify a record refuses the site
 entirely. Inside the bundle it is covered by the same signature chain as the
 pages, and no version of anything had to change.
@@ -217,7 +217,7 @@ Three constraints shape it, and each is a thing somebody will otherwise take
 for a bug:
 
 **Being listed is opt in, and silence means no.** A relay will tell anyone the
-names it holds — `GET /v1/sites` exists so relays can gossip records — so
+names it holds, `GET /v1/sites` exists so relays can gossip records, so
 discovering a name says nothing about permission to catalogue it. The
 permission is `capsule.json` inside the bundle, and a site carrying none is
 skipped.
@@ -239,7 +239,7 @@ whoever runs the index rather than on any visitor.
 
 Run it again to refresh; it publishes a new sequence under the same name. A
 deployment of the web app points at an index with `VITE_CAPSULE_INDEX`, which is
-empty by default — a link to an address that resolves to nothing is worse than
+empty by default: a link to an address that resolves to nothing is worse than
 no link.
 
 ## 6. The extension
@@ -247,7 +247,7 @@ no link.
 `http://<name>.capsule/` does not resolve in DNS and never will. The extension
 intercepts the navigation with a `declarativeNetRequest` rule before the
 browser resolves anything, and turns it into a page of its own with the
-original address in the **fragment** — which never travels to any server, the
+original address in the **fragment**, which never travels to any server, the
 same as in a capsule link.
 
 Then:
@@ -255,8 +255,8 @@ Then:
 1. It parses the name. If it does not parse, it stops there: no search, no
    "did you mean".
 2. It asks the configured relays and verifies every answer. By default the
-   asking goes through the mix network — mix operation `8` carries the record
-   lookup and the same path carries the capsule — so the relay holding the site
+   asking goes through the mix network, mix operation `8` carries the record
+   lookup and the same path carries the capsule, so the relay holding the site
    answers without learning who asked. With fewer than two allowed relays there
    is no path to build, and it asks directly instead.
 3. It compares the sequence with the highest this browser has accepted for the
@@ -270,7 +270,7 @@ A site's content is not trusted: it was written by whoever holds a key and
 arrived through relays nobody vouches for. So the document is not displayed, it
 is remade:
 
-- Every reference that resolves inside the bundle becomes a `data:` URL —
+- Every reference that resolves inside the bundle becomes a `data:` URL:
   stylesheets, images, fonts, `srcset`, `url()` inside CSS.
 - Every reference pointing outside is removed.
 - Internal links point back at the viewer's own page, so navigating updates the
@@ -300,7 +300,7 @@ when scripts are allowed. The reason is a rule that is easy to miss and was
 missed here at first: **a document created from `srcdoc` inherits the
 Content-Security-Policy of the page embedding it.** An extension page's policy
 is `script-src 'self'`, and a `<meta>` policy in the written document can only
-add restrictions on top of an inherited one, never lift it — so through
+add restrictions on top of an inherited one, never lift it, so through
 `srcdoc` a site's own scripts could never run, whatever the visitor chose.
 
 With scripts on, the page therefore goes into `sandboxed.html`, declared under
@@ -309,7 +309,7 @@ into an opaque origin with no extension API reachable from it: the same
 isolation `srcdoc` gave, arrived at deliberately rather than as a side effect.
 The viewer hands it the rebuilt HTML by `postMessage` and it writes it. The
 policy injected into that HTML still applies on top of the sandbox policy, so
-`connect-src 'none'` holds either way — verified in a browser, not assumed.
+`connect-src 'none'` holds either way: verified in a browser, not assumed.
 
 They can be enabled per site, with a visible warning.
 
@@ -335,7 +335,7 @@ click and passes the address up; the viewer decides what to honour, in
 That bootstrap is a convenience, not a control: a script can remove the
 listener or swallow the click, and all that costs is the site's own links. It
 cannot navigate the tab either way. What remains is that a visitor who
-approves a confirmation naming an outside address has still gone there — which
+approves a confirmation naming an outside address has still gone there, which
 is the same decision, and the same warning, as with scripts off.
 
 `allow-same-origin` is never used. The frame lives in an opaque origin; if it
@@ -368,8 +368,8 @@ over mix operation `8` and the capsule download over the same path, so the
 relay holding a site answers a request with no address attached to it.
 
 That needs at least two relays the visitor has already allowed, and it is not
-always available. When it is not, the extension asks directly — a relay then
-sees an address asking about a name — and the panel says which of the two
+always available. When it is not, the extension asks directly, a relay then
+sees an address asking about a name, and the panel says which of the two
 happened rather than leaving it to be assumed. Turning it off is a switch in
 the settings.
 

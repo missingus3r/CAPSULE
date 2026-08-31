@@ -22,7 +22,7 @@ Two warnings that apply to everything below:
 
 | Network                 | Its stated limitation                                                            | CAPSULE | Why                                                                                                                                                                                                             |
 | ----------------------- | -------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tor**                 | Slow, TCP only, vulnerable to correlation by an observer of both ends            | Partly  | Per-hop delays and cover traffic attack correlation, which is what Tor chose not to do. In exchange we are not a general TCP transport — see _Work in progress_ below.                                          |
+| **Tor**                 | Slow, TCP only, vulnerable to correlation by an observer of both ends            | Partly  | Per-hop delays and cover traffic attack correlation, which is what Tor chose not to do. In exchange we are not a general TCP transport: see _Work in progress_ below.                                           |
 | **I2P**                 | Installation and technical experience; not oriented to the conventional internet | Yes     | A `.capsule` site opens in Chrome with an extension and an `npm install`. Nobody has to learn a network model to read a page.                                                                                   |
 | **Nym**                 | More protection means far more latency; too slow for daily use                   | Partly  | The cost is the same, but it is chosen per operation: `--mix` when it matters, direct when it does not. The CLI reports how much anonymity there actually is before each send rather than selling it wholesale. |
 | **Lokinet**             | Smaller anonymity set than Tor, and a dependency on a token network              | Partly  | There is no token, no staking and no economy to capture: a relay is a Node process. CAPSULE's anonymity set today is **smaller still**.                                                                         |
@@ -40,7 +40,7 @@ Two warnings that apply to everything below:
 | **Yggdrasil**           | Encryption is not anonymity                                                      | Yes     | Agreed, which is why encryption and anonymity are separate layers here and the interface says which one is on.                                                                                                  |
 | **Reticulum**           | Small ecosystem, complicated onboarding                                          | Partly  | Onboarding is simpler (`npm install`, one command). The ecosystem is smaller still.                                                                                                                             |
 | **Meshtastic**          | Needs hardware and has little bandwidth                                          | Partly  | An offline capsule covers the air-gapped case with no hardware at all. It does not cover radio: where there is no IP and nobody to carry a file, Meshtastic works and CAPSULE does not.                         |
-| **Veilid**              | A framework: an application still has to be built                                | Yes     | CAPSULE is the application — CLI, web and extension — not a library waiting for somebody to build something on it.                                                                                              |
+| **Veilid**              | A framework: an application still has to be built                                | Yes     | CAPSULE is the application, CLI, web and extension, not a library waiting for somebody to build something on it.                                                                                                |
 | **Iroh / libp2p**       | Toolkits, not networks with end users                                            | Yes     | Same argument. There are commands a person runs.                                                                                                                                                                |
 | **Bitcoin / Lightning** | Traceability and custody complexity                                              | N/A     | There are no payments and no economy in CAPSULE.                                                                                                                                                                |
 
@@ -57,7 +57,7 @@ protects a visitor with heuristics and settings; here it is a property of the
 format. See [SITES.md](./SITES.md).
 
 **A bridge a probe cannot recognise.** An unlisted relay that answers every
-request without the key exactly like an unconfigured web server — including a
+request without the key exactly like an unconfigured web server, including a
 request with the right secret prefix but a bad, expired or replayed
 authenticator. See [CENSORSHIP.md](./CENSORSHIP.md).
 
@@ -70,7 +70,7 @@ KiB site and a 60 KiB one occupy exactly the same.
 
 **Manifests that are all the same length.** AES-GCM does not hide length, so
 without this the encrypted manifest would measure the filename. Every manifest
-is padded to a size class, and it is not an option — an anonymity feature some
+is padded to a size class, and it is not an option: an anonymity feature some
 people switch on splits everyone into those who did and those who did not.
 
 **A network measurement the tool actually reports.** `capsule network` prints
@@ -99,7 +99,7 @@ operator are not an anonymity network; they are a way for a relay not to see
 your IP.
 
 CAPSULE cannot even measure its own anonymity set. There are no accounts, no
-sessions and no counters — that is the point of the project — so there is
+sessions and no counters, that is the point of the project, so there is
 nobody to count. `capsule network` reports the _ceiling_ instead: relays
 reachable, apparent operators, mix nodes, mix operators. With one operator the
 ceiling is one, whatever the traffic looks like, and the CLI prints that number
@@ -121,7 +121,7 @@ the _Limits_ section of the showcase page.
 
 **A general-purpose TCP tunnel.** Tor, I2P, Lokinet and Yggdrasil carry any TCP
 or IP connection; CAPSULE carries files and static sites. The capsule format
-needs the content known in full up front, which a stream is not — so this is
+needs the content known in full up front, which a stream is not, so this is
 not an extension of the existing format but a second one beside it. The design
 is sketched in [ROADMAP.md](./ROADMAP.md) §16. It is not implemented, and every
 table here says so.

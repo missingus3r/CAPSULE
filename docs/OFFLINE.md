@@ -49,8 +49,8 @@ courier, and it means a lost memory stick is a lost memory stick rather than a
 disclosure.
 
 `--with-key` puts the key inside, so the file opens on its own. That is a
-reasonable thing to want — sometimes the point is to hand somebody one object
-and be done — and the tool says what it costs when you do it.
+reasonable thing to want, sometimes the point is to hand somebody one object
+and be done, and the tool says what it costs when you do it.
 
 ### 1.2 What it inherits
 
@@ -65,7 +65,7 @@ name of the file on the memory stick says nothing about what is inside.
 ### 1.3 What it does not have
 
 **No expiry.** There is no relay running a clock, so an offline capsule says
-`expiresAt: null` — which is the truthful answer, rather than a promise no
+`expiresAt: null`, which is the truthful answer, rather than a promise no
 software will keep. It exists until the file is deleted.
 
 **No deletion capability.** There is nobody to ask to delete it. Whoever holds
@@ -102,7 +102,7 @@ capsule send ./report.pdf --relay http://192.168.1.10:8795
 
 No DNS, no bootstrap list, no server anywhere outside the room. This is UDP
 multicast on `239.255.42.99:8799`, an administratively scoped group that is
-never routed off the local network — the same mechanism a printer uses to
+never routed off the local network: the same mechanism a printer uses to
 announce itself.
 
 ### 2.1 It is off by default, and it should be

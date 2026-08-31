@@ -14,16 +14,16 @@ be for sale.
 ## What is it
 
 Send someone a file. Put a website online. Both work without an account,
-without paying anyone, and without asking permission — and they keep working
+without paying anyone, and without asking permission, and they keep working
 when the Internet does not.
 
-|                              |                                                                                                                                                                                              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Send a file**              | You get a link. Whoever you give it to can open it. The server holding the file cannot — it only ever sees scrambled bytes, and the part of the link that unscrambles them never reaches it. |
-| **Publish a site**           | You get an address ending in `.capsule`. Nobody sold it to you, nobody renews it, and nobody can hand it to someone else — the address _is_ your key.                                        |
-| **No Internet? Still works** | Two laptops on the same wifi find each other with no DNS and no uplink. With no network at all, a capsule becomes one file you carry on a memory stick.                                      |
-| **Blocked? Still works**     | A bridge is a server the network does not list. To anyone scanning for it, it answers like an ordinary empty website.                                                                        |
-| **Nothing to sign up for**   | No account, no email, no phone number, no identifier of any kind. There is nothing to log in to and nothing to delete afterwards.                                                            |
+|                              |                                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Send a file**              | You get a link. Whoever you give it to can open it. The server holding the file cannot: it only ever sees scrambled bytes, and the part of the link that unscrambles them never reaches it. |
+| **Publish a site**           | You get an address ending in `.capsule`. Nobody sold it to you, nobody renews it, and nobody can hand it to someone else: the address _is_ your key.                                        |
+| **No Internet? Still works** | Two laptops on the same wifi find each other with no DNS and no uplink. With no network at all, a capsule becomes one file you carry on a memory stick.                                     |
+| **Blocked? Still works**     | A bridge is a server the network does not list. To anyone scanning for it, it answers like an ordinary empty website.                                                                       |
+| **Nothing to sign up for**   | No account, no email, no phone number, no identifier of any kind. There is nothing to log in to and nothing to delete afterwards.                                                           |
 
 ![How a capsule travels](docs/diagrams/capsule-flow.svg)
 
@@ -40,13 +40,13 @@ subpoenaed, breached, scanned and sold. The interesting question is not "is it
 encrypted" but **who holds the key**.
 
 Publishing has the same shape. A domain is rented, a certificate is issued, a
-host serves the bytes — three parties, any of whom can be leaned on to make a
+host serves the bytes: three parties, any of whom can be leaned on to make a
 page disappear or say something else, and all three send an invoice.
 
 > A relay that _could_ read your file eventually _will_ be asked to.
 
 CAPSULE's answer is to give the server less to hold: ciphertext of an unknown
-size, with no account attached, for a bounded time, and — if you ask — split
+size, with no account attached, for a bounded time, and, if you ask, split
 across several relays so no single one has enough to rebuild anything. Nobody
 sells you a name, because nobody issues one. Nobody bills you for storage,
 because a relay is a process somebody chose to run.
@@ -67,7 +67,7 @@ because a relay is a process somebody chose to run.
 | **General-purpose TCP tunnel**                   |   🚧    | ✅  |  ❌  |  ❌   |   ❌   |  ❌   |
 | **Designed for anonymity that grows with users** |   ✅    |  ~  |  ❌  |  ❌   |   ❌   |   ~   |
 
-🚧 designed, not built — [ROADMAP.md](docs/ROADMAP.md) §16.1.
+🚧 designed, not built: [ROADMAP.md](docs/ROADMAP.md) §16.1.
 
 That last row is about the architecture: every packet is the same size, every
 hop holds it a random time, every node emits cover traffic, and since 1.3 every
@@ -76,8 +76,8 @@ Nothing in the design caps how good it gets as people join.
 
 **What it is today is a different question**, and it is the honest weak point:
 the network is small, so the protection is small. CAPSULE cannot even measure
-its own anonymity set — there are no accounts and no counters, so there is
-nobody to count — and `capsule network` reports the ceiling instead. The CLI
+its own anonymity set, there are no accounts and no counters, so there is
+nobody to count, and `capsule network` reports the ceiling instead. The CLI
 prints that number before every mixed send, and the web app puts it under the
 switch. That part is adoption rather than engineering, and the most useful thing
 you can do about it is run a relay.
@@ -118,7 +118,7 @@ verified: [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ## Get started
 
-Requires **Node.js 22 or newer**. Nothing else — no database, no account, no
+Requires **Node.js 22 or newer**. Nothing else: no database, no account, no
 API key.
 
 ### 1. Install
@@ -130,30 +130,41 @@ npm install
 npm run build
 ```
 
-### 2. Send a file
+### 2. Use it
+
+**You do not need to run a relay.** A relay is already running and every client
+uses it by default, so this works straight after the install above:
 
 ```bash
-# Start a relay of your own on :8787 (a second terminal)
-npm run dev:relay
-
 # Encrypt, upload and print a link
 node apps/cli/dist/index.js send ./secret.pdf --anonymous --ttl 24h
 ```
 
 It prints two things:
 
-- a **share URL** — give it to the recipient, who needs nothing installed;
-- a **deletion capability** — keep it; it removes the capsule early.
+- a **share URL**: give it to the recipient, who needs nothing installed;
+- a **deletion capability**: keep it; it removes the capsule early.
 
 ```bash
 node apps/cli/dist/index.js receive "<share-url>" --out ./downloads/
 node apps/cli/dist/index.js delete "<deletion-capability>"
 ```
 
-### 3. Join the network
+The web app is the same thing with a page in front of it:
 
-There is a relay running, so a fresh checkout reaches the network without you
-having to start one:
+```bash
+npm run dev:web        # then open the address it prints
+```
+
+Point either at a different relay whenever you want, with `--relay` on the CLI
+or `VITE_RELAY_URL` for the web app.
+
+### 3. Run a relay (optional)
+
+Everything above already works. This section is about **adding** to the network
+rather than using it.
+
+The relay every client starts from:
 
 ```
 https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M
@@ -161,18 +172,21 @@ https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M
 
 That is the **genesis relay**, and the part after `#` is not decoration. A
 pinned seed has to sign a challenge the client generated a moment ago, so
-seizing the name, the certificate or the host is not enough to stand in for it
-— only the key can answer. Clients use it by default; nothing needs configuring.
+seizing the name, the certificate or the host is not enough to stand in for it:
+only the key can answer. Clients use it by default; nothing needs configuring.
 
 The hostname is that address, `68.211.136.69`, spelled so a certificate can
 exist for it: Let's Encrypt does not sign bare IPs through the ordinary flow,
 and `<ip>.sslip.io` resolves to exactly that IP and nothing else.
 
-**Running your own is better and it is the point.** The genesis relay sees the
-address, the timing and the size of everything sent through it, and one relay
-run by one person is not a network. A relay is one process. There is no registry
-and nobody to ask: point yours at one you already know and they introduce
-themselves with signed announcements.
+**Running your own is the useful thing you can do here.** The genesis relay
+sees the address, the timing and the size of everything sent through it, and
+one relay run by one person is not a network: a mix path across relays a single
+party operates protects nobody. That is not fixed by code, only by other people
+running relays.
+
+A relay is one process. There is no registry and nobody to ask: point yours at
+one you already know and they introduce themselves with signed announcements.
 
 ```bash
 export CAPSULE_PUBLIC_URL="https://relay.example.org"   # where others reach you
@@ -186,14 +200,14 @@ See who is reachable from a starting point:
 node apps/cli/dist/index.js relays --seed https://relay.example.org
 ```
 
-Operator guide — quotas, IP-blind mode, storage without expiry, proof of work:
+Operator guide: quotas, IP-blind mode, storage without expiry, proof of work:
 [docs/RUN_A_RELAY.md](docs/RUN_A_RELAY.md).
 
 ### If the web app says it cannot reach the relay
 
 A browser reports a refused origin as a plain network failure, so "cannot
 connect" usually means the relay is running and did not accept the address the
-page was opened from — `localhost` and `127.0.0.1` are the same machine but
+page was opened from: `localhost` and `127.0.0.1` are the same machine but
 different origins. Open the app at the address the dev server prints, or set
 `CAPSULE_CORS_ORIGIN` on the relay. The relay logs the origin it refused.
 
@@ -212,20 +226,20 @@ CAPSULE_ALLOW_PERSISTENT_CAPSULES=false npm run dev:relay   # to refuse them
 ![How a .capsule site is published and read](docs/diagrams/capsule-site.svg)
 
 ```bash
-# 1. Make a name. This file IS the site — losing it loses the name.
+# 1. Make a name. This file IS the site: losing it loses the name.
 node apps/cli/dist/index.js site key --out site.capsulekey
 
 # 2. Publish a folder that has an index.html
 node apps/cli/dist/index.js site publish ./www --key site.capsulekey --ttl 7d
 #    → http://6dijvuvwrd5jqp4efjbb4hwcsmtsf6sgi3at4jeto63k7x5fkbwat2yb.capsule/
 
-# 3. Update it later — the name stays, the version goes up
+# 3. Update it later: the name stays, the version goes up
 node apps/cli/dist/index.js site publish ./www --key site.capsulekey
 ```
 
 Or do the whole thing from the web app: the **Publish** tab takes a folder or a
 `.zip`, packs and encrypts it in the page, and hands you the address. A new name
-downloads its key file before it is used for anything — the key _is_ the name —
+downloads its key file before it is used for anything, the key _is_ the name,
 and the browser keeps a signing handle that cannot be read back out, so the next
 version is one click.
 
@@ -252,10 +266,10 @@ It reads every name the relays admit to holding, keeps the ones carrying a
 site of its own. Being listed is a decision the author makes: **a site that says
 nothing is treated as one that said no**, whether or not a relay will admit to
 holding it. The page is a snapshot rather than a live search, because a
-`.capsule` page cannot query anything — that is the same rule that stops it
+`.capsule` page cannot query anything: that is the same rule that stops it
 tracking you. Point the web app at yours with `VITE_CAPSULE_INDEX`.
 
-A relay refuses a TTL longer than its own ceiling — seven days out of the box,
+A relay refuses a TTL longer than its own ceiling: seven days out of the box,
 raised with `CAPSULE_MAX_TTL_SECONDS`. The record survives a restart of the
 relay; a site published to a relay running an older version than this does not.
 
@@ -267,7 +281,7 @@ npm run build:extension
 
 Then in Chrome or Edge: **⋮ → Extensions → Manage extensions → Developer mode →
 Load unpacked** and choose `apps/extension/dist`. Open the settings, add your
-relay, and type the `.capsule` address in the address bar — or `capsule <name>`,
+relay, and type the `.capsule` address in the address bar, or `capsule <name>`,
 which works even when the browser wants to search instead.
 
 ![A `.capsule` site open in the extension viewer, with the verification bar above it](docs/screenshots/extension-site.png)
@@ -302,8 +316,8 @@ quietly handed yesterday's version of a site.
 
 ### It is not a `.onion` with a different suffix
 
-The address is built exactly the way an onion v3 address is — an Ed25519 key, a
-checksum and a version in base32 — for exactly the same reason: a readable name
+The address is built exactly the way an onion v3 address is, an Ed25519 key, a
+checksum and a version in base32, for exactly the same reason: a readable name
 needs a registrar, and a registrar is somebody who can be leaned on. What sits
 behind the name is not the same thing at all:
 
@@ -314,7 +328,7 @@ behind the name is not the same thing at all:
 So the publisher can turn the machine off, the page cannot run scripts or reach
 the network, nobody learns which pages you read, and the signature covers the
 bytes you are shown rather than the identity of a host. What Tor gives in return
-is a real dynamic web — sessions, forms, search — and a visitor its relays
+is a real dynamic web, sessions, forms, search, and a visitor its relays
 cannot see, which is the gap this version has not closed.
 
 Side by side, including what each one gets wrong:
@@ -363,7 +377,7 @@ line is.
 capsule network --seed https://relay.example.org
 ```
 
-It prints relays reachable, apparent operators and mix nodes — and states
+It prints relays reachable, apparent operators and mix nodes, and states
 plainly that the anonymity set itself cannot be measured here, because there
 are no accounts and nothing to count.
 
@@ -387,7 +401,7 @@ node apps/cli/dist/index.js --tor --mix send ./report.pdf
 
 The web app has the same thing as a switch beside anonymous mode, and both it
 and the CLI print how much protection the live network actually offers **before
-every mixed send** — a four-node network is called what it is rather than sold
+every mixed send**: a four-node network is called what it is rather than sold
 as anonymity. Design and limits: [docs/MIXNET.md](docs/MIXNET.md).
 
 ### Survive a relay disappearing
@@ -421,7 +435,7 @@ node apps/cli/dist/index.js combine "capsule-share:…" "capsule-share:…"
 ### Anonymisation, one switch at a time
 
 `--pad` hides the size, `--scrub` removes embedded metadata (EXIF and GPS from
-JPEG, text chunks from PNG, XMP from PDF, author and company from Office files —
+JPEG, text chunks from PNG, XMP from PDF, author and company from Office files,
 and it _reports_ what it could not remove instead of silently skipping it),
 `--hide-name` replaces the filename and mime type, `--jitter <ms>` spaces the
 uploads. `--anonymous` turns on all four.
@@ -456,7 +470,7 @@ npm run format:check
 npm run diagrams    # regenerate the SVGs and re-inline them into the showcase
 ```
 
-`npm run vectors` regenerates the protocol byte vectors — if that changes the
+`npm run vectors` regenerates the protocol byte vectors, if that changes the
 file, the protocol changed. `npm run release` produces `release/SHA256SUMS` and a
 CycloneDX SBOM.
 

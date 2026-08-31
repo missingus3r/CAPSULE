@@ -1,6 +1,6 @@
 # Changelog
 
-Every released version of CAPSULE, with what changed and — where it applies —
+Every released version of CAPSULE, with what changed and, where it applies,
 what stopped being true. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
@@ -9,7 +9,7 @@ what stopped being true. The format follows
 ### Fixed
 
 - **`.capsule` addresses did not open at all.** The extension declared no host
-  permission, and a `declarativeNetRequest` **redirect** rule — unlike `block` —
+  permission, and a `declarativeNetRequest` **redirect** rule, unlike `block`,
   only applies where the extension holds host access to the address being
   redirected. Chrome accepted the rule and ignored it, so every `.capsule`
   address fell through to DNS and failed like the extension was not installed.
@@ -17,7 +17,7 @@ what stopped being true. The format follows
   open web, and says so in the service worker log if it is ever taken away.
 - **Turning scripts on for a site did nothing.** The page was handed to the
   frame through `srcdoc`, and a `srcdoc` document inherits the
-  Content-Security-Policy of the page embedding it — `script-src 'self'` for an
+  Content-Security-Policy of the page embedding it: `script-src 'self'` for an
   extension page. The policy the viewer injects can only add restrictions to an
   inherited one, never lift one, so a site's own scripts were blocked whatever
   the visitor chose, with the violation reported against a policy the visitor
@@ -25,9 +25,9 @@ what stopped being true. The format follows
   `sandbox` in the manifest, which Chrome gives its own policy and an opaque
   origin with no extension API in it. `connect-src 'none'` still applies on top,
   so a site with scripts allowed can compute anything and still cannot send it
-  anywhere — checked in a browser rather than assumed.
+  anywhere: checked in a browser rather than assumed.
 - **A relay forgot every `.capsule` name when it restarted.** Records were held
-  in memory only, while the capsules they point at were on disk — so a restart
+  in memory only, while the capsules they point at were on disk, so a restart
   emptied a relay's half of the name space, including names its own operator had
   published minutes earlier. They are now kept in `sites.json` in the data
   directory and re-verified on load: the name is re-derived from the key, the
@@ -42,8 +42,8 @@ what stopped being true. The format follows
   navigation is not a request subject to CSP, so a script could put whatever it
   had computed into a URL and take the visitor there on any click. The frame no
   longer has that reach. Links are passed up to the viewer, which honours a page
-  of the site on screen and turns everything else — including an address a
-  script invented — into the confirmation naming where it goes.
+  of the site on screen and turns everything else, including an address a
+  script invented, into the confirmation naming where it goes.
 
 ### Added
 
@@ -57,7 +57,7 @@ what stopped being true. The format follows
   app links to it beside send, receive and publish, saying that opening it
   needs the extension. Hardcoding this name is safe in a way a relay address is
   not: a `.capsule` name is a public key and its record is signed, so it can be
-  seized from nobody — there is nothing extra to pin.
+  seized from nobody: there is nothing extra to pin.
 - **The relay's root redirects to the project page** instead of answering 404.
   It is an exact-match location: everything under `/v1` still reaches the
   relay, which was checked rather than assumed.
@@ -65,7 +65,7 @@ what stopped being true. The format follows
   `https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M`
   ships as the default seed, so a fresh checkout reaches the network without
   also running a relay. The hostname is the address `68.211.136.69` spelled so
-  a certificate can exist for it — Let's Encrypt does not sign bare IPs through
+  a certificate can exist for it: Let's Encrypt does not sign bare IPs through
   the ordinary flow, and `<ip>.sslip.io` resolves to that IP and nothing else.
   The pin is the point: the relay signs a challenge the client just generated,
   so seizing the name, the certificate or the host is not enough to stand in
@@ -78,7 +78,7 @@ what stopped being true. The format follows
 
 - **A pinned seed now has to prove itself, and the check it replaces was
   decorative.** `fetchRelayInfo` compared the `relayId` a relay sent back
-  against the pinned one — but `relayId` and `publicKey` are both public, so
+  against the pinned one, but `relayId` and `publicKey` are both public, so
   anyone who fetched a relay's `/v1/info` once could serve those values and
   pass. A pinned lookup sends a fresh challenge and requires an Ed25519
   signature over it, and derives `relayId` from the key rather than reading it,
@@ -94,8 +94,8 @@ what stopped being true. The format follows
   with the software is the address every new install believes before anything
   else, and an unpinned one would hand whoever controls it the opening view of
   the network for everybody. The web app also remembers the relays it reached
-  and tries them, pinned to what they announced, before falling back to a seed
-  — a default should be how a browser finds the network once, not a party it
+  and tries them, pinned to what they announced, before falling back to a seed:
+  a default should be how a browser finds the network once, not a party it
   depends on for good.
 - **`capsule index`, a directory of sites that asked to be listed.** It reads
   every name the reachable relays admit to holding, downloads each bundle,
@@ -106,7 +106,7 @@ what stopped being true. The format follows
   than a live search, because a `.capsule` page cannot query anything; and
   every site is fetched to find out whether it wanted to be there, because a
   bundle has no partial download. With scripts off the page is a full list,
-  and allowing them reveals a filter over the rows already rendered — the
+  and allowing them reveals a filter over the rows already rendered: the
   rebuilder strips every `<script>`, so a page whose data lived in one would
   show nothing. Titles and descriptions come from other people's sites and are
   escaped; `apps/cli/test/indexer.test.ts` covers that boundary.
@@ -117,7 +117,7 @@ what stopped being true. The format follows
   does not ask to be indexed, so trying the feature out leaves nothing behind.
 - **A site can be published from the web app.** The **Publish** tab takes a
   folder or a `.zip`, packs and encrypts it in the page, and announces the
-  signed record — the same `publishSite` the CLI calls, given its files from a
+  signed record: the same `publishSite` the CLI calls, given its files from a
   `FileList` instead of a directory walk, and routed through the mix network
   like everything else. The zip reader is a hundred lines over
   `DecompressionStream` rather than a dependency inside the page that handles a
@@ -130,13 +130,13 @@ what stopped being true. The format follows
   publishing openly is not the same as asking to be catalogued. It lives in the
   bundle rather than the record deliberately: the record's signed message is a
   fixed field list, so adding to it would make records existing clients cannot
-  verify — and a client that cannot verify a record refuses the site entirely.
+  verify, and a client that cannot verify a record refuses the site entirely.
   Inside the bundle it is covered by the same signature chain as the pages, and
   no version of anything had to change. Specified in
   [docs/PROTOCOL.md](docs/PROTOCOL.md) §17.3.1.
 - **The extension routes `.capsule` reads through the mix network, by
   default.** Opening a site used to tell the relay holding it which address
-  asked for which name — the gap [docs/SITES.md](docs/SITES.md) §7 called the
+  asked for which name: the gap [docs/SITES.md](docs/SITES.md) §7 called the
   most important one in this version. Both halves of the read now go over the
   mix: the record lookup through a new operation `8`, and the capsule download
   through the same path. It uses only relays the visitor has already allowed,
@@ -150,7 +150,7 @@ what stopped being true. The format follows
   any other relay that did not answer, so no version bump was needed.
 - **The web app can route through the mix network.** A switch beside anonymous
   mode sends every request over three hops, so the relay storing the capsule
-  never learns who uploaded or fetched it — the thing `--mix` has done in the
+  never learns who uploaded or fetched it: the thing `--mix` has done in the
   CLI since 1.1. Under the switch it prints what the live network actually
   offers, because a four-node network is not anonymity and should not be sold
   as it. The switch is off when no relay in reach forwards for others, and says
@@ -162,7 +162,7 @@ what stopped being true. The format follows
   `buildMixNetwork` picked the mailbox provider at random from every relay it
   knew, including the destination. When they were the same relay it learned the
   reply token by answering the request, and saw the address polling for that
-  token — enough to put a name and an address back together and undo the point
+  token: enough to put a name and an address back together and undo the point
   of routing at all. The mailbox now moves to another relay whenever the
   destination is the provider and there is anywhere else to put it. Found by
   the integration test written for the extension's path, not by reading.
@@ -180,7 +180,7 @@ what stopped being true. The format follows
   which is the whole reason mix routing was CLI-only: X25519, HKDF, AES-CTR and
   HMAC now come from the audited `@noble` packages, and the byte helpers from
   `@capsule/protocol`, which the browser already had. **Nothing about the wire
-  format changed** — every primitive was compared against what `node:crypto`
+  format changed**, every primitive was compared against what `node:crypto`
   produced, a packet built by either version is processed by the other, and
   `packages/mixnet/test/interop.test.ts` pins those bytes so a relay on an older
   version and one on a newer version cannot drift apart. The functions stayed
@@ -203,7 +203,7 @@ what stopped being true. The format follows
   seven-day ceiling refuses. They ask for `--ttl 7d`, and the ceiling is named
   where it bites.
 
-## [1.3.0] — 2026-08-30
+## [1.3.0]: 2026-08-30
 
 Three of the four gaps the comparison table called out, and an honest note
 about the fourth.
@@ -217,7 +217,7 @@ and [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ### Added
 
-**Bridges — reaching the network when it is blocked**
+**Bridges: reaching the network when it is blocked**
 
 - A relay started with `CAPSULE_BRIDGE=true` never announces itself, so it
   appears in nobody's peer list. Enumerating the public directory does not find
@@ -230,8 +230,8 @@ and [docs/COMPARISON.md](docs/COMPARISON.md).
 - The cookie's name is derived from the key and chosen from ordinary session
   cookie names, so two bridges do not look alike and there is no single string
   to write a DPI rule for.
-- Everything without a valid one — wrong prefix, missing cookie, malformed,
-  expired, replayed, or for another path — gets exactly what an unconfigured web
+- Everything without a valid one, wrong prefix, missing cookie, malformed,
+  expired, replayed, or for another path, gets exactly what an unconfigured web
   server gives: a page at `/` and a 404 everywhere else. The operator can point
   `CAPSULE_BRIDGE_DECOY` at a real file.
 - `--bridge <line>` in the CLI works everywhere, because it wraps `fetch`
@@ -248,15 +248,15 @@ and [docs/COMPARISON.md](docs/COMPARISON.md).
   no uplink. A relay announces itself only with `CAPSULE_LAN=true`, which is off
   by default because a beacon tells the whole network that CAPSULE is running
   here.
-- A beacon may only name a plain `http(s)` origin — no path, no credentials, no
-  other scheme — because anybody on the network can send one.
+- A beacon may only name a plain `http(s)` origin, no path, no credentials, no
+  other scheme, because anybody on the network can send one.
 
 **The part of the anonymity set that code can affect**
 
 - **Every encrypted manifest is now padded to a size class.** AES-GCM does not
   hide length, so the manifest used to measure the filename and the note: a
   capsule called `x.txt` and one called `Ana Pereira - passport scan.jpg` were
-  visibly different to the relay. It is unconditional on purpose — an anonymity
+  visibly different to the relay. It is unconditional on purpose: an anonymity
   feature some senders enable splits everyone into two distinguishable groups.
 - `capsule network` reports what the live network can offer: relays reachable,
   apparent operators, mix nodes, mix operators. It also says plainly that the
@@ -267,7 +267,7 @@ and [docs/COMPARISON.md](docs/COMPARISON.md).
 
 - **The documentation is in English.** Every file in `docs/` and this changelog.
 - **Wire format:** manifests changed length. It is visible on the wire but
-  compatible in both directions — readers ignore unknown fields — and the test
+  compatible in both directions, readers ignore unknown fields, and the test
   vectors were regenerated. Manifest padding is specified in
   [docs/PROTOCOL.md](docs/PROTOCOL.md) §13.4.
 - The showcase page is monochrome, with a capsule mark in the header.
@@ -275,9 +275,9 @@ and [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ### Documentation
 
-- [docs/CENSORSHIP.md](docs/CENSORSHIP.md) — what a probe gets, what a bridge
+- [docs/CENSORSHIP.md](docs/CENSORSHIP.md): what a probe gets, what a bridge
   does not protect against, and how to run one.
-- [docs/OFFLINE.md](docs/OFFLINE.md) — offline capsules and LAN discovery, and
+- [docs/OFFLINE.md](docs/OFFLINE.md): offline capsules and LAN discovery, and
   why neither is a mesh.
 - `PROTOCOL.md` §13.4, §18 and §19; `THREAT_MODEL.md` §16; `RUN_A_RELAY.md`
   §10 and §11; `ROADMAP.md` §16.
@@ -296,7 +296,7 @@ and [docs/COMPARISON.md](docs/COMPARISON.md).
 - **A general-purpose TCP tunnel** is designed but not built; see
   [docs/ROADMAP.md](docs/ROADMAP.md) §16.1.
 
-## [1.2.0] — 2026-08-30
+## [1.2.0]: 2026-08-30
 
 Websites with a name of their own. The capsule format, the relay API and the
 capabilities are unchanged: a site is an ordinary v3 capsule plus a naming
@@ -319,7 +319,7 @@ published as a site. See [docs/SITES.md](docs/SITES.md).
 - **A site bundle format** (`CAPSITE1`): a whole folder inside one capsule. No
   partial download, on purpose: asking file by file would tell the relay which
   pages were read.
-- **Three relay endpoints** — `GET`/`PUT /v1/sites/:name` and `GET /v1/sites` —
+- **Three relay endpoints**, `GET`/`PUT /v1/sites/:name` and `GET /v1/sites`,
   and record gossip between relays, so a name resolves anywhere rather than only
   where its author announced it. Turned off with `CAPSULE_SITES_ENABLED=false`.
 - **`capsule site` commands**: `key`, `publish`, `resolve`, `get` and
@@ -358,7 +358,7 @@ published as a site. See [docs/SITES.md](docs/SITES.md).
 - **The page rebuilder is not audited.** It is a hand-written security boundary
   tested against the cases we thought of.
 
-## [1.1.0] — 2026-08-30
+## [1.1.0]: 2026-08-30
 
 CAPSULE has its own mix network. The capsule format, the relay API and the
 capabilities do not change: a capsule sent through the network is identical to
@@ -379,7 +379,7 @@ otherwise. The full design and its limits are in
   encrypted with LIONESS: changing one bit randomises the whole packet, which
   is what defeats tagging.
 - Per-hop delays drawn from an exponential distribution. This is what Tor
-  cannot do — somebody waiting for a web page will not wait — and it is what
+  cannot do, somebody waiting for a web page will not wait, and it is what
   breaks end-to-end timing correlation.
 - Single-use reply blocks: the relay answers without knowing whom.
 - Mailboxes on a provider relay, for clients that cannot receive connections.
@@ -428,7 +428,7 @@ otherwise. The full design and its limits are in
 - There is no censorship resistance: no bridges and no pluggable transports.
 - This composition has no external cryptographic review.
 
-## [1.0.0] — 2026-08-29
+## [1.0.0]: 2026-08-29
 
 The first stable release: the capsule format, the relay API and the
 capabilities are frozen and published with test vectors. v1 and v2 capsules are
@@ -518,8 +518,8 @@ Findings from this version's security review, all fixed before publishing. The
 detail and the reasoning are in [the threat model](docs/THREAT_MODEL.md) §13.3.
 
 - **The relay's address filter could be bypassed (medium).** The blocklist
-  compared strings: `127.0.0.1` was blocked and `[::ffff:7f00:1]` — the same
-  address in IPv6 — passed. Anyone could make a public relay query its
+  compared strings: `127.0.0.1` was blocked and `[::ffff:7f00:1]`, the same
+  address in IPv6, passed. Anyone could make a public relay query its
   operator's internal services and republish that address to the whole network.
   Replaced with a parser that normalises every equivalent form and blocks
   private, loopback, link-local, CGNAT, multicast, reserved and documentation
@@ -557,7 +557,7 @@ These are not omissions: they are known limits documented in
 - A PDF's `/Info` dictionary and the metadata of exotic TIFF/HEIF are not
   cleaned.
 
-## [0.1.0] — 2026-08-29
+## [0.1.0]: 2026-08-29
 
 - The first runnable version: web, CLI, SDK and a temporary relay
   interoperating, with AES-256-GCM encryption on the client, capability links

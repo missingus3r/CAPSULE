@@ -73,39 +73,35 @@ describe("counting who is here", () => {
 });
 
 describe("the page it is drawn on", () => {
-  it("carries a dictionary that parses, with the same keys in each language", async () => {
-    // The page is one string with no build step, so a stray comma or a key
-    // missing from one language is a blank label in a browser and nothing at
-    // all anywhere else.
-    const { REALTIME_PAGE } = await import("../src/realtime-page.js");
-    const match = /var S = (\{[\s\S]*?\});\n/u.exec(REALTIME_PAGE);
-    expect(match, "the dictionary is where the script expects it").toBeTruthy();
-
-    const dictionary = JSON.parse(match?.[1] ?? "") as Record<
-      string,
-      Record<string, string>
-    >;
-    const languages = Object.keys(dictionary);
-    expect(languages).toEqual(["en", "es", "pt"]);
-
-    const reference = Object.keys(dictionary.en ?? {}).sort();
-    expect(reference.length).toBeGreaterThan(5);
-    for (const language of languages) {
-      expect(
-        Object.keys(dictionary[language] ?? {}).sort(),
-        `${language} is missing a key`,
-      ).toEqual(reference);
-    }
-  });
-
   it("asks the relay for its numbers and nothing else", async () => {
     const { REALTIME_PAGE } = await import("../src/realtime-page.js");
-    // A page that reached anywhere else would be sending a reader's presence
-    // to somebody other than the relay they were already talking to.
+    // A page that reached anywhere else would be telling somebody other than
+    // the relay, which the reader was already talking to, that they are here.
     const urls = [...REALTIME_PAGE.matchAll(/fetch\("([^"]+)"/gu)].map(
       (m) => m[1],
     );
     expect(urls).toEqual(["/v1/realtime"]);
     expect(REALTIME_PAGE).not.toMatch(/https?:\/\//u);
+  });
+
+  it("names every element its script writes into", async () => {
+    // The script and the markup are two halves of one file with nothing
+    // checking they agree; a renamed id is a number that silently stops
+    // updating.
+    const { REALTIME_PAGE } = await import("../src/realtime-page.js");
+    // Ids reach the DOM two ways here: straight through getElementById, and
+    // as the first argument to the page's own `set` helper.
+    const written = new Set([
+      ...[...REALTIME_PAGE.matchAll(/getElementById\("([^"]+)"\)/gu)].map(
+        (m) => m[1] as string,
+      ),
+      ...[...REALTIME_PAGE.matchAll(/set\("([^"]+)",/gu)].map(
+        (m) => m[1] as string,
+      ),
+    ]);
+    for (const id of written) {
+      expect(REALTIME_PAGE, `no element has id ${id}`).toContain(`id="${id}"`);
+    }
+    expect(written.size).toBeGreaterThan(4);
   });
 });

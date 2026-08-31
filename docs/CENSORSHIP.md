@@ -30,8 +30,8 @@ work, and it is unsolved here.
 A relay started with `CAPSULE_BRIDGE=true`. It differs from an ordinary relay
 in three ways:
 
-- **It never announces itself.** It still learns the network — it pulls peer
-  lists so it can route — but it never posts an announcement, so it never
+- **It never announces itself.** It still learns the network, it pulls peer
+  lists so it can route, but it never posts an announcement, so it never
   appears in anybody's `/v1/peers`. A bridge in a peer list is not a bridge.
 - **Everything real lives under a secret path prefix**, sixteen base32
   characters derived from its key. A scan for `/v1/info` finds nothing.
@@ -61,7 +61,7 @@ GET /           → 200, "It works!"
 ```
 
 And with the secret prefix but no valid authenticator, or a malformed one, or
-an expired one, or one replayed from traffic the censor recorded — the same 404. There is no error that distinguishes them, because an error message is an
+an expired one, or one replayed from traffic the censor recorded: the same 404. There is no error that distinguishes them, because an error message is an
 answer, and the point is to have nothing to say.
 
 The operator can point `CAPSULE_BRIDGE_DECOY` at a real HTML file, in which
@@ -88,7 +88,7 @@ as an opaque session id.
 
 The MAC covers the request's own method and path, so a cookie observed on one
 request cannot be replayed onto another. Timestamps outside five minutes are
-refused, and each nonce is remembered for that window — so recording one
+refused, and each nonce is remembered for that window, so recording one
 request off the wire and sending it again is not a probe either.
 
 ## 5. Running one
@@ -166,7 +166,7 @@ ten thousand might.
 
 ## 8. The other road: something else underneath
 
-CAPSULE has spoken SOCKS5 since 1.0, and that is not a lesser answer — it is
+CAPSULE has spoken SOCKS5 since 1.0, and that is not a lesser answer: it is
 often the better one, because it borrows a decade of work this project has not
 done:
 

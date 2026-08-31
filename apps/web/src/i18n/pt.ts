@@ -156,7 +156,7 @@ export const pt: Messages = {
   "privacy.step3.detail": "Quem o tiver pode baixar e decifrar.",
   "privacy.details.summary": "O que ainda pode ser visto",
   "privacy.details.body":
-    "O relay vê o seu endereço IP no momento da conexão, embora não o guarde. O modo anônimo remove os metadados do arquivo, esconde o nome e preenche o tamanho até uma categoria, mas não esconde o seu endereço. O roteamento por mixes esconde: o pedido viaja por vários relays e aquele que guarda a cápsula nunca sabe quem pediu. Nenhum dos dois esconde que você usa CAPSULE — para isso a CLI tem {flag}. A cifragem não protege um dispositivo infectado nem impede que quem recebe guarde uma cópia.",
+    "O relay vê o seu endereço IP no momento da conexão, embora não o guarde. O modo anônimo remove os metadados do arquivo, esconde o nome e preenche o tamanho até uma categoria, mas não esconde o seu endereço. O roteamento por mixes esconde: o pedido viaja por vários relays e aquele que guarda a cápsula nunca sabe quem pediu. Nenhum dos dois esconde que você usa CAPSULE: para isso a CLI tem {flag}. A cifragem não protege um dispositivo infectado nem impede que quem recebe guarde uma cópia.",
 
   "mode.publish": "Publicar",
   "mode.search": "Buscar",

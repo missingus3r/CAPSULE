@@ -1,4 +1,4 @@
-# CAPSULE — product and protocol roadmap
+# CAPSULE: product and protocol roadmap
 
 **Status:** 1.3 released; what follows is proposed by milestone, with no dates
 **Date:** 2026-08-30
@@ -59,7 +59,7 @@ Recovery was pulled forward into 1.0 because capsules without expiry made it
 urgent: losing the owner capability of a capsule that never expires is a
 permanent loss, and waiting two milestones for that had no defence.
 
-## 4. v0.1 — Minimum runnable
+## 4. v0.1: Minimum runnable
 
 ### 4.1 Deliverables
 
@@ -119,7 +119,7 @@ v0.1 ships only if:
 - the web headers, CORS, CSP and redirects have been reviewed;
 - the UI never says "anonymous", "untraceable" or "self-destructing".
 
-## 5. v0.1.x — Hardening
+## 5. v0.1.x: Hardening
 
 Goal: operate v0.1 honestly before distributing the architecture.
 
@@ -138,7 +138,7 @@ Goal: operate v0.1 honestly before distributing the architecture.
 **Gate:** a test instance must run for a sustained period, with cleanup
 failures and disk usage observable, retaining no secrets in telemetry.
 
-## 6. v0.2 — Open network, partial anonymisation and optional permanence
+## 6. v0.2: Open network, partial anonymisation and optional permanence
 
 **Status: implemented.** Goal: that one relay going down or being blocked does
 not destroy the capsule, that the sender can decide how much is revealed, and
@@ -209,7 +209,7 @@ that anyone wanting to contribute infrastructure can do so without asking.
 **Permitted claim:** "it tolerates the configured unavailability of relays".
 **Not permitted:** "it is anonymous because it uses several servers".
 
-## 7. v0.3 — P2P transfer
+## 7. v0.3: P2P transfer
 
 Goal: allow direct delivery when both devices are available, keeping the relay
 as a temporary fallback.
@@ -227,7 +227,7 @@ as a temporary fallback.
 **Gate:** web/desktop interoperability, correct behaviour behind NAT and across
 disconnections, and a screen explaining IP exposure before P2P begins.
 
-## 8. v0.4 — BLE and local Wi-Fi
+## 8. v0.4: BLE and local Wi-Fi
 
 Goal: share nearby capsules without depending on the internet, especially on
 mobile and unstable networks.
@@ -243,7 +243,7 @@ mobile and unstable networks.
 **Non-guarantees:** nearby devices can observe radio, presence and patterns;
 operating-system permissions and APIs remain trust points.
 
-## 9. v0.5 — Opt-in recovery
+## 9. v0.5: Opt-in recovery
 
 **Status: implemented in 1.0.** Two of the candidates below shipped: encrypted
 export under a passphrase (PBKDF2-SHA-256 + AES-GCM, with versioned parameters
@@ -272,7 +272,7 @@ the server unilateral decryption power.
 **Gate:** a formal analysis of the trade-offs, a UI showing who can recover,
 loss/rotation tests, and cryptographic review of the chosen scheme.
 
-## 10. v0.6 — Experimental mix routing
+## 10. v0.6: Experimental mix routing
 
 Goal: investigate metadata protection against a defined adversary, not add a
 cosmetic chain of proxies.
@@ -282,8 +282,8 @@ Mandatory prior work:
 1. Decide whether the aim is to resist the relay, the local ISP, several
    colluding relays, or a global passive observer.
 2. Measure acceptable latency, bandwidth and battery on real mobile networks.
-3. Select a published construction — for example Sphinx-style packets and a
-   mixnet with batching and delays — rather than designing ad hoc cryptography.
+3. Select a published construction, for example Sphinx-style packets and a
+   mixnet with batching and delays, rather than designing ad hoc cryptography.
 4. Design the directory, rotation and node admission with Sybil defence.
 5. Evaluate size-class padding, fragmentation, delays, reordering and cover
    traffic.
@@ -300,7 +300,7 @@ hide the fact that a small anonymity set offers little protection.
 review, real operator diversity, and no anonymity claims based only on the
 number of hops.
 
-## 11. v1.0 — Stability and external audit
+## 11. v1.0: Stability and external audit
 
 v1.0 does not mean "no bugs"; it means a stable contract, reproducible evidence
 and a mature response process.
@@ -432,13 +432,13 @@ What is **missing**, in order of importance:
 4. **Browser support**, once X25519 in Web Crypto is available everywhere.
 5. **External cryptographic review** of this composition.
 
-Point 6 of the original list — censorship resistance — was addressed in 1.3
+Point 6 of the original list, censorship resistance, was addressed in 1.3
 with bridges; see [CENSORSHIP.md](./CENSORSHIP.md) for what that does and does
 not cover.
 
 None of this is on by default, and no version will say "anonymous" for having
 more hops. A small anonymity set offers little protection however impressive
-the topology looks — which is why the CLI prints its real size before every
+the topology looks, which is why the CLI prints its real size before every
 send.
 
 ### 14.4 Trust that third parties can verify
@@ -503,8 +503,8 @@ not code, and it is the real bottleneck.
   pattern exists. A scheme that fetched fixed-size padded blocks could keep the
   property and scale; it needs designing, not improvising.
 - **Readable names, with no registrar.** A signed pointer file published by
-  somebody the visitor already trusts — like an organisation publishing its
-  `.onion` on its own site — does not reintroduce a central registrar. It is
+  somebody the visitor already trusts, like an organisation publishing its
+  `.onion` on its own site, does not reintroduce a central registrar. It is
   worth exploring, carefully enough not to become one.
 - **A real "reading only" mode.** Today scripts are turned off per site. There
   is no way yet to say "never, on any site" and have that be the extension's
@@ -512,7 +512,7 @@ not code, and it is the real bottleneck.
 
 ## 16. After 1.3: what is next
 
-### 16.1 A general-purpose TCP tunnel — _work in progress_
+### 16.1 A general-purpose TCP tunnel: _work in progress_
 
 Tor, I2P, Lokinet and Yggdrasil carry any TCP connection. CAPSULE carries files
 and static sites, and the comparison tables say so. This is the design intended
@@ -521,8 +521,8 @@ more than an intention.
 
 **Why it is not an extension of the capsule format.** A capsule assumes the
 content is known in full before anything is sent: that is what makes size-class
-padding, chunk counts and `k`-of-`n` sharing possible. A stream is the opposite
-— unbounded, interactive, with timing that carries meaning. So this is a second
+padding, chunk counts and `k`-of-`n` sharing possible. A stream is the opposite:
+unbounded, interactive, with timing that carries meaning. So this is a second
 format beside the existing one, not a change to it.
 
 **The shape it should take.**
@@ -533,7 +533,7 @@ format beside the existing one, not a change to it.
 - **Constant-rate framing**, with padding frames sent when there is nothing to
   send. Otherwise the shape of the stream is the shape of the conversation, and
   a tunnel over a mix network would leak more than a capsule does.
-- A **SOCKS5 listener** on the client, because everything already speaks it —
+- A **SOCKS5 listener** on the client, because everything already speaks it,
   including CAPSULE's own `--proxy`.
 - An **exit decision that is explicitly the operator's**, not a default. This is
   the hard part and it is not technical: an exit node sees plaintext traffic to
@@ -544,12 +544,12 @@ format beside the existing one, not a change to it.
 **What has to be settled first.**
 
 1. Whether CAPSULE should have exit nodes at all. Everything in the design so
-   far has avoided them — the destination is always the relay itself, so no
+   far has avoided them: the destination is always the relay itself, so no
    party ever sees plaintext without being its recipient. A TCP tunnel breaks
    that property, and it may be the wrong trade for this project.
 2. The latency budget. Per-hop delays that are reasonable for a file are
-   unusable for a shell session. Either the tunnel gets a shorter delay profile
-   — and says what that costs — or it is only useful for things that tolerate
+   unusable for a shell session. Either the tunnel gets a shorter delay profile,
+   and says what that costs, or it is only useful for things that tolerate
    seconds.
 3. Congestion and backpressure across a mix network that deliberately reorders
    and delays, which is not a solved problem in the literature.

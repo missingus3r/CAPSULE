@@ -4,49 +4,9 @@
  * A plain page served by the relay, not a `.capsule` site, so it may run its
  * own script and poll. It is written as one string with no build step because
  * the relay has no bundler and should not grow one to draw two numbers.
- *
- * The copy is in three languages, chosen from the browser's own preference.
- * Nothing about that choice is sent anywhere: the whole dictionary ships in
- * the page and the picking happens on the device.
  */
 
 export const REALTIME_POLL_MS = 2000;
-
-const STRINGS = `{
-  "en": {
-    "title": "Right now",
-    "clients": "addresses",
-    "relays": "relays",
-    "peak": "peak",
-    "clientsNote": "made a request in the last {minutes} minutes",
-    "relaysNote": "in this relay's directory",
-    "caveat": "Addresses are not people. Two devices are two, a household behind one router is one, and anyone routing through the mix network is counted as the relay that forwarded for them. The relay keeps a salted digest of the address for as long as the window, the same thing rate limiting already holds, and the salt rotates — so nothing here can be turned back into an address or followed from one window to the next.",
-    "since": "counting since",
-    "offline": "the relay is not answering"
-  },
-  "es": {
-    "title": "Ahora mismo",
-    "clients": "direcciones",
-    "relays": "relays",
-    "peak": "pico",
-    "clientsNote": "hicieron un pedido en los últimos {minutes} minutos",
-    "relaysNote": "en el directorio de este relay",
-    "caveat": "Las direcciones no son personas. Dos dispositivos son dos, una casa detrás de un router es una, y quien rutea por la red mix cuenta como el relay que reenvió por él. El relay guarda un digest con sal de la dirección mientras dura la ventana, lo mismo que ya guarda el rate limiting, y la sal rota — así que nada de esto se puede volver a convertir en una dirección ni seguir de una ventana a la siguiente.",
-    "since": "contando desde",
-    "offline": "el relay no responde"
-  },
-  "pt": {
-    "title": "Agora mesmo",
-    "clients": "endereços",
-    "relays": "relays",
-    "peak": "pico",
-    "clientsNote": "fizeram um pedido nos últimos {minutes} minutos",
-    "relaysNote": "no diretório deste relay",
-    "caveat": "Endereços não são pessoas. Dois dispositivos são dois, uma casa atrás de um roteador é uma, e quem roteia pela rede mix conta como o relay que encaminhou por ele. O relay guarda um digest com sal do endereço enquanto dura a janela, o mesmo que o rate limiting já guarda, e o sal gira — então nada aqui pode virar um endereço de novo nem ser seguido de uma janela para a outra.",
-    "since": "contando desde",
-    "offline": "o relay não responde"
-  }
-}`;
 
 export const REALTIME_PAGE = `<!doctype html>
 <html lang="en">
@@ -81,48 +41,43 @@ export const REALTIME_PAGE = `<!doctype html>
       .dot { display: inline-block; width: .42rem; height: .42rem; margin-right: .45rem; border-radius: 50%; background: var(--accent); vertical-align: middle; animation: pulse 2s ease-in-out infinite }
       @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
       @media (prefers-reduced-motion: reduce) { .dot { animation: none } }
+      @media (max-width: 26rem) { .pair { grid-template-columns: 1fr } }
     </style>
   </head>
   <body>
     <main>
-      <h1><span class="dot" aria-hidden="true"></span><span id="title">Right now</span></h1>
+      <h1><span class="dot" aria-hidden="true"></span>Right now</h1>
       <div class="pair">
         <div class="card">
-          <div class="n" id="clients">–</div>
-          <div class="k" id="clients-k">addresses</div>
+          <div class="n" id="clients">&ndash;</div>
+          <div class="k">addresses</div>
           <div class="sub" id="clients-note"></div>
-          <div class="peak"><span id="peak-a">peak</span> <b id="clients-peak">–</b></div>
+          <div class="peak">peak <b id="clients-peak">&ndash;</b></div>
         </div>
         <div class="card">
-          <div class="n" id="relays">–</div>
-          <div class="k" id="relays-k">relays</div>
-          <div class="sub" id="relays-note"></div>
-          <div class="peak"><span id="peak-b">peak</span> <b id="relays-peak">–</b></div>
+          <div class="n" id="relays">&ndash;</div>
+          <div class="k">relays</div>
+          <div class="sub">in this relay's directory</div>
+          <div class="peak">peak <b id="relays-peak">&ndash;</b></div>
         </div>
       </div>
-      <p class="caveat" id="caveat"></p>
+      <p class="caveat">
+        Addresses are not people. Two devices count as two, a household behind
+        one router counts as one, and anyone routing through the mix network is
+        counted as the relay that forwarded for them. The relay keeps a salted
+        digest of the address for as long as the window lasts, which is the same
+        value rate limiting already holds, and the salt rotates. Nothing here
+        can be turned back into an address, or followed from one window into the
+        next.
+      </p>
       <p class="since" id="since"></p>
     </main>
     <script>
       (function () {
-        var S = ${STRINGS};
-        var lang = (navigator.languages || [navigator.language || "en"])
-          .map(function (l) { return String(l).toLowerCase().split("-")[0]; })
-          .filter(function (l) { return S[l]; })[0] || "en";
-        var t = S[lang];
-        document.documentElement.lang = lang;
-
         var set = function (id, value) {
           var node = document.getElementById(id);
           if (node) node.textContent = value;
         };
-        set("title", t.title);
-        set("clients-k", t.clients);
-        set("relays-k", t.relays);
-        set("peak-a", t.peak);
-        set("peak-b", t.peak);
-        set("relays-note", t.relaysNote);
-        set("caveat", t.caveat);
 
         var render = function (data) {
           set("clients", String(data.clients));
@@ -131,15 +86,16 @@ export const REALTIME_PAGE = `<!doctype html>
           set("relays-peak", String(data.relaysPeak));
           set(
             "clients-note",
-            t.clientsNote.replace(
-              "{minutes}",
-              String(Math.round(data.windowSeconds / 60))
-            )
+            "made a request in the last " +
+              String(Math.round(data.windowSeconds / 60)) +
+              " minutes"
           );
           var since = new Date(data.since);
           set(
             "since",
-            t.since + " " + (isNaN(since.getTime()) ? "" : since.toLocaleString(lang))
+            isNaN(since.getTime())
+              ? ""
+              : "counting since " + since.toLocaleString("en")
           );
           document.getElementById("since").classList.remove("off");
         };
@@ -150,7 +106,7 @@ export const REALTIME_PAGE = `<!doctype html>
             .then(render)
             .catch(function () {
               var node = document.getElementById("since");
-              node.textContent = t.offline;
+              node.textContent = "the relay is not answering";
               node.classList.add("off");
             });
         };

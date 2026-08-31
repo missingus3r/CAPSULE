@@ -164,7 +164,7 @@ export const en = {
   "privacy.step3.detail": "Anyone holding it can download and decrypt.",
   "privacy.details.summary": "What can still be seen",
   "privacy.details.body":
-    "The relay sees your IP address at the moment you connect, though it does not keep it. Anonymous mode removes the file's metadata, hides the name and pads the size to a category, but it does not hide your address. Mix routing does: the request travels through several relays and the one storing the capsule never learns who asked. Neither hides that you use CAPSULE at all — the CLI has {flag} for that. Encryption does not protect an infected device, nor stop whoever receives the file from keeping a copy.",
+    "The relay sees your IP address at the moment you connect, though it does not keep it. Anonymous mode removes the file's metadata, hides the name and pads the size to a category, but it does not hide your address. Mix routing does: the request travels through several relays and the one storing the capsule never learns who asked. Neither hides that you use CAPSULE at all: the CLI has {flag} for that. Encryption does not protect an infected device, nor stop whoever receives the file from keeping a copy.",
 
   "mode.publish": "Publish",
   "mode.search": "Search",
@@ -255,7 +255,7 @@ export const en = {
   "error.authentication":
     "The link is incomplete or the file could not be verified. Ask for a new link.",
   "error.network":
-    "We could not reach the relay. If it is running, this is usually the relay refusing the address this page was opened from — localhost and 127.0.0.1 are different origins. Open it at the address the relay expects, or set CAPSULE_CORS_ORIGIN.",
+    "We could not reach the relay. If it is running, this is usually the relay refusing the address this page was opened from: localhost and 127.0.0.1 are different origins. Open it at the address the relay expects, or set CAPSULE_CORS_ORIGIN.",
   "error.uploadGeneric":
     "We could not prepare the capsule. The file is still on your device; you can try again.",
   "error.downloadGeneric":

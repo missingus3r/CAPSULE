@@ -1,4 +1,4 @@
-# CAPSULE — requirements specification v0.1
+# CAPSULE: requirements specification v0.1
 
 **Status:** implementable draft
 **Document version:** 0.1
@@ -109,82 +109,82 @@ respectively.
 
 ### 6.1 Creation and encryption
 
-- **FR-001 — Selection.** The client MUST accept a file, a permitted TTL and an
+- **FR-001: Selection.** The client MUST accept a file, a permitted TTL and an
   optional note. It MUST reject locally any file or TTL beyond the limits the
   relay announced.
-- **FR-002 — Secrets.** For each capsule the client MUST generate, with a
+- **FR-002: Secrets.** For each capsule the client MUST generate, with a
   CSPRNG, a 32-byte AES key and an 8-byte nonce prefix. It MUST NOT reuse the
   key/prefix combination in another capsule.
-- **FR-003 — Chunks.** The client MUST split the file into independent chunks
+- **FR-003: Chunks.** The client MUST split the file into independent chunks
   and encrypt them as described in [PROTOCOL.md](./PROTOCOL.md). File chunks are
   numbered from 1; index 0 is reserved for the encrypted metadata.
-- **FR-004 — Metadata.** Name, MIME type, size, chunk count, timestamps and the
+- **FR-004: Metadata.** Name, MIME type, size, chunk count, timestamps and the
   optional note MUST be encrypted. The relay MUST NOT require those values in
   the clear, beyond the minimum operational information: chunk count, encrypted
   bytes and requested expiry.
-- **FR-005 — Reservation.** The relay MUST create an unfinalised reservation
+- **FR-005: Reservation.** The relay MUST create an unfinalised reservation
   and return a capsule identifier, random write, read and delete capabilities,
   and the effective expiry.
-- **FR-006 — Upload.** The client MUST upload the encrypted metadata block and
+- **FR-006: Upload.** The client MUST upload the encrypted metadata block and
   each encrypted chunk. A byte-for-byte retry of the same ciphertext MUST be
   idempotent. The client MUST NOT encrypt different content under the same
   index, key and nonce prefix.
-- **FR-007 — Finalisation.** The relay MUST publish a capsule for reading only
+- **FR-007: Finalisation.** The relay MUST publish a capsule for reading only
   after it has received the metadata and every declared chunk. An unfinalised
   capsule MUST expire and be cleaned up automatically within a short,
   configurable operational window.
-- **FR-008 — Link.** The client MUST produce a link carrying the read
+- **FR-008: Link.** The client MUST produce a link carrying the read
   capability and the cryptographic secrets exclusively in the URL fragment
   (`#capsule=...`). The write and delete capabilities MUST NOT be part of the
   shared link.
-- **FR-009 — Owner.** The client MUST show or store the delete capability
+- **FR-009: Owner.** The client MUST show or store the delete capability
   separately, and warn that it cannot be recovered if lost.
 
 ### 6.2 Reading and downloading
 
-- **FR-010 — Safe parsing.** The client MUST validate version, types, lengths
+- **FR-010: Safe parsing.** The client MUST validate version, types, lengths
   and relay URL before starting a download. Invalid values MUST fail without
   making further requests.
-- **FR-011 — Authorisation.** The relay MUST require the read capability for
+- **FR-011: Authorisation.** The relay MUST require the read capability for
   the manifest and every object. An invalid capability, a non-existent capsule
   and an expired capsule SHOULD be indistinguishable in the public response.
-- **FR-012 — Decryption.** The client MUST authenticate and decrypt the
+- **FR-012: Decryption.** The client MUST authenticate and decrypt the
   metadata first, then each chunk with its index. It MUST NOT report success if
   a chunk is missing, an extra one appears, a tag fails, or the reconstructed
   size does not match.
-- **FR-013 — File.** After validating the complete capsule, the client MUST
+- **FR-013: File.** After validating the complete capsule, the client MUST
   allow saving the file under a sanitised name. The MIME type is treated as
   untrusted data and MUST NOT cause automatic execution.
-- **FR-014 — Errors.** The UI and CLI MUST distinguish at least: invalid link,
+- **FR-014: Errors.** The UI and CLI MUST distinguish at least: invalid link,
   unavailable/expired, failed cryptographic authentication, limit exceeded,
   network error and internal error. They MUST NOT reveal secrets in messages.
 
 ### 6.3 Expiry and deletion
 
-- **FR-015 — TTL.** The relay MUST set `expiresAt` using its own clock, within
+- **FR-015: TTL.** The relay MUST set `expiresAt` using its own clock, within
   the configured maximum. After that instant it MUST refuse new reads.
-- **FR-016 — Cleanup.** An automatic process MUST remove expired capsules from
+- **FR-016: Cleanup.** An automatic process MUST remove expired capsules from
   primary storage. The v0.1 target is to begin cleanup within 60 seconds of
   expiry on a healthy instance.
-- **FR-017 — Early deletion.** The delete capability MUST allow removing a
+- **FR-017: Early deletion.** The delete capability MUST allow removing a
   capsule before its TTL. The operation MUST be idempotent.
-- **FR-018 — Uniform responses.** The relay MUST NOT publicly confirm whether
+- **FR-018: Uniform responses.** The relay MUST NOT publicly confirm whether
   an identifier exists when a valid capability is absent.
 
 ### 6.4 Operation and compatibility
 
-- **FR-019 — Configuration.** Host, port, storage directory, CORS origin,
+- **FR-019: Configuration.** Host, port, storage directory, CORS origin,
   maximum size, maximum chunk size, default TTL and maximum TTL MUST be
   configurable from the environment.
-- **FR-020 — Limit discovery.** The relay MUST expose a public configuration
+- **FR-020: Limit discovery.** The relay MUST expose a public configuration
   endpoint with no secrets, so clients learn the version and limits before
   reserving.
-- **FR-021 — Health.** The relay MUST expose a liveness check that neither
+- **FR-021: Health.** The relay MUST expose a liveness check that neither
   enumerates capsules nor reveals internal paths.
-- **FR-022 — CLI.** The CLI MUST support `create`, `download` and `delete`; an
+- **FR-022: CLI.** The CLI MUST support `create`, `download` and `delete`; an
   error MUST produce a non-zero exit code. A structured mode SHOULD emit JSON
   without mixing it with human-readable messages.
-- **FR-023 — Interoperability.** Web, CLI and SDK MUST produce mutually
+- **FR-023: Interoperability.** Web, CLI and SDK MUST produce mutually
   compatible v1 capsules from the same protocol library.
 
 ## 7. Non-functional requirements

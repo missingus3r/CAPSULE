@@ -18,7 +18,7 @@ An `.onion` address is **a route to a process that is running right now**. A
 across relays**.
 
 Tor moves connections. CAPSULE moves content. An onion service is a web server
-you reach through a tunnel; a `.capsule` site is closer to IPFS with IPNS —
+you reach through a tunnel; a `.capsule` site is closer to IPFS with IPNS:
 immutable content at rest, plus a mutable pointer signed by a key.
 
 Everything below is a consequence of that sentence.
@@ -38,14 +38,14 @@ base32( Ed25519 public key (32) ‖ checksum (2) ‖ version (1) ) ‖ ".capsule
 ```
 
 Same fields, same order, 56 characters either way. Only the checksum's domain
-separator differs — `SHA3-256(".onion checksum" ‖ …)` against
-`SHA-256("CAPSULE/site-name/v1" ‖ …)` — and in both cases the checksum protects
+separator differs, `SHA3-256(".onion checksum" ‖ …)` against
+`SHA-256("CAPSULE/site-name/v1" ‖ …)`, and in both cases the checksum protects
 against nothing. It is there so that a mistyped name fails instead of resolving
 to a different site.
 
 The reasoning is identical too: a readable name needs a registry, a registry
 needs a registrar, and a registrar is somebody who can be leaned on. Both
-networks paid the same price — an address nobody can remember — to avoid that.
+networks paid the same price, an address nobody can remember, to avoid that.
 
 ## 3. How each one resolves
 
@@ -62,8 +62,8 @@ Note what that means for anyone who has just read about directory authorities:
 **the HSDir ring is derived from the consensus**, so an onion service inherits
 Tor's dependency on its directory authorities.
 
-**`.capsule`.** The publisher signs a record — `name`, `sequence`,
-`publishedAt`, `capability`, `signature` — and `PUT`s it to relays it already
+**`.capsule`.** The publisher signs a record, `name`, `sequence`,
+`publishedAt`, `capability`, `signature`, and `PUT`s it to relays it already
 knows. Relays **gossip records to each other** on every sync round. The record
 points at one capsule holding the entire site in a single encrypted blob
 (`CAPSITE1`). There is no consensus, no ring and no authority: a record is
@@ -94,23 +94,23 @@ the relay which pages were read.
 
 ## 5. The table
 
-|                                      | `.onion` v3                      | `.capsule`                                              |
-| ------------------------------------ | -------------------------------- | ------------------------------------------------------- |
-| What is on the other side            | a live server                    | a static blob on relays                                 |
-| Publisher must stay online           | **yes, 24/7**                    | no                                                      |
-| Dynamic content, forms, login, DB    | **yes, all of it**               | none                                                    |
-| JavaScript                           | whatever the site wants          | off by default, opt-in per site                         |
-| The page can reach the network       | **yes**                          | **no** — `connect-src 'none'`                           |
-| The site learns which pages you read | **yes, every request**           | no — the bundle arrives whole                           |
-| The site learns your IP              | no, the circuit hides it         | there is no server to learn it                          |
-| **The relay/HSDir learns your IP**   | no, six hops                     | no, three hops — when there are relays to route through |
-| Names can be enumerated              | no, blinded keys                 | **yes** — `GET /v1/sites`                               |
-| What the signature covers            | the server's identity            | the bytes you are shown                                 |
-| Anti-rollback                        | `revision-counter`               | monotonic `sequence`                                    |
-| Latency                              | six hops, slow                   | one fetch, fast                                         |
-| Size                                 | unbounded                        | **64 MiB, downloaded whole**                            |
-| What the visitor installs            | Tor Browser or a `tor` daemon    | a Chromium extension                                    |
-| Depends on a central authority       | **yes** — consensus → HSDir ring | no — gossip                                             |
+|                                      | `.onion` v3                     | `.capsule`                                             |
+| ------------------------------------ | ------------------------------- | ------------------------------------------------------ |
+| What is on the other side            | a live server                   | a static blob on relays                                |
+| Publisher must stay online           | **yes, 24/7**                   | no                                                     |
+| Dynamic content, forms, login, DB    | **yes, all of it**              | none                                                   |
+| JavaScript                           | whatever the site wants         | off by default, opt-in per site                        |
+| The page can reach the network       | **yes**                         | **no**: `connect-src 'none'`                           |
+| The site learns which pages you read | **yes, every request**          | no: the bundle arrives whole                           |
+| The site learns your IP              | no, the circuit hides it        | there is no server to learn it                         |
+| **The relay/HSDir learns your IP**   | no, six hops                    | no, three hops, when there are relays to route through |
+| Names can be enumerated              | no, blinded keys                | **yes**: `GET /v1/sites`                               |
+| What the signature covers            | the server's identity           | the bytes you are shown                                |
+| Anti-rollback                        | `revision-counter`              | monotonic `sequence`                                   |
+| Latency                              | six hops, slow                  | one fetch, fast                                        |
+| Size                                 | unbounded                       | **64 MiB, downloaded whole**                           |
+| What the visitor installs            | Tor Browser or a `tor` daemon   | a Chromium extension                                   |
+| Depends on a central authority       | **yes**: consensus → HSDir ring | no: gossip                                             |
 
 ## 6. What `.capsule` does that an onion service cannot
 
@@ -118,7 +118,7 @@ the relay which pages were read.
 difference and the least obvious one. An onion service is a normal web server:
 it can run scripts, fingerprint the browser, pull in external resources, log
 every path, and serve different content to different people. An anonymous
-connection does not change any of that — Tor protects the visitor from the
+connection does not change any of that: Tor protects the visitor from the
 network, not from the site.
 
 A `.capsule` page cannot make a single network request. Not a font, not a pixel,
@@ -149,17 +149,17 @@ later; it is the shape of the thing.
 **It hides the visitor from the network without needing a crowd to be there
 first.** Tor's guarantee holds because thousands of relays already exist.
 CAPSULE routes a record lookup and a capsule download through its own mix
-network — the extension does it by default now — but a path needs relays, and
+network, the extension does it by default now, but a path needs relays, and
 with fewer than two the extension asks directly and says so. The mechanism is
 built; the network it needs is not, and that is a difference of degree that
 matters more than the design.
 
-**Its names cannot be enumerated.** Onion v3 fixed this deliberately — a blinded
+**Its names cannot be enumerated.** Onion v3 fixed this deliberately: a blinded
 key means an HSDir stores a descriptor without being able to tell which service
 it belongs to. In CAPSULE, `GET /v1/sites?limit=n` exists so that relays can
 gossip records, which means anyone can ask a relay for the list of names it
 holds. The _content_ of a `.capsule` site is public by definition, so nothing
-secret leaks — but **the existence of your site is discoverable**, and in Tor it
+secret leaks, but **the existence of your site is discoverable**, and in Tor it
 is not. If you need a name nobody can stumble onto, this is not the layer for
 it.
 
@@ -176,7 +176,7 @@ A `.capsule` site dies when the relays holding its capsule let it expire and
 nobody republishes. A record is also refused once it is more than ninety days
 old (`MAX_SITE_RECORD_AGE_MS`), so a name that is never re-announced stops
 resolving even if the bytes are still sitting somewhere. Relays cannot lie about
-a record — the signature is checked against the key in the name — but they can
+a record, the signature is checked against the key in the name, but they can
 **stay silent**, which is why a client asks several and keeps the highest
 sequence that verifies.
 

@@ -1,4 +1,4 @@
-# CAPSULE — threat model
+# CAPSULE: threat model
 
 **Status:** current for CAPSULE 1.3
 **Date:** 2026-08-30
@@ -430,8 +430,8 @@ were found. All are fixed; they are documented because the finding and the fix
 are both part of the security history.
 
 **1. The relay's address filter could be bypassed (medium).** The blocklist
-compared strings, so `127.0.0.1` was blocked but `[::ffff:7f00:1]` — the same
-address written in IPv6 — passed and reached the same socket. Verified by
+compared strings, so `127.0.0.1` was blocked but `[::ffff:7f00:1]`, the same
+address written in IPv6, passed and reached the same socket. Verified by
 execution. Since announcing requires no permission, anyone could make a public
 relay query its operator's internal services, and republish that address to the
 whole network.
@@ -504,8 +504,8 @@ Listed because they are still there, not because they are acceptable forever.
   make Sybil expensive, not impossible. A large directory is not evidence of
   jurisdictional or operational independence.
 - **The first relay a fresh install asks.** Bootstrapping needs an entry point,
-  and whoever answers there decides which relays that install ever hears about
-  — an eclipse, not a forgery, and mix routing through relays one party
+  and whoever answers there decides which relays that install ever hears about:
+  an eclipse, not a forgery, and mix routing through relays one party
   controls protects nobody. Two things bound it. A **pinned** seed must prove
   it holds the identity it was pinned to, by signing a challenge the client
   generated a moment ago; the identifier itself is `SHA-256(publicKey)`, so it
@@ -530,9 +530,9 @@ traffic can travel through a network of nodes that are the relays themselves.
 | Observer              | Without the network      | With the network                         |
 | --------------------- | ------------------------ | ---------------------------------------- |
 | Storing relay         | Client IP, timing, size  | Only the operation and the previous node |
-| First hop on the path | —                        | The client's IP, and nothing else        |
-| Intermediate nodes    | —                        | Two node addresses; neither end          |
-| Mailbox provider      | —                        | That an address polls a mailbox          |
+| First hop on the path | :                        | The client's IP, and nothing else        |
+| Intermediate nodes    | :                        | Two node addresses; neither end          |
+| Mailbox provider      | :                        | That an address polls a mailbox          |
 | Internet provider     | That you talk to a relay | That you talk to a relay                 |
 | Global observer       | All of the above         | Statistical analysis, far more expensive |
 
@@ -651,7 +651,7 @@ can serve an earlier version without it being noticed.
   chose.
 - **The relay does not know which page was read.** The bundle is downloaded
   whole. There is no per-file request to reveal.
-- **The page cannot contact anybody.** With scripts off — the default mode —
+- **The page cannot contact anybody.** With scripts off, the default mode,
   the document's policy and the frame's isolation prevent every network
   request. Verified in the tests.
 
@@ -663,7 +663,7 @@ is nobody to ask. It is the same property as an onion address and it has the
 same cost.
 
 **The relay sees who is asking.** The extension queries relays directly from
-the browser, so a relay sees an IP address asking about a name — and, if it is
+the browser, so a relay sees an IP address asking about a name, and, if it is
 the one storing the capsule, downloading it. This is the most important gap in
 this version. The CLI can go through the mix network; the extension cannot yet.
 
@@ -683,9 +683,9 @@ holding it leave, the name resolves to a record pointing at nothing. The record
 still verifies; the content is not there.
 
 **The page rebuilder is a hand-written security boundary.** It is tested
-against the cases we thought of — `<base>`, `meta refresh`, `srcset`, nested
+against the cases we thought of, `<base>`, `meta refresh`, `srcset`, nested
 `url()`, paths that climb out of a directory, `<object data>`, `xlink:href`,
-bare `@import` — and it is not audited. A mistake there is an escape from the
+bare `@import`, and it is not audited. A mistake there is an escape from the
 isolation.
 
 ### 15.4 Outside the model
@@ -709,10 +709,10 @@ for this.
 | ------------------------------------- | ---------------------------------------- | --------------------------------------- |
 | Enumerate the directory               | Works: `/v1/peers` lists everything      | Finds nothing: a bridge never announces |
 | Probe a suspected address             | `GET /v1/info` identifies it immediately | Answers like an unconfigured web server |
-| Probe with the secret prefix          | —                                        | Same answer, without a valid cookie     |
-| Replay a recorded request             | —                                        | Refused; the nonce is remembered        |
+| Probe with the secret prefix          | :                                        | Same answer, without a valid cookie     |
+| Replay a recorded request             | :                                        | Refused; the nonce is remembered        |
 | Write one DPI rule for all of CAPSULE | Works on the API shape                   | The cookie name differs per bridge      |
-| Obtain the bridge line                | —                                        | **Works completely**                    |
+| Obtain the bridge line                | :                                        | **Works completely**                    |
 | Fingerprint TLS                       | Works                                    | **Works**: the handshake is Node's      |
 | Traffic analysis                      | Works                                    | Partly: sizes are padded, timing is not |
 
@@ -766,7 +766,7 @@ turned on only when the local network is the only network there is.
 A beacon is unauthenticated and cannot be otherwise: the point is to find a
 relay you have never heard of, with no infrastructure to check a signature
 against. What protects the content is that it was already encrypted before it
-went anywhere — a hostile relay on the LAN sees ciphertext, exactly as a hostile
+went anywhere: a hostile relay on the LAN sees ciphertext, exactly as a hostile
 relay on the internet does. What a beacon is prevented from doing is naming
 anything other than a plain `http(s)` origin. Verified in the tests.
 
@@ -784,5 +784,5 @@ and each group is smaller than the whole. Uniformity only works when it is not
 a choice.
 
 This is the only kind of work that improves an anonymity set from inside the
-code. The rest of that number is adoption, and no commit changes it — see
+code. The rest of that number is adoption, and no commit changes it: see
 [COMPARISON.md](./COMPARISON.md).

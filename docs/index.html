@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>CAPSULE — a free network for files and websites with no server</title>
+    <title>CAPSULE: a free network for files and websites with no server</title>
     <meta
       name="description"
       content="A free, decentralised network where anyone can launch their own .capsule domain, share files with no account and no identity attached, and stay reachable when the Internet is not. Encryption happens in your browser; relays store ciphertext they cannot read."
@@ -24,7 +24,7 @@
     <meta property="og:site_name" content="CAPSULE" />
     <meta
       property="og:title"
-      content="CAPSULE — a free network for files and websites with no server"
+      content="CAPSULE: a free network for files and websites with no server"
     />
     <meta
       property="og:description"
@@ -36,7 +36,7 @@
     <meta name="twitter:creator" content="@missingus3r" />
     <meta
       name="twitter:title"
-      content="CAPSULE — a free network for files and websites with no server"
+      content="CAPSULE: a free network for files and websites with no server"
     />
     <meta
       name="twitter:description"
@@ -793,7 +793,7 @@
         margin-bottom: 5px;
       }
       .honest .item b::before {
-        content: "—";
+        content: ": ";
         color: var(--accent);
         margin-right: 10px;
       }
@@ -1105,11 +1105,11 @@
     </header>
 
     <section id="what" class="wrap">
-      <div class="kicker">01 — What it is</div>
+      <div class="kicker">01: What it is</div>
       <h2>A network for <b>sharing things</b>, with nobody in the middle</h2>
       <p class="body">
         Send someone a file. Put a website online. Both work without an account,
-        without paying anyone, and without asking permission — and they keep
+        without paying anyone, and without asking permission, and they keep
         working when the Internet does not.
       </p>
 
@@ -1118,7 +1118,7 @@
           <b>Send a file</b>
           <span
             >You get a link. Whoever you give it to can open it. The server
-            holding the file cannot — it only ever sees scrambled bytes, and the
+            holding the file cannot: it only ever sees scrambled bytes, and the
             part of the link that unscrambles them never reaches it.</span
           >
         </div>
@@ -1126,7 +1126,7 @@
           <b>Publish a site</b>
           <span
             >You get an address ending in <code>.capsule</code>. Nobody sold it
-            to you, nobody renews it, and nobody can hand it to someone else —
+            to you, nobody renews it, and nobody can hand it to someone else:
             the address <em>is</em> your key.</span
           >
         </div>
@@ -1209,7 +1209,7 @@
     </section>
 
     <section id="why" class="wrap">
-      <div class="kicker">02 — Why</div>
+      <div class="kicker">02: Why</div>
       <h2>Encryption stopped being the <b>hard part</b></h2>
       <p class="body">
         Every mainstream file service encrypts in transit and at rest. What none
@@ -1219,7 +1219,7 @@
       </p>
       <p class="body">
         The same is true of publishing. A domain is rented, a certificate is
-        issued, and a host serves the bytes — three parties, each of whom can be
+        issued, and a host serves the bytes: three parties, each of whom can be
         leaned on to make a page disappear or say something else. A
         <code class="inline">.capsule</code> name has none of them, because the
         name and the signing key are the same object.
@@ -1233,13 +1233,13 @@
     </section>
 
     <section id="capsules" class="wrap">
-      <div class="kicker">03 — Capsules</div>
+      <div class="kicker">03: Capsules</div>
       <h2>The key goes <b>around</b> the relay</h2>
       <p class="body">
         A capsule is a file split into chunks, each encrypted with AES-256-GCM
         under a key generated in the browser. The nonce is a random prefix plus
         the chunk index, and the associated data binds every chunk to the
-        protocol version — so a downgrade fails to authenticate rather than
+        protocol version, so a downgrade fails to authenticate rather than
         silently succeeding.
       </p>
 
@@ -1260,7 +1260,7 @@
 <text x="32" y="40" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#000000" letter-spacing="0.24em">CAPSULE</text>
 <text x="32" y="72" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-size="28" font-weight="400" fill="#3a3a3a">The key goes around the relay, not through it</text>
 <path d="M 176 224 L 218 224" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><path d="M 350 224 L 392 224" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><rect x="343" y="217" width="56" height="14" fill="#f2f2f2" /><text x="371" y="227" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">ciphertext</text><path d="M 524 224 L 566 224" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><rect x="517" y="217" width="56" height="14" fill="#f2f2f2" /><text x="545" y="227" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">ciphertext</text><path d="M 698 224 L 740 224" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-flow)" /><path d="M 284 196 L 284 164 A 8 8 0 0 1 292 156 L 392 156" fill="none" stroke="#000000" stroke-width="1.25" marker-end="url(#tip-accent-capsule-flow)" /><rect x="272.1" y="161" width="23.799999999999997" height="14" fill="#f2f2f2" /><text x="284" y="171" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">key</text><path d="M 524 156 L 624 156 A 8 8 0 0 1 632 164 L 632 196" fill="none" stroke="#000000" stroke-width="1.25" marker-end="url(#tip-accent-capsule-flow)" /><rect x="620.1" y="161" width="23.799999999999997" height="14" fill="#f2f2f2" /><text x="632" y="171" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">key</text><rect x="44" y="196" width="132" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="110" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">SENDER</text><text x="110" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Your file</text><rect x="218" y="196" width="132" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="284" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">IN YOUR BROWSER</text><text x="284" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Encrypted</text><text x="284" y="246" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">AES-256-GCM</text><rect x="392" y="196" width="132" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="458" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">RELAY</text><text x="458" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Stores bytes</text><text x="458" y="246" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">cannot read</text><rect x="566" y="196" width="132" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="632" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">IN THEIR BROWSER</text><text x="632" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Decrypted</text><rect x="740" y="196" width="132" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="806" y="216" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">RECEIVER</text><text x="806" y="232" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">The file</text><rect x="392" y="128" width="132" height="56" rx="8" fill="#ebebeb" stroke="#000000" stroke-width="2" /><text x="458" y="148" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#000000" letter-spacing="0.18em">THE LINK YOU SEND</text><text x="458" y="164" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">#fragment</text><text x="458" y="178" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">never sent to a server</text>
-<line x1="32" y1="294" x2="888" y2="294" stroke="#dcdcdc" stroke-width="1" /><text x="32" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Solid — ciphertext, over the network</text><text x="317" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Black — the key, out of band</text><text x="602" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">The relay never holds both</text>
+<line x1="32" y1="294" x2="888" y2="294" stroke="#dcdcdc" stroke-width="1" /><text x="32" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Solid, ciphertext, over the network</text><text x="317" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Black, the key, out of band</text><text x="602" y="314" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">The relay never holds both</text>
 </svg>
 <!-- diagram:capsule-flow:end -->
       </div>
@@ -1274,14 +1274,14 @@
     </section>
 
     <section id="sites" class="wrap">
-      <div class="kicker">04 — Sites</div>
+      <div class="kicker">04: Sites</div>
       <h2>A name nobody issues, a page nobody <b>can rewrite</b></h2>
       <p class="body">
         <code class="inline">capsule site publish ./www</code> packs a folder
         into one capsule, stores it on relays, and signs a short record saying
         which capsule is the current version of your name. Relays hand that
-        record out and gossip it to each other. They cannot forge one — they
-        have no key — and they cannot quietly serve an old one, because every
+        record out and gossip it to each other. They cannot forge one, they
+        have no key, and they cannot quietly serve an old one, because every
         record carries a sequence number the browser remembers.
       </p>
 
@@ -1302,7 +1302,7 @@
 <text x="32" y="40" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#000000" letter-spacing="0.24em">SITES</text>
 <text x="32" y="72" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-size="28" font-weight="400" fill="#3a3a3a">A name nobody issues, a page nobody can rewrite</text>
 <path d="M 192 162 L 252 162" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="207.8" y="155" width="28.4" height="14" fill="#f2f2f2" /><text x="222" y="165" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">pack</text><path d="M 400 162 L 460 162" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="408.9" y="155" width="42.199999999999996" height="14" fill="#f2f2f2" /><text x="430" y="165" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">encrypt</text><path d="M 608 162 L 668 162" fill="none" stroke="#000000" stroke-width="1.25" marker-end="url(#tip-accent-capsule-site)" /><rect x="623.8" y="155" width="28.4" height="14" fill="#f2f2f2" /><text x="638" y="165" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">sign</text><path d="M 742 192 L 742 290 A 8 8 0 0 1 734 298 L 608 298" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="695.6" y="219" width="92.8" height="14" fill="#f2f2f2" /><text x="742" y="229" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">relays hand it out</text><path d="M 460 298 L 400 298" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="411.2" y="291" width="37.599999999999994" height="14" fill="#f2f2f2" /><text x="430" y="301" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">verify</text><path d="M 252 298 L 192 298" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-capsule-site)" /><rect x="200.9" y="291" width="42.199999999999996" height="14" fill="#f2f2f2" /><text x="222" y="301" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">decrypt</text><rect x="44" y="132" width="148" height="60" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="118" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">PUBLISHER</text><text x="118" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">A folder of files</text><text x="118" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">index.html and friends</text><rect x="252" y="132" width="148" height="60" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="326" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">BUNDLE</text><text x="326" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">One capsule</text><text x="326" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">padded to a size class</text><rect x="460" y="132" width="148" height="60" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="534" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">RELAYS</text><text x="534" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Ciphertext only</text><text x="534" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">mirrored, or sharded</text><rect x="668" y="132" width="148" height="60" rx="8" fill="#ebebeb" stroke="#000000" stroke-width="2" /><text x="742" y="152" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#000000" letter-spacing="0.18em">THE NAME IS THE KEY</text><text x="742" y="168" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Signed record</text><text x="742" y="182" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">&lt;key&gt;.capsule</text><rect x="460" y="268" width="148" height="60" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="534" y="288" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">VISITOR ASKS</text><text x="534" y="304" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Several relays</text><text x="534" y="318" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">newest signed wins</text><rect x="252" y="268" width="148" height="60" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="326" y="288" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">IN THE BROWSER</text><text x="326" y="304" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Checked, then read</text><text x="326" y="318" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">no rollback accepted</text><rect x="44" y="268" width="148" height="60" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="118" y="288" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">WHAT YOU SEE</text><text x="118" y="304" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Sandboxed page</text><text x="118" y="318" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">cannot reach the web</text>
-<line x1="32" y1="354" x2="888" y2="354" stroke="#dcdcdc" stroke-width="1" /><text x="32" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Top — publishing, once per update</text><text x="317" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Bottom — visiting, every time</text><text x="602" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Black — the only thing that has to be trusted: the key</text>
+<line x1="32" y1="354" x2="888" y2="354" stroke="#dcdcdc" stroke-width="1" /><text x="32" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Top, publishing, once per update</text><text x="317" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Bottom, visiting, every time</text><text x="602" y="374" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Black, the only thing that has to be trusted: the key</text>
 </svg>
 <!-- diagram:capsule-site:end -->
       </div>
@@ -1365,13 +1365,13 @@
     </section>
 
     <section id="mix" class="wrap">
-      <div class="kicker">05 — The mix network</div>
+      <div class="kicker">05: The mix network</div>
       <h2>Every hop knows one step, and <b>no hop knows two</b></h2>
       <p class="body">
         Encryption hides what you sent. It does not hide that you sent it, to
         whom, or when. With <code class="inline">--mix</code>, a request is
-        wrapped in a Sphinx packet — one layer per hop, every packet exactly
-        65,920 bytes — and each relay peels one layer, waits a random time, and
+        wrapped in a Sphinx packet, one layer per hop, every packet exactly
+        65,920 bytes, and each relay peels one layer, waits a random time, and
         forwards. The reply comes back along a second path the destination
         cannot see, into a mailbox you poll.
       </p>
@@ -1393,7 +1393,7 @@
 <text x="32" y="40" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#000000" letter-spacing="0.24em">MIX NETWORK</text>
 <text x="32" y="72" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-size="28" font-weight="400" fill="#3a3a3a">Every hop knows one step, and no hop knows two</text>
 <path d="M 172 180 L 216 180" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 344 180 L 388 180" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 516 180 L 560 180" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 688 180 L 732 180" fill="none" stroke="#9e9e9e" stroke-width="1.25" marker-end="url(#tip-mix-network)" /><path d="M 796 208 L 796 260 A 8 8 0 0 1 788 268 L 516 268" fill="none" stroke="#9e9e9e" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#tip-mix-network)" /><rect x="566" y="261" width="148" height="14" fill="#f2f2f2" /><text x="640" y="271" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">reply, by a path it cannot see</text><path d="M 388 268 L 116 268 A 8 8 0 0 1 108 260 L 108 208" fill="none" stroke="#9e9e9e" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#tip-mix-network)" /><rect x="178.8" y="261" width="74.39999999999999" height="14" fill="#f2f2f2" /><text x="216" y="271" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a8a8a" letter-spacing="0.06em">you collect it</text><rect x="44" y="152" width="128" height="56" rx="8" fill="#ebebeb" stroke="#000000" stroke-width="2" /><text x="108" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#000000" letter-spacing="0.18em">YOU</text><text x="108" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Your client</text><text x="108" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">one layer per hop</text><rect x="216" y="152" width="128" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="280" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">HOP 1</text><text x="280" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Sees your address</text><text x="280" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">and nothing else</text><rect x="388" y="152" width="128" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="452" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">HOP 2</text><text x="452" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Sees two hops</text><text x="452" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">neither end</text><rect x="560" y="152" width="128" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="624" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">HOP 3</text><text x="624" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Sees the relay</text><text x="624" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">not you</text><rect x="732" y="152" width="128" height="56" rx="8" fill="#ebebeb" stroke="#000000" stroke-width="2" /><text x="796" y="172" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#000000" letter-spacing="0.18em">DESTINATION</text><text x="796" y="188" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Storage relay</text><text x="796" y="202" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">no client address</text><rect x="388" y="240" width="128" height="56" rx="8" fill="#ffffff" stroke="#dcdcdc" stroke-width="1" /><text x="452" y="260" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7.5" fill="#8a8a8a" letter-spacing="0.18em">MAILBOX</text><text x="452" y="276" text-anchor="middle" font-family="Geist, 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#3a3a3a">Holds the answer</text><text x="452" y="290" text-anchor="middle" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#8a8a8a">you poll it</text>
-<line x1="32" y1="314" x2="888" y2="314" stroke="#dcdcdc" stroke-width="1" /><text x="32" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Black — the two ends, which never meet</text><text x="317" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Dashed — the reply, along a path the sender chose</text><text x="602" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Each hop waits a random time before forwarding</text>
+<line x1="32" y1="314" x2="888" y2="314" stroke="#dcdcdc" stroke-width="1" /><text x="32" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Black, the two ends, which never meet</text><text x="317" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Dashed, the reply, along a path the sender chose</text><text x="602" y="334" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#8a8a8a" letter-spacing="0.05em">Each hop waits a random time before forwarding</text>
 </svg>
 <!-- diagram:mix-network:end -->
       </div>
@@ -1416,7 +1416,7 @@
           <span class="flag">--mix --anonymous</span>
         </div>
         <div class="out">
-          <div>Mix network: 4 nodes across 2 operators, 3 hops — small.</div>
+          <div>Mix network: 4 nodes across 2 operators, 3 hops: small.</div>
           <div>
             This hides you from a curious relay, not from someone watching the
             network.
@@ -1431,12 +1431,12 @@
     </section>
 
     <section id="compare" class="wrap">
-      <div class="kicker">06 — Compared</div>
+      <div class="kicker">06: Compared</div>
       <h2>Where CAPSULE sits among the <b>alternatives</b></h2>
       <p class="body">
         Two tables. The first is what CAPSULE was built to do differently. The
         second is every other system on the map, with the limitation it is known
-        for and whether CAPSULE answers it — often only partly.
+        for and whether CAPSULE answers it, often only partly.
       </p>
 
       <div class="compare-wrap">
@@ -1457,8 +1457,8 @@
               <td class="feat">Server cannot read the content</td>
               <td class="me"><span class="yes">✓</span></td>
               <td><span class="partial">~</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
               <td><span class="partial">~</span></td>
               <td><span class="yes">✓</span></td>
             </tr>
@@ -1466,43 +1466,43 @@
               <td class="feat">No account, no identifier</td>
               <td class="me"><span class="yes">✓</span></td>
               <td><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
             </tr>
             <tr>
               <td class="feat">Content size hidden from the host</td>
               <td class="me"><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
             </tr>
             <tr>
               <td class="feat">Resists end-to-end timing correlation</td>
               <td class="me"><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
               <td><span class="partial">~</span></td>
             </tr>
             <tr>
               <td class="feat">Split so no single host has enough</td>
               <td class="me"><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
             </tr>
             <tr>
               <td class="feat">Content can be withdrawn</td>
               <td class="me"><span class="yes">✓</span></td>
               <td><span class="partial">~</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
               <td><span class="partial">~</span></td>
               <td><span class="partial">~</span></td>
               <td><span class="yes">✓</span></td>
@@ -1512,35 +1512,35 @@
               <td class="me"><span class="yes">✓</span></td>
               <td><span class="yes">✓</span></td>
               <td><span class="partial">~</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
             </tr>
             <tr>
               <td class="feat">Pages cannot phone home</td>
               <td class="me"><span class="yes">✓</span></td>
               <td><span class="partial">~</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
             </tr>
             <tr>
               <td class="feat">Readable in an unmodified browser</td>
               <td class="me"><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
               <td><span class="partial">~</span></td>
               <td><span class="yes">✓</span></td>
               <td><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
             </tr>
             <tr>
               <td class="feat">Works with no internet at all</td>
               <td class="me"><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
               <td><span class="yes">✓</span></td>
             </tr>
             <tr>
@@ -1549,25 +1549,25 @@
               <td><span class="yes">✓</span></td>
               <td><span class="partial">~</span></td>
               <td><span class="partial">~</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
               <td><span class="yes">✓</span></td>
             </tr>
             <tr>
               <td class="feat">General-purpose TCP tunnel</td>
               <td class="me"><span class="partial">WIP</span></td>
               <td><span class="yes">✓</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
             </tr>
             <tr>
               <td class="feat">Designed for anonymity that grows with users</td>
               <td class="me"><span class="yes">✓</span></td>
               <td><span class="partial">~</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
-              <td><span class="no">—</span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
+              <td><span class="no">, </span></td>
               <td><span class="partial">~</span></td>
             </tr>
           </tbody>
@@ -1575,9 +1575,9 @@
       </div>
       <p class="compare-note">
         ✓ by design and tested &nbsp;·&nbsp; ~ partly &nbsp;·&nbsp; WIP
-        designed, not built &nbsp;·&nbsp; — not addressed.<br />
+        designed, not built &nbsp;·&nbsp;, not addressed.<br />
         This table is about the design. What the network is <em>today</em> is
-        smaller, and therefore weaker, than the design allows — the
+        smaller, and therefore weaker, than the design allows: the
         <a href="https://github.com/missingus3r/CAPSULE/blob/main/docs/THREAT_MODEL.md"
           >threat model</a
         >
@@ -1713,7 +1713,7 @@
     </section>
 
     <section id="run" class="wrap">
-      <div class="kicker">07 — Run it</div>
+      <div class="kicker">07: Run it</div>
       <h2>Four commands to <b>join the network</b></h2>
 
       <div class="steps">
@@ -1806,7 +1806,7 @@
     </section>
 
     <section id="stack" class="wrap">
-      <div class="kicker">08 — Stack</div>
+      <div class="kicker">08: Stack</div>
       <h2>Boring choices, on <b>purpose</b></h2>
       <p class="body">
         Nothing here is novel cryptography. Every primitive is one that has been
@@ -1860,7 +1860,7 @@
         <p>
           The part after <code>#</code> is not decoration. A pinned seed has to
           sign a challenge the client generated a moment ago, so seizing the
-          name, the certificate or the host is not enough to stand in for it —
+          name, the certificate or the host is not enough to stand in for it:
           only the key can answer. The hostname is that address,
           <code>68.211.136.69</code>, spelled so a certificate can exist for it.
         </p>
@@ -1932,7 +1932,7 @@ capsule-id/
           Padding rounds the plaintext up to a size class in quarter-octave
           steps with a 64 KiB floor, then to a whole number of chunks. A 1.4 KiB
           site and a 60 KiB site are both stored as 64 KiB. The relay learns a
-          bucket, not a size — and erasure coding needs equal chunks anyway, so
+          bucket, not a size, and erasure coding needs equal chunks anyway, so
           the two features pay for each other.
         </p>
         <h4>The three tokens</h4>
@@ -1946,7 +1946,7 @@ capsule-id/
         <p>
           <b>k-of-n erasure coding</b> gives each relay one Reed–Solomon shard
           per chunk. Any <em>k</em> relays can rebuild the capsule and any
-          <em>k−1</em> have nothing — not a partial file, not a shorter file,
+          <em>k−1</em> have nothing, not a partial file, not a shorter file,
           nothing that decrypts.
         </p>
       </div>
@@ -1964,7 +1964,7 @@ capsule-id/
 6dijvuvwrd5jqp4efjbb4hwcsmtsf6sgi3at4jeto63k7x5fkbwat2yb.capsule</pre>
         <p>
           Ugly and unmemorable, and that is the price of nobody having to issue
-          it. The checksum protects against nothing — it exists so a mistyped
+          it. The checksum protects against nothing: it exists so a mistyped
           name fails in the browser instead of resolving somewhere else.
         </p>
         <h4>The record</h4>
@@ -2006,7 +2006,7 @@ capsule-id/
         <p>
           Off by default, and the guarantee is absolute while they are: the page
           cannot issue a network request of any kind. They can be enabled per
-          site, with a visible warning — a script can navigate the frame to an
+          site, with a visible warning: a script can navigate the frame to an
           outside address, and no CSP directive covers navigation since
           <code>navigate-to</code> left the standard.
         </p>
@@ -2083,7 +2083,7 @@ capsule-id/
           </tr>
           <tr>
             <td>Guard nodes</td>
-            <td>None — the first hop is re-chosen every request</td>
+            <td>None: the first hop is re-chosen every request</td>
             <td class="v v-part">open</td>
           </tr>
           <tr>
@@ -2152,17 +2152,17 @@ capsule-id/
         </table>
         <h4>Documents in the repository</h4>
         <p>
-          <b>PROTOCOL.md</b> — the capsule format, byte for byte, with
+          <b>PROTOCOL.md</b>, the capsule format, byte for byte, with
           official byte vectors.<br />
-          <b>THREAT_MODEL.md</b> — what is defended, what is not, and what is
+          <b>THREAT_MODEL.md</b>, what is defended, what is not, and what is
           explicitly out of scope.<br />
-          <b>MIXNET.md</b> — the mix network design, leading with its own
+          <b>MIXNET.md</b>, the mix network design, leading with its own
           limitation.<br />
-          <b>SITES.md</b> — names, records, bundles and how the extension
+          <b>SITES.md</b>, names, records, bundles and how the extension
           renders them.<br />
-          <b>COMPARISON.md</b> — the 21-system table, in full, with where each
+          <b>COMPARISON.md</b>, the 21-system table, in full, with where each
           claim can be verified.<br />
-          <b>RUN_A_RELAY.md</b> — running one, including what an operator can
+          <b>RUN_A_RELAY.md</b>, running one, including what an operator can
           and cannot see.
         </p>
         <h4>Conformance</h4>

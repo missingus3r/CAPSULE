@@ -49,8 +49,8 @@ directory, or at least that file.
 
 The data directory also holds `capsules/`, one directory per capsule, and
 `sites.json`, the `.capsule` records this relay serves. Both survive a restart.
-Losing `sites.json` costs nothing permanent — publishers re-announce and peers
-gossip — but until they do, the names it held resolve nowhere at this relay.
+Losing `sites.json` costs nothing permanent, publishers re-announce and peers
+gossip, but until they do, the names it held resolve nowhere at this relay.
 
 ## 3. Joining the network
 
@@ -157,7 +157,7 @@ somebody deletes it or until this relay stops existing".
 
 A seed is the relay a fresh install asks first, so it is the most valuable
 address in the network to impersonate. If yours is going to be one, it has to
-be handed out **pinned** — with the identifier a client can hold you to:
+be handed out **pinned**, with the identifier a client can hold you to:
 
 ```bash
 curl -s https://relay.example.org/v1/info | jq -r '.relayId'
@@ -167,7 +167,7 @@ curl -s https://relay.example.org/v1/info | jq -r '.relayId'
 
 A client given that form sends a challenge and requires your relay to sign it.
 Your relay answers on its own, with no configuration: the key it already has is
-the one that signs. What this buys is precise — somebody who seizes the name,
+the one that signs. What this buys is precise: somebody who seizes the name,
 the certificate or the host **cannot** stand in for you, because they cannot
 produce the signature. What it does not buy is protection against you: a seed
 that answers correctly still decides which relays a new install first hears
@@ -191,7 +191,7 @@ installing anything.
 Read `addresses` as addresses. It is not a user count and cannot become one:
 two devices are two, a household behind one router is one, and anybody using
 the mix network is counted as the relay that forwarded for them. The page holds
-nothing — the relay keeps a salted digest of the address for the length of the
+nothing: the relay keeps a salted digest of the address for the length of the
 window, which is the same value rate limiting already keeps, and the salt
 rotates, so a digest cannot be followed from one window into the next.
 
@@ -295,7 +295,7 @@ set one. Records are public by design: circulating is what they are for.
 
 **You do not see** the content. The capability is inside the record and can be
 used to download the capsule, but the capsule is encrypted end to end and your
-relay does not have the key — unless you also choose to download and decrypt it
+relay does not have the key, unless you also choose to download and decrypt it
 as any visitor would. Like any site, it is public; there is nothing special
 about you being able to read it too.
 
@@ -345,7 +345,7 @@ CAPSULE_LAN=true
 ```
 
 The relay then announces itself over UDP multicast so a client with no
-internet, no DNS and no seed list can still find it — see
+internet, no DNS and no seed list can still find it: see
 [OFFLINE.md](./OFFLINE.md).
 
 It is off by default and it should be: **a beacon tells everyone on the network

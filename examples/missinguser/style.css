@@ -1,0 +1,109 @@
+:root {
+  color-scheme: light dark;
+  --ink: #18352f;
+  --muted: #5a6b65;
+  --faint: #8b9691;
+  --bg: #f3efe6;
+  --card: #fffdf8;
+  --line: rgba(27, 62, 54, 0.14);
+  --accent: #c2543a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e8efec;
+    --muted: #b9c9c3;
+    --faint: #7d8e88;
+    --bg: #12201d;
+    --card: #18302b;
+    --line: rgba(255, 255, 255, 0.1);
+    --accent: #ef7959;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 4rem 1.25rem 5rem;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    17px/1.68 Georgia,
+    "Iowan Old Style",
+    "Times New Roman",
+    serif;
+}
+main {
+  max-width: 38rem;
+  margin: 0 auto;
+}
+header {
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--line);
+}
+h1 {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  color: var(--accent);
+}
+.bio {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+article {
+  padding-top: 2.5rem;
+}
+h2 {
+  margin: 0;
+  font-size: clamp(1.9rem, 6vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.dateline {
+  margin: 0.5rem 0 2rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 0 2.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+p {
+  margin: 0 0 1.25rem;
+}
+article p:first-of-type {
+  font-size: 1.18rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+footer {
+  margin-top: 3.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 0.85rem;
+}
+footer p {
+  margin: 0;
+}
+a {
+  color: var(--accent);
+}
+.mark {
+  width: 11rem;
+  margin: 0 0 1.5rem;
+  border: 0;
+  border-radius: 0;
+}
