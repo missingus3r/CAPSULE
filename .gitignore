@@ -22,3 +22,7 @@ release
 # It is a private key: it must never be committed.
 *.pem
 *.crx
+
+# A personal site published to the network by hand, kept out of the repository
+# on purpose: it belongs to whoever writes it, not to the project.
+examples/missinguser/
