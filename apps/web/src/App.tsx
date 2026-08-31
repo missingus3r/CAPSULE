@@ -274,10 +274,7 @@ function ConnectionStatus({
 
   const alone = relayCount <= 1;
   return (
-    <div
-      className={alone ? "connection is-alone" : "connection is-online"}
-      role="status"
-    >
+    <div className="connection is-online" role="status">
       <Server size={16} aria-hidden="true" />
       <span>
         <strong>
@@ -335,14 +332,21 @@ function NetworkPanel({
 function PrivacyAside({
   relays,
   relayUrl,
+  reachable,
 }: {
   relays: RelayInfo[];
   relayUrl: string;
+  reachable: boolean | undefined;
 }) {
   const t = useT();
   const steps = [1, 2, 3] as const;
   return (
     <aside className="privacy-aside" aria-labelledby="privacy-title">
+      <ConnectionStatus
+        reachable={reachable}
+        relayCount={relays.length}
+        relayUrl={relayUrl}
+      />
       <div className="aside-eyebrow">{t("privacy.eyebrow")}</div>
       <h2 id="privacy-title">{t("privacy.title")}</h2>
       <div className="privacy-steps" aria-label={t("privacy.steps")}>
@@ -862,12 +866,6 @@ export default function App() {
             <h1 id="main-title">{t(`${mode}.title` as MessageKey)}</h1>
             <p>{t(`${mode}.sub` as MessageKey)}</p>
           </div>
-
-          <ConnectionStatus
-            reachable={reachable}
-            relayCount={network.length}
-            relayUrl={relayUrl}
-          />
 
           <div
             className="mode-tabs"
@@ -1546,7 +1544,11 @@ export default function App() {
           ) : null}
         </section>
 
-        <PrivacyAside relays={network} relayUrl={relayUrl} />
+        <PrivacyAside
+          relays={network}
+          relayUrl={relayUrl}
+          reachable={reachable}
+        />
       </main>
 
       <footer>

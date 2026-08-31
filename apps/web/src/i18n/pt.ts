@@ -218,7 +218,7 @@ export const pt: Messages = {
   "publish.error.missingKey":
     "Este navegador não tem mais essa chave. Importe o arquivo .capsulekey.",
 
-  "extension.eyebrow": "A outra metade",
+  "extension.eyebrow": "Instale a extensão",
   "extension.title": "Ler um site .capsule",
   "extension.body":
     "Um endereço .capsule não resolve em nenhum DNS, então o navegador precisa da extensão para abri-lo. Ela reconstrói cada página antes de mostrá-la, e o resultado não consegue fazer uma única requisição de rede.",

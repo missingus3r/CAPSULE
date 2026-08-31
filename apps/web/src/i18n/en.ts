@@ -226,7 +226,7 @@ export const en = {
   "publish.error.missingKey":
     "This browser no longer holds that key. Import the .capsulekey file.",
 
-  "extension.eyebrow": "The other half",
+  "extension.eyebrow": "Get the extension",
   "extension.title": "Reading a .capsule site",
   "extension.body":
     "A .capsule address resolves nowhere in DNS, so a browser needs the extension to open one. It rebuilds every page before showing it, and the result cannot make a single network request.",

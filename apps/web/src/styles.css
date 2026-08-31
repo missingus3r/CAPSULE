@@ -2179,61 +2179,64 @@ select.publish-field {
 /* --- Connection status ----------------------------------------------------- */
 
 /*
- * Whether the page can reach the network at all, above the fold and above the
- * tabs. Somebody who cannot send a file should learn that before choosing one,
- * not from a failed upload.
+ * Whether the page can reach the network at all, at the top of the panel that
+ * explains what the network does and does not protect. Somebody who cannot
+ * send a file should learn that before choosing one, not from a failed upload.
+ *
+ * It sits on the dark aside, so the colours are drawn against that rather than
+ * against paper: a tinted border and a wash, not a light-mode alert box.
  */
 .connection {
+  position: relative;
+  z-index: 1;
   display: flex;
-  gap: 0.65rem;
+  gap: 0.6rem;
   align-items: flex-start;
-  margin: 0 42px;
-  padding: 0.72rem 0.95rem;
-  border: 1px solid var(--line);
-  border-radius: 0.9rem;
-  font-size: 0.83rem;
+  margin: 0 0 1.4rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .connection > svg {
   flex: none;
-  margin-top: 0.12rem;
+  margin-top: 0.1rem;
 }
 
 .connection strong {
   display: block;
-  font-size: 0.86rem;
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: -0.005em;
 }
 
 .connection small {
   display: block;
-  margin-top: 0.15rem;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
+  margin-top: 0.2rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10.5px;
+  line-height: 1.55;
 }
 
 .connection.is-checking {
   border-style: dashed;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Connected is connected: green whether it is one relay or many. What one
+   relay costs you is in the line underneath, which informs without reading
+   as a failure. */
+.connection.is-online {
+  border-color: rgba(150, 214, 178, 0.42);
+  background: rgba(150, 214, 178, 0.12);
+  color: #b7ecce;
 }
 
 .connection.is-offline {
-  border-color: rgba(168, 71, 52, 0.35);
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.connection.is-alone {
-  border-color: rgba(239, 121, 89, 0.34);
-  background: var(--coral-soft);
-  color: var(--ink);
-}
-
-.connection.is-online {
-  border-color: rgba(94, 154, 130, 0.34);
-  background: var(--mint-soft);
-  color: var(--forest);
+  border-color: rgba(239, 121, 89, 0.5);
+  background: rgba(239, 121, 89, 0.14);
+  color: #ffb9a2;
 }
 
 .spin {
@@ -2249,11 +2252,5 @@ select.publish-field {
 @media (prefers-reduced-motion: reduce) {
   .spin {
     animation: none;
-  }
-}
-
-@media (max-width: 620px) {
-  .connection {
-    margin-inline: 20px;
   }
 }
