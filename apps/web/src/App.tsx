@@ -1125,7 +1125,7 @@ export default function App() {
                       ) : null}
                     </div>
 
-                    <div className="field-group note-group">
+                    <div className="field-group">
                       <div className="field-label">
                         <span>3</span>
                         <div>

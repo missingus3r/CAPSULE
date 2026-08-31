@@ -2007,6 +2007,79 @@ footer > span {
 
 /* --- Publishing a site ---------------------------------------------------- */
 
+/*
+ * Text fields and the name picker, matching the note field the send form
+ * already uses. A bare input inherits nothing here: it comes out at the
+ * browser's default size, which next to 15px rounded controls reads as
+ * broken rather than plain, and swallows its own placeholder.
+ */
+.publish-field {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--paper-soft);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.publish-field::placeholder {
+  color: #9da6a1;
+}
+
+.publish-field:focus {
+  border-color: rgba(239, 121, 89, 0.7);
+  outline: none;
+  background: var(--paper);
+  box-shadow: 0 0 0 3px rgba(239, 121, 89, 0.1);
+}
+
+/* A select does not take a border radius from the shorthand on every engine. */
+select.publish-field {
+  appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 19px) calc(50% + 1px),
+    calc(100% - 14px) calc(50% + 1px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+/*
+ * Buttons stacked in one step need to be told apart. `.secondary-action`
+ * carries its own top margin for the one case it was written for; here two of
+ * them can follow a picker or each other, so the gap is set from the group.
+ */
+.publish-step-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.publish-step-actions .secondary-action {
+  margin-top: 0;
+}
+
+/* Asking to be listed is a separate decision from naming the site. */
+.publish-optin {
+  margin-top: 16px;
+}
+
 .publish-pickers {
   display: grid;
   grid-template-columns: 1fr 1fr;

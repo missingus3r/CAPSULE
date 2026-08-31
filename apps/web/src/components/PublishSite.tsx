@@ -1,7 +1,10 @@
 import { siteManifestFile, type SiteFile } from "@capsule/protocol";
 import { publishSite, type RelayTransportFactory } from "@capsule/sdk";
 import {
+  Check,
   CheckCircle2,
+  Copy,
+  Link2,
   FolderUp,
   Globe,
   KeyRound,
@@ -209,27 +212,39 @@ export function PublishSite({
             </div>
           </div>
 
-          <label className="field">
-            <span>{t("publish.address")}</span>
-            <div className="copy-row">
-              <input readOnly value={address} />
+          <div className="share-link-block">
+            <label htmlFor="published-address">{t("publish.address")}</label>
+            <div className="share-field">
+              <Link2 size={18} aria-hidden="true" />
+              <input
+                id="published-address"
+                readOnly
+                value={address}
+                onFocus={(event) => event.target.select()}
+              />
               <button
                 type="button"
+                className={copied ? "copied" : ""}
                 onClick={() => {
                   void copyText(address).then((ok) => setCopied(ok));
                 }}
+                aria-label={t("publish.copy")}
               >
-                {copied ? t("publish.copied") : t("publish.copy")}
+                {copied ? <Check size={17} /> : <Copy size={17} />}
               </button>
             </div>
-          </label>
+          </div>
 
           <p className="inline-warning">
             <KeyRound size={14} aria-hidden="true" />
             {t("publish.keptKey")}
           </p>
 
-          <button type="button" className="ghost" onClick={startOver}>
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={startOver}
+          >
             <RotateCcw size={15} aria-hidden="true" />
             {t("publish.again")}
           </button>
@@ -293,20 +308,22 @@ export function PublishSite({
           }}
         />
 
-        <button
-          type="button"
-          className="ghost example-button"
-          onClick={() => {
-            setProblem(undefined);
-            setGathered(exampleSite());
-            setIsExample(true);
-            setListed(false);
-            setTitle("Hello from CAPSULE");
-          }}
-        >
-          <Sparkles size={15} aria-hidden="true" />
-          {t("publish.example")}
-        </button>
+        <div className="publish-step-actions">
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => {
+              setProblem(undefined);
+              setGathered(exampleSite());
+              setIsExample(true);
+              setListed(false);
+              setTitle("Hello from CAPSULE");
+            }}
+          >
+            <Sparkles size={15} aria-hidden="true" />
+            {t("publish.example")}
+          </button>
+        </div>
 
         {gathered ? (
           <p className="publish-summary">
@@ -334,6 +351,7 @@ export function PublishSite({
         </div>
 
         <select
+          className="publish-field"
           value={selected}
           onChange={(event) => setSelected(event.target.value)}
           aria-label={t("publish.step2.label")}
@@ -346,14 +364,16 @@ export function PublishSite({
           ))}
         </select>
 
-        <button
-          type="button"
-          className="ghost"
-          onClick={() => keyInput.current?.click()}
-        >
-          <KeyRound size={15} aria-hidden="true" />
-          {t("publish.importKey")}
-        </button>
+        <div className="publish-step-actions">
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => keyInput.current?.click()}
+          >
+            <KeyRound size={15} aria-hidden="true" />
+            {t("publish.importKey")}
+          </button>
+        </div>
         <input
           ref={keyInput}
           type="file"
@@ -388,6 +408,7 @@ export function PublishSite({
         </div>
 
         <input
+          className="publish-field"
           type="text"
           maxLength={120}
           placeholder={t("publish.titlePlaceholder")}
@@ -395,7 +416,7 @@ export function PublishSite({
           onChange={(event) => setTitle(event.target.value)}
         />
 
-        <label className="switch-row">
+        <label className="switch-row publish-optin">
           <input
             type="checkbox"
             checked={listed}
@@ -412,6 +433,7 @@ export function PublishSite({
 
         {listed ? (
           <input
+            className="publish-field"
             type="text"
             maxLength={300}
             placeholder={t("publish.descriptionPlaceholder")}
@@ -442,7 +464,7 @@ export function PublishSite({
 
       <button
         type="button"
-        className="primary"
+        className="primary-action"
         disabled={!gathered}
         onClick={() => void publish()}
       >
