@@ -216,7 +216,8 @@ export const en = {
   "publish.workingDetail":
     "Packing the bundle, encrypting it, and signing the record that points at it.",
   "publish.done": "Published",
-  "publish.doneDetail": "Version {version}, announced to {relays} relay(s).",
+  "publish.doneDetail":
+    "Version {version}, stored on {copies} relay(s) and announced to {relays}. Relays that learn the name carry a copy too.",
   "publish.address": "The address",
   "publish.copy": "Copy",
   "publish.copied": "Copied",

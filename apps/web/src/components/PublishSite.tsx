@@ -1,5 +1,10 @@
 import { siteManifestFile, type SiteFile } from "@capsule/protocol";
-import { publishSite, type RelayTransportFactory } from "@capsule/sdk";
+import {
+  publishSite,
+  selectRelays,
+  type RelayInfo,
+  type RelayTransportFactory,
+} from "@capsule/sdk";
 import {
   Check,
   CheckCircle2,
@@ -42,6 +47,17 @@ import { ProgressState } from "./ProgressState";
  * there is nobody to appeal to when it is gone.
  */
 
+/**
+ * Relays a site is copied to besides the one it is published through.
+ *
+ * It used to be none, which made the honest description of a `.capsule` site
+ * "a name every relay knows, pointing at bytes on one machine". Two is not a
+ * guarantee — it is the smallest number for which losing a relay is not the
+ * same as losing the site — and relays that take a copy from gossip add to it
+ * afterwards without the publisher choosing anything.
+ */
+const SITE_MIRRORS = 2;
+
 type Stage = "form" | "working" | "done" | "error";
 
 interface Published {
@@ -49,14 +65,19 @@ interface Published {
   sequence: number;
   bundleBytes: number;
   announcedTo: string[];
+  /** Relays that hold the bundle itself, not just the record. */
+  relayUrls: string[];
 }
 
 export function PublishSite({
   relayUrl,
+  mirrorCandidates,
   transport,
   ttlSeconds,
 }: {
   relayUrl: string;
+  /** Other relays in the directory, for the copies every site gets. */
+  mirrorCandidates?: RelayInfo[];
   transport?: RelayTransportFactory;
   ttlSeconds: number | null;
 }) {
@@ -133,11 +154,26 @@ export function PublishSite({
         }),
       ];
 
+      const ttl = isExample ? EXAMPLE_TTL_SECONDS : ttlSeconds;
+      // Sized from the files rather than the bundle, which does not exist
+      // yet: it is a filter over relay limits, so erring high only drops
+      // relays that would have refused the upload anyway.
+      const bytes = gathered.totalBytes;
+      const mirrorRelayUrls = selectRelays(mirrorCandidates ?? [], {
+        count: SITE_MIRRORS,
+        ciphertextBytes: bytes + 1024 * 1024,
+        chunkCount: Math.max(1, Math.ceil(bytes / (1024 * 1024))),
+        persistent: ttl === null,
+        ...(ttl !== null ? { ttlSeconds: ttl } : {}),
+        exclude: [relayUrl],
+      }).map((relay) => relay.url);
+
       const result = await publishSite({
         identity,
         files,
         relayUrl,
-        ttlSeconds: isExample ? EXAMPLE_TTL_SECONDS : ttlSeconds,
+        ...(mirrorRelayUrls.length > 0 ? { mirrorRelayUrls } : {}),
+        ttlSeconds: ttl,
         sequence,
         ...(title.trim() ? { title: title.trim() } : {}),
         ...(transport ? { transport } : {}),
@@ -160,6 +196,7 @@ export function PublishSite({
         sequence,
         bundleBytes: result.bundleBytes,
         announcedTo: result.announcedTo,
+        relayUrls: result.relayUrls,
       });
       setStage("done");
     } catch (error) {
@@ -206,6 +243,7 @@ export function PublishSite({
               <p>
                 {t("publish.doneDetail", {
                   version: published.sequence,
+                  copies: published.relayUrls.length,
                   relays: published.announcedTo.length,
                 })}
               </p>

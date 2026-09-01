@@ -383,6 +383,17 @@ export async function resolveSite(
 }
 
 export interface FetchSiteOptions {
+  /**
+   * Relays to fall back to when the ones inside the capability cannot be
+   * reached — normally the relays that answered the name.
+   *
+   * A record is signed once and then outlives the arrangement it describes.
+   * The relay it names can be gone, blocked, or simply refusing to carry the
+   * site any more, while every relay that took a copy still answers for it
+   * under the same identifier. Passing the relays already known is what turns
+   * that from a fact about the network into a site that still loads.
+   */
+  relayUrls?: readonly string[];
   fetchImpl?: FetchLike;
   transport?: RelayTransportFactory;
   signal?: AbortSignal;
@@ -396,6 +407,7 @@ export async function fetchSiteBytes(
 ): Promise<Uint8Array> {
   const downloaded = await downloadCapsule({
     capability,
+    ...(options.relayUrls ? { extraRelayUrls: options.relayUrls } : {}),
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     ...(options.transport ? { transport: options.transport } : {}),
     ...(options.signal ? { signal: options.signal } : {}),

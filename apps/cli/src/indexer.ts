@@ -515,6 +515,7 @@ function fingerprintOf(listings: Listing[]): string {
 async function crawl(
   records: CapsuleSiteRecord[],
   cache: IndexCache,
+  relayUrls: string[],
   fetchImpl: FetchLike | undefined,
   onProgress: (name: string, cached: boolean) => void,
 ): Promise<CrawlResult> {
@@ -539,7 +540,12 @@ async function crawl(
     try {
       const bundle = await fetchSiteBundle(
         decodeShareCapability(record.capability),
-        { ...(fetchImpl ? { fetchImpl } : {}) },
+        {
+          // A site whose origin relay is gone is still indexable from
+          // whichever relay took a copy of it.
+          relayUrls,
+          ...(fetchImpl ? { fetchImpl } : {}),
+        },
       );
       const manifest = readSiteManifest(bundle);
       if (!manifest.index) {
@@ -659,6 +665,7 @@ export function registerIndexerCommands(
         const result = await crawl(
           records,
           cache,
+          urls,
           fetchImpl,
           (name, cached) => {
             if (!json) {

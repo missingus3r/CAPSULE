@@ -443,6 +443,10 @@ async function open(target: Target): Promise<void> {
     );
     try {
       const downloaded = await fetchSiteBytes(resolved.capability, {
+        // The relays the reader already trusts enough to ask, offered as a
+        // fallback: the one named in the record may be long gone, and a copy
+        // answers to the same identifier.
+        relayUrls: settings.relays,
         ...(mix ? { transport: mix.transportFor } : {}),
       });
       const bundle = unpackSite(downloaded);

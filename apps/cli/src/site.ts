@@ -118,6 +118,18 @@ async function relayPool(
   return [...new Set(urls)].slice(0, limit);
 }
 
+/**
+ * Relays a site is copied to besides the one it is published through.
+ *
+ * The default used to be none, which made the honest description of a
+ * `.capsule` site "a name every relay knows, pointing at bytes on one
+ * machine". Two is not a guarantee — it is the smallest number for which
+ * losing a relay is not the same as losing the site — and relays that take a
+ * copy from gossip add to it afterwards without the publisher choosing
+ * anything. `--mirror 0` opts out.
+ */
+const SITE_MIRRORS = 2;
+
 /** Relays that can hold a copy of the bundle, chosen for operator diversity. */
 async function mirrorPool(
   context: SiteCommandContext,
@@ -200,7 +212,7 @@ export function registerSiteCommands(
     )
     .option(
       "--mirror <count>",
-      "also store the site on this many relays from the network",
+      `also store the site on this many relays from the network (default ${SITE_MIRRORS})`,
     )
     .option(
       "--seed <url>",
@@ -236,7 +248,9 @@ export function registerSiteCommands(
         const fetchImpl = context.transport();
         const ttlSeconds = parseTtl(options.ttl);
 
-        const mirrorCount = options.mirror ? Number(options.mirror) : 0;
+        const mirrorCount = options.mirror
+          ? Number(options.mirror)
+          : SITE_MIRRORS;
         if (!Number.isSafeInteger(mirrorCount) || mirrorCount < 0) {
           throw new Error("--mirror must be a non-negative integer");
         }
@@ -391,6 +405,10 @@ export function registerSiteCommands(
         if (!resolved) throw new Error(`Could not resolve ${name}`);
 
         const bundle = await fetchSiteBundle(resolved.capability, {
+          // The record names the relays its publisher used; the pool is the
+          // relays that exist now. A site whose origin is gone is still held
+          // by whoever took a copy, under the same identifier.
+          relayUrls: pool,
           ...(fetchImpl ? { fetchImpl } : {}),
           ...context.retryPolicy(),
           ...context.progressReporter("Downloading", [

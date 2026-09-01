@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 export interface RelayConfig {
   host: string;
@@ -56,6 +56,19 @@ export interface RelayConfig {
   maxSites: number;
   /** Records pulled from one peer per gossip round. */
   siteGossipLimit: number;
+  /**
+   * Fetches a copy of the sites this relay gossips, so a `.capsule` name
+   * outlives the one machine its publisher happened to upload to.
+   */
+  siteReplication: boolean;
+  /** Ceiling for the ciphertext held by copies this relay fetched itself. */
+  maxReplicaBytes: number;
+  /** How long a copy is kept before the record has to renew it. */
+  replicaTtlSeconds: number;
+  /** Capsule identifiers and `.capsule` names this operator will not serve. */
+  denylistFile: string;
+  /** How often the denylist is re-read. Zero means only at startup. */
+  denylistReloadMs: number;
   /** Keeps raw client addresses out of logs and rate-limit state. */
   ipBlind: boolean;
   /** Acts as a node in the mix network. */
@@ -112,6 +125,9 @@ const DEFAULTS = {
   maxPeersPerOperator: 4,
   maxSites: 5_000,
   siteGossipLimit: 200,
+  maxReplicaBytes: 256 * 1024 * 1024,
+  replicaTtlSeconds: 7 * 24 * 60 * 60,
+  denylistReloadMs: 15_000,
   mixMaxQueued: 2048,
   mixMaxDelayMs: 5 * 60_000,
   mixMeanDelayMs: 5_000,
@@ -342,6 +358,53 @@ export function loadRelayConfig(
       "CAPSULE_SITE_GOSSIP_LIMIT",
       DEFAULTS.siteGossipLimit,
       { minimum: 0, maximum: 1000 },
+    ),
+    /**
+     * On by default, bounded, and the reason a `.capsule` name survives the
+     * loss of any one relay.
+     *
+     * Gossip already carries the record everywhere; without this it carries
+     * only the pointer, and the bytes stay on whichever machine the publisher
+     * uploaded to. That is the wrong way round for a network whose claim is
+     * that content does not depend on one host: the part that is impossible
+     * to withdraw would be the metadata, and the part one power cut removes
+     * would be the site.
+     *
+     * What makes the default defensible is the same thing that makes
+     * persistent capsules defensible — a known bound. A relay nobody
+     * configured gives up 256 MB and a week's lease per copy, and an operator
+     * who wants to carry only what was uploaded to them sets
+     * `CAPSULE_SITE_REPLICATION=false`.
+     */
+    siteReplication: booleanFromEnvironment(
+      environment,
+      "CAPSULE_SITE_REPLICATION",
+      true,
+    ),
+    maxReplicaBytes: integerFromEnvironment(
+      environment,
+      "CAPSULE_MAX_REPLICA_BYTES",
+      DEFAULTS.maxReplicaBytes,
+      { minimum: 0 },
+    ),
+    replicaTtlSeconds: integerFromEnvironment(
+      environment,
+      "CAPSULE_REPLICA_TTL_SECONDS",
+      DEFAULTS.replicaTtlSeconds,
+      { minimum: 60 },
+    ),
+    denylistFile: resolve(
+      environment.CAPSULE_DENYLIST_FILE?.trim() ||
+        join(
+          environment.CAPSULE_STORAGE_DIR?.trim() || DEFAULTS.storageDir,
+          "denylist.json",
+        ),
+    ),
+    denylistReloadMs: integerFromEnvironment(
+      environment,
+      "CAPSULE_DENYLIST_RELOAD_MS",
+      DEFAULTS.denylistReloadMs,
+      { minimum: 0 },
     ),
     /**
      * On by default, bounded by `maxPersistentBytes`.

@@ -184,6 +184,22 @@ export interface UploadTicket {
 
 export interface DownloadCapsuleOptions {
   capability: CapsuleShareCapability;
+  /**
+   * Relays to try after the ones the capability names, using the same
+   * identifier and read token.
+   *
+   * A capability is signed, or embedded in a link, at the moment of
+   * publishing: it can only ever name the relays that existed for the
+   * publisher then. Relays that took a copy afterwards answer for the same
+   * `capsuleId` — that is the point of storing a copy under the identifier it
+   * came with — but nothing in the capability can say so. This is how a
+   * caller who knows the network offers those relays as a fallback, and it is
+   * what makes losing the origin survivable rather than final.
+   *
+   * Ignored for sharded capsules, where each relay holds a shard rather than
+   * a copy and the relay list is ordered by shard index.
+   */
+  extraRelayUrls?: readonly string[];
   fetchImpl?: FetchLike;
   retry?: Partial<RetryPolicy>;
   transport?: RelayTransportFactory;
@@ -909,7 +925,22 @@ async function openSources(
   const sources: ReadSource[] = [];
   const failures: MirrorFailure[] = [];
 
-  const locations = shareLocations(capability);
+  const locations = [...shareLocations(capability)];
+  if (!capability.sharding && options.extraRelayUrls) {
+    const known = new Set(
+      locations.map((location) => trimSlash(location.relayUrl)),
+    );
+    for (const relayUrl of options.extraRelayUrls) {
+      const url = trimSlash(relayUrl);
+      if (!url || known.has(url)) continue;
+      known.add(url);
+      locations.push({
+        relayUrl: url,
+        capsuleId: capability.capsuleId,
+        readToken: capability.readToken,
+      });
+    }
+  }
   for (const [index, location] of locations.entries()) {
     try {
       const client = options.transport
@@ -1300,4 +1331,8 @@ export async function deleteCapsule(
     );
   }
   return { deleted, failed };
+}
+
+function trimSlash(url: string): string {
+  return url.replace(/\/+$/u, "");
 }

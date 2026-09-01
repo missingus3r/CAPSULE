@@ -930,6 +930,7 @@ export default function App() {
           {mode === "publish" ? (
             <PublishSite
               relayUrl={relayUrl}
+              mirrorCandidates={mirrorCandidates}
               ttlSeconds={ttlSeconds}
               {...(mixTransport?.transport
                 ? { transport: mixTransport.transport }

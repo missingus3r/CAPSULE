@@ -208,7 +208,8 @@ export const pt: Messages = {
   "publish.workingDetail":
     "Empacotando o bundle, cifrando, e assinando o record que aponta para ele.",
   "publish.done": "Publicado",
-  "publish.doneDetail": "Versão {version}, anunciada a {relays} relay(s).",
+  "publish.doneDetail":
+    "Versão {version}, guardada em {copies} relay(s) e anunciada a {relays}. Os relays que aprendem o nome também guardam uma cópia.",
   "publish.address": "O endereço",
   "publish.copy": "Copiar",
   "publish.copied": "Copiado",

@@ -51,6 +51,16 @@ export interface CreateCapsuleOutput {
 export interface StoredCapsuleRecord {
   /** Version 2 added capsules without expiry; version 1 records stay valid. */
   schemaVersion: 1 | 2;
+  /**
+   * Present when this relay fetched the capsule itself rather than being
+   * given it. A replica is a copy of public content: it holds no secret its
+   * origin did not already publish, and it is the operator's to drop.
+   */
+  replica?: {
+    /** The `.capsule` name whose record pointed here. */
+    siteName: string;
+    adoptedAt: string;
+  };
   capsuleId: string;
   encryptedManifest: string;
   manifestCiphertextBytes: number;
@@ -63,6 +73,28 @@ export interface StoredCapsuleRecord {
     write: string;
     delete: string;
   };
+}
+
+export interface AdoptCapsuleInput {
+  /** The identifier the publisher's capability names. Kept, never minted. */
+  capsuleId: string;
+  readToken: string;
+  /** The `.capsule` name whose record pointed here. */
+  siteName: string;
+  encryptedManifest: string;
+  chunkCount: number;
+  totalCiphertextBytes: number;
+  /** Replicas always expire; carrying a site means renewing the lease. */
+  expiresAt: string;
+}
+
+export type AdoptOutcome = "stored" | "held" | "no_space" | "refused";
+
+export interface StoredReplica {
+  capsuleId: string;
+  siteName: string;
+  bytes: number;
+  expiresAt: string | null;
 }
 
 export interface CapsuleStatus {
@@ -188,8 +220,17 @@ export class CapsuleStorage {
   private readonly mutex = new KeyedMutex();
   /** Ciphertext held by capsules without expiry; bounded by configuration. */
   private persistentBytes = 0;
+  /** Ciphertext held by copies this relay fetched itself. */
+  private replicaBytes = 0;
 
-  constructor(private readonly config: RelayConfig) {
+  constructor(
+    private readonly config: RelayConfig,
+    /**
+     * Content this operator has refused. Asked on every read rather than at
+     * startup, because an entry added at 3am has to take effect at 3am.
+     */
+    private readonly denies: (capsuleId: string) => boolean = () => false,
+  ) {
     this.rootDirectory = config.storageDir;
     this.capsulesDirectory = join(this.rootDirectory, "capsules");
   }
@@ -206,8 +247,14 @@ export class CapsuleStorage {
     return this.persistentBytes;
   }
 
+  /** Bytes currently stored by copies of public sites this relay fetched. */
+  get replicaBytesUsed(): number {
+    return this.replicaBytes;
+  }
+
   private async recountPersistentBytes(): Promise<void> {
     let total = 0;
+    let replicas = 0;
     let entries;
     try {
       entries = await readdir(this.capsulesDirectory, { withFileTypes: true });
@@ -219,13 +266,15 @@ export class CapsuleStorage {
       if (!entry.isDirectory() || !CAPSULE_ID_PATTERN.test(entry.name))
         continue;
       try {
-        const record = await this.readRecord(entry.name);
+        const record = await this.readStoredRecord(entry.name);
         if (record.expiresAt === null) total += record.totalCiphertextBytes;
+        if (record.replica) replicas += record.totalCiphertextBytes;
       } catch {
         // A corrupt record is reported when it is read, not during startup.
       }
     }
     this.persistentBytes = total;
+    this.replicaBytes = replicas;
   }
 
   async checkHealth(): Promise<void> {
@@ -391,6 +440,18 @@ export class CapsuleStorage {
   }
 
   async readRecord(capsuleId: string): Promise<StoredCapsuleRecord> {
+    // A capsule the operator refuses is indistinguishable from one that was
+    // never uploaded: the same 404 as a wrong identifier or an expired
+    // capsule. Refusing loudly would turn the denylist into a catalogue of
+    // exactly what to go looking for elsewhere.
+    if (this.denies(capsuleId)) throw notFound();
+    return this.readStoredRecord(capsuleId);
+  }
+
+  /** The read the operator's own tooling uses, denylist and all. */
+  private async readStoredRecord(
+    capsuleId: string,
+  ): Promise<StoredCapsuleRecord> {
     assertCapsuleId(capsuleId);
     try {
       const parsed: unknown = JSON.parse(
@@ -664,7 +725,7 @@ export class CapsuleStorage {
         continue;
       try {
         await this.mutex.run(entry.name, async () => {
-          const record = await this.readRecord(entry.name);
+          const record = await this.readStoredRecord(entry.name);
           // A capsule without expiry is only removed by its owner capability.
           if (
             record.expiresAt !== null &&
@@ -682,6 +743,270 @@ export class CapsuleStorage {
       }
     }
     return { removed, errors };
+  }
+
+  // --- Replicas --------------------------------------------------------------
+
+  /**
+   * Stores a copy of a public capsule under the identifiers it already has.
+   *
+   * The identifiers are the point. A relay that minted its own `capsuleId`
+   * for the copy would be holding bytes nobody can address: the capability
+   * naming this content was signed by its publisher and cannot be amended, so
+   * a copy is only reachable if it answers to the same identifier and the
+   * same read token as the original. That makes `capsuleId` the content's
+   * name across the network rather than one relay's filing system, which is
+   * what lets a visitor fall back to any relay when the origin is gone.
+   *
+   * Nothing secret is taken on here. The read token arrived inside a signed
+   * record that every relay gossips and every visitor can fetch; a site is
+   * public by construction. The write and delete tokens are minted locally
+   * and told to nobody, so a replica cannot be modified by anyone — including
+   * its publisher, who withdraws it by publishing a newer sequence instead.
+   */
+  async adopt(
+    input: AdoptCapsuleInput,
+    fetchChunk: (index: number) => Promise<Buffer>,
+  ): Promise<AdoptOutcome> {
+    if (!CAPSULE_ID_PATTERN.test(input.capsuleId)) return "refused";
+    if (!TOKEN_PATTERN.test(input.readToken)) return "refused";
+    if (this.denies(input.capsuleId)) return "refused";
+
+    let manifestBytes: Buffer;
+    try {
+      manifestBytes = canonicalBase64UrlBytes(input.encryptedManifest);
+    } catch {
+      return "refused";
+    }
+    if (manifestBytes.length > this.config.maxManifestBytes) return "refused";
+    if (
+      !Number.isSafeInteger(input.chunkCount) ||
+      input.chunkCount <= 0 ||
+      input.chunkCount > this.config.maxChunkCount ||
+      !Number.isSafeInteger(input.totalCiphertextBytes) ||
+      input.totalCiphertextBytes <= 0 ||
+      input.totalCiphertextBytes > this.config.maxCapsuleBytes ||
+      input.totalCiphertextBytes < input.chunkCount * MIN_CHUNK_BYTES ||
+      input.totalCiphertextBytes > input.chunkCount * this.config.maxChunkBytes
+    ) {
+      return "refused";
+    }
+    if (!Number.isFinite(Date.parse(input.expiresAt))) return "refused";
+
+    return this.mutex.run(input.capsuleId, async () => {
+      try {
+        await stat(this.capsuleDirectory(input.capsuleId));
+        // Already here, whether as a replica or as the original. A relay that
+        // published a site does not need a copy of it from itself.
+        return "held";
+      } catch (error) {
+        if (!isNodeError(error, "ENOENT")) throw error;
+      }
+      // Checked inside the lock, so two records racing for the last of the
+      // budget cannot both be told there is room.
+      if (
+        this.replicaBytes + input.totalCiphertextBytes >
+        this.config.maxReplicaBytes
+      ) {
+        return "no_space";
+      }
+
+      const record: StoredCapsuleRecord = {
+        schemaVersion: 2,
+        replica: {
+          siteName: input.siteName,
+          adoptedAt: new Date().toISOString(),
+        },
+        capsuleId: input.capsuleId,
+        encryptedManifest: input.encryptedManifest,
+        manifestCiphertextBytes: manifestBytes.length,
+        chunkCount: input.chunkCount,
+        totalCiphertextBytes: input.totalCiphertextBytes,
+        createdAt: new Date().toISOString(),
+        expiresAt: input.expiresAt,
+        tokenHashes: {
+          read: hashToken(input.readToken),
+          // Minted here and never revealed: a replica is read-only to the
+          // whole world, and the operator's route to removing it is the
+          // denylist, not a token.
+          write: hashToken(randomBase64Url(32)),
+          delete: hashToken(randomBase64Url(32)),
+        },
+      };
+
+      const temporary = join(
+        this.capsulesDirectory,
+        `.adopt-${input.capsuleId}-${randomBase64Url(6)}`,
+      );
+      try {
+        await mkdir(join(temporary, "chunks"), {
+          recursive: true,
+          mode: 0o700,
+        });
+        let written = 0;
+        for (let index = 0; index < input.chunkCount; index += 1) {
+          const ciphertext = await fetchChunk(index);
+          if (
+            ciphertext.length < MIN_CHUNK_BYTES ||
+            ciphertext.length > this.config.maxChunkBytes
+          ) {
+            throw new Error(`Replica chunk ${index} has an invalid size`);
+          }
+          written += ciphertext.length;
+          if (written > input.totalCiphertextBytes) {
+            throw new Error("Replica exceeds the ciphertext it declared");
+          }
+          await writeFile(
+            join(temporary, "chunks", `${index}.bin`),
+            ciphertext,
+            { flag: "wx", mode: 0o600 },
+          );
+        }
+        if (written !== input.totalCiphertextBytes) {
+          throw new Error("Replica is short of the ciphertext it declared");
+        }
+        await writeFile(
+          join(temporary, "record.json"),
+          `${JSON.stringify(record)}\n`,
+          { flag: "wx", mode: 0o600 },
+        );
+        // The rename is what makes the replica exist, so there is no window
+        // in which this relay serves a copy it has not finished fetching.
+        await writeFile(
+          join(temporary, "finalized.json"),
+          `${JSON.stringify({ finalizedAt: new Date().toISOString() })}\n`,
+          { flag: "wx", mode: 0o600 },
+        );
+        await rename(temporary, this.capsuleDirectory(input.capsuleId));
+        this.replicaBytes += input.totalCiphertextBytes;
+        return "stored";
+      } catch (error) {
+        await rm(temporary, { recursive: true, force: true });
+        if (isNodeError(error, "EEXIST") || isNodeError(error, "ENOTEMPTY")) {
+          return "held";
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Pushes a replica's expiry out while the name it belongs to is still being
+   * gossiped.
+   *
+   * Replicas expire on purpose. A copy that outlived every record pointing at
+   * it would be a relay quietly accumulating content nobody asks for and
+   * nobody can name, so the lease is short and renewing it is what carrying a
+   * site means. Stop gossiping the record and every replica of it drains away
+   * on its own.
+   */
+  async extendReplica(capsuleId: string, expiresAt: string): Promise<boolean> {
+    if (!Number.isFinite(Date.parse(expiresAt))) return false;
+    return this.mutex.run(capsuleId, async () => {
+      let record: StoredCapsuleRecord;
+      try {
+        record = await this.readStoredRecord(capsuleId);
+      } catch {
+        return false;
+      }
+      if (!record.replica) return false;
+      if (
+        record.expiresAt !== null &&
+        Date.parse(record.expiresAt) >= Date.parse(expiresAt)
+      ) {
+        return false;
+      }
+      const updated: StoredCapsuleRecord = { ...record, expiresAt };
+      const path = join(this.capsuleDirectory(capsuleId), "record.json");
+      const temporary = `${path}.tmp-${process.pid}-${randomBase64Url(6)}`;
+      await writeFile(temporary, `${JSON.stringify(updated)}\n`, {
+        mode: 0o600,
+      });
+      await rename(temporary, path);
+      return true;
+    });
+  }
+
+  /** Whether this relay has the capsule at all, as origin or as a copy. */
+  async holds(capsuleId: string): Promise<boolean> {
+    if (!CAPSULE_ID_PATTERN.test(capsuleId)) return false;
+    try {
+      await stat(this.capsuleDirectory(capsuleId));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Every copy this relay fetched, for renewal, accounting and purging. */
+  async listReplicas(): Promise<StoredReplica[]> {
+    const replicas: StoredReplica[] = [];
+    let entries;
+    try {
+      entries = await readdir(this.capsulesDirectory, { withFileTypes: true });
+    } catch (error) {
+      if (isNodeError(error, "ENOENT")) return replicas;
+      throw error;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !CAPSULE_ID_PATTERN.test(entry.name))
+        continue;
+      try {
+        const record = await this.readStoredRecord(entry.name);
+        if (!record.replica) continue;
+        replicas.push({
+          capsuleId: record.capsuleId,
+          siteName: record.replica.siteName,
+          bytes: record.totalCiphertextBytes,
+          expiresAt: record.expiresAt,
+        });
+      } catch {
+        // Unreadable records are the cleanup's problem, not the replicator's.
+      }
+    }
+    return replicas;
+  }
+
+  /**
+   * Removes a capsule on the operator's own authority, with no token.
+   *
+   * This is the whole point of the denylist: an operator holding content they
+   * have been given a reason not to hold could otherwise only stop serving it
+   * by stopping the relay, which takes down everyone else's capsules to
+   * answer a complaint about one.
+   */
+  async removeAsOperator(capsuleId: string): Promise<boolean> {
+    if (!CAPSULE_ID_PATTERN.test(capsuleId)) return false;
+    return this.mutex.run(capsuleId, async () => {
+      let record: StoredCapsuleRecord | undefined;
+      try {
+        record = await this.readStoredRecord(capsuleId);
+      } catch {
+        // What is corrupt or half-written still has a directory to remove.
+      }
+      try {
+        await stat(this.capsuleDirectory(capsuleId));
+      } catch {
+        return false;
+      }
+      await rm(this.capsuleDirectory(capsuleId), {
+        recursive: true,
+        force: true,
+      });
+      if (record?.expiresAt === null) {
+        this.persistentBytes = Math.max(
+          0,
+          this.persistentBytes - record.totalCiphertextBytes,
+        );
+      }
+      if (record?.replica) {
+        this.replicaBytes = Math.max(
+          0,
+          this.replicaBytes - record.totalCiphertextBytes,
+        );
+      }
+      return true;
+    });
   }
 
   private capsuleDirectory(capsuleId: string): string {

@@ -47,6 +47,49 @@ what stopped being true. The format follows
 
 ### Added
 
+- **Relays carry the sites they gossip, instead of only pointing at them.** A
+  relay that accepts a `.capsule` record now fetches the capsule behind it and
+  stores it under the same `capsuleId` and read token, so it answers for that
+  content exactly as the origin does. Clients pass the relays they already know
+  (`relayUrls` on `fetchSiteBytes`, the CLI's `--seed` pool, the extension's
+  relay list) and those are tried after the ones named in the capability.
+
+  This closes a gap between what the design claimed and what it did. Gossip
+  spread records and nothing else, so every relay knew the _name_ of a page
+  whose bytes sat on the one machine its publisher uploaded to: the pointer was
+  the part nobody could withdraw and the site was the part one power cut
+  removed. The identifiers are what makes the fix work — a capability is signed
+  and cannot be amended, so a copy is only reachable if it answers to the
+  identifier the record already names.
+
+  Bounded rather than unlimited, because an operator has to be able to live
+  with the default: `CAPSULE_MAX_REPLICA_BYTES` (256 MB) caps the total, each
+  copy is a `CAPSULE_REPLICA_TTL_SECONDS` lease (7 days) renewed only while the
+  record is still gossiped, superseded versions are released, and
+  `CAPSULE_SITE_REPLICATION=false` turns it off. Capsules shared as a link are
+  never replicated — their key and read token live in a URL fragment no relay
+  ever sees — and neither are sharded capsules, where each relay holds a shard
+  rather than a copy.
+
+- **An operator denylist**, `CAPSULE_DENYLIST_FILE` (`data/denylist.json` by
+  default): capsule identifiers and `.capsule` names a relay will not serve.
+  An entry is refused at the door, dropped from the gossiped directory, and
+  removed from the disk, and the file is re-read while the relay runs so it
+  takes effect without a restart. A denied capsule answers with the same `404`
+  as an identifier that was never there.
+
+  The documentation promised this — "delete by `capsuleId` when you receive a
+  well-founded complaint", "the operator's ability to withdraw an identified
+  capsule" — and the code had no such thing: `DELETE /v1/capsules/:id` needs
+  the owner's token, and a record deleted from `sites.json` came back on the
+  next gossip round. The only working answer to a complaint was stopping the
+  relay, which drops everyone else's capsules to deal with one.
+
+  It is per-operator and shared with nobody. No relay can add to another's
+  list, nothing signs it, no endpoint writes to it, and what one relay drops
+  stays reachable at every relay that kept it. That is an exit policy, not a
+  blocklist.
+
 - `examples/site/`, a small `.capsule` site to publish against a local relay.
   Three of its checks are deliberate: an external image the viewer must drop, an
   inline script it must not run, and an outbound link it must ask about first.
@@ -157,6 +200,19 @@ what stopped being true. The format follows
   so rather than failing at upload.
 
 ### Changed
+
+- **Publishing a site puts it on three relays, not one.** The web app and
+  `capsule site publish` now default to two mirrors besides the relay being
+  published through; `--mirror 0` opts out. The old default of none was what
+  made "a signed pointer to a static site already replicated across relays" an
+  aspiration rather than a description.
+- **`docs/SITES.md` no longer says a relay cannot read a site.** It can: the
+  record carries the capability and the capability carries the key, which is
+  what lets a name resolve at any relay without a registry. That was always
+  true and stated the other way round; the sentence that matters — anything
+  private is sent as a capsule, not published as a site — was already there.
+  `README.md`, `docs/RUN_A_RELAY.md` and `docs/THREAT_MODEL.md` now say the
+  same thing in the places an operator reads before taking a relay online.
 
 - **The mailbox never sits on the relay a request is addressed to.**
   `buildMixNetwork` picked the mailbox provider at random from every relay it

@@ -95,6 +95,24 @@ export function isRoutablePeerUrl(
   return classifyRelayOrigin(value).routable;
 }
 
+/**
+ * The full check before this relay makes a request to a URL somebody else
+ * chose: the literal has to be routable, and every address its name resolves
+ * to has to be one we would have dialled directly.
+ *
+ * Peers are not the only such URL any more. A site record is signed by its
+ * publisher, and the relay it names is a string that publisher picked — so
+ * replication would otherwise be a request to an arbitrary address, made by a
+ * server that is inside somebody's network, on a schedule an attacker sets.
+ */
+export async function isFetchableRelayOrigin(
+  value: string,
+  allowPrivate: boolean,
+): Promise<boolean> {
+  if (!isRoutablePeerUrl(value, allowPrivate)) return false;
+  return resolvesToPublicAddress(value, allowPrivate);
+}
+
 function tryParseOrigin(value: string): URL | undefined {
   try {
     const url = new URL(value);

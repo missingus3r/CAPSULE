@@ -17,13 +17,22 @@ What a `.capsule` site does guarantee:
 - **Nobody can hand you an older version** without the browser noticing.
 - **The visitor tells nobody what they read**, because the page cannot make any
   network request.
-- **The relay does not know what it is storing**: it receives an encrypted
-  capsule, padded to a size class, under a neutral filename.
+- **The relay does not know the size or the filename**: the capsule is padded
+  to a size class and stored under a neutral name.
 
 What it does not guarantee:
 
+- **That the relay cannot read it.** It can. A site record carries the
+  capability, the capability carries the key, and the record is the thing
+  relays store and hand out — that is what makes a name resolvable anywhere
+  without a registry. Every relay holding the record can decrypt the site, and
+  so can anyone who asks one for it. This is not a weakness in the encryption;
+  a `.capsule` site is public by construction, and the sentence to keep in
+  mind is the one at the top: **if something has to be private it is not
+  published as a site.** A capsule sent as a link is the opposite case — its
+  key rides in a URL fragment that never reaches a server.
 - **That the site keeps existing.** It lives on relays somebody maintains. If
-  the capsules expire or the relays disappear, the name resolves to nothing.
+  every relay carrying it disappears, the name resolves to nothing.
 - **That publishing is anonymous by itself.** The relay sees the address of
   whoever uploads, unless `--mix`, `--tor` or `--bridge` is used.
 - **That nobody knows you visited.** The relay you ask sees that you asked
@@ -144,6 +153,68 @@ those are, which is a registry with extra steps.
 A relay can **stay silent**, not lie. That is why the client asks several and
 keeps the highest sequence that verifies: for silence to be worth anything,
 they would all have to be silent.
+
+### 5a.1 Carrying a site, not just naming it
+
+Gossip spreading only records would leave the network in an odd shape: every
+relay knows the name, and the bytes sit on the one machine the publisher
+uploaded to. The pointer becomes the part that cannot be withdrawn and the
+site becomes the part one power cut removes.
+
+So a relay that accepts a record also **fetches the capsule behind it** and
+stores it under the same `capsuleId` and read token. The identifiers are the
+point: a capability is signed and cannot be amended, so a copy is only
+reachable if it answers to the identifier the publisher's record already
+names. `capsuleId` is the content's name across the network rather than one
+relay's filing system.
+
+| Setting                       | Default | What it bounds                                  |
+| ----------------------------- | ------: | ----------------------------------------------- |
+| `CAPSULE_SITE_REPLICATION`    |  `true` | Whether copies are taken at all                 |
+| `CAPSULE_MAX_REPLICA_BYTES`   |  256 MB | Total ciphertext held as copies                 |
+| `CAPSULE_REPLICA_TTL_SECONDS` |     7 d | The lease a copy gets before it must be renewed |
+
+Copies are leases, not archives. Each round renews the ones whose record is
+still gossiped and releases the rest, so a version that has been superseded is
+dropped, and a name the network stops carrying drains away on its own. That is
+also a publisher's route to withdrawing something: publish a newer sequence.
+
+Two things are deliberately never replicated. **Capsules shared as a link**,
+because their key and read token live in a URL fragment no relay ever sees —
+the relay could not fetch one if it wanted to. And **sharded capsules**, where
+each relay holds a shard rather than a copy; splitting a site across relays
+buys confidentiality from any single operator and gives up this.
+
+On the reading side, a capability names the relays that existed when it was
+signed. Clients pass the relays they already know (`relayUrls` on
+`fetchSiteBytes`, `--seed` in the CLI, the extension's relay list) and those
+are tried after the ones in the record, using the same identifier. Losing the
+origin becomes survivable rather than final.
+
+### 5a.2 What an operator will not carry
+
+A relay carrying sites it never chose needs a way to stop carrying one, and
+"stop the relay" is not it: that answers a complaint about one capsule by
+dropping everyone's. `CAPSULE_DENYLIST_FILE` is a JSON file of capsule
+identifiers and `.capsule` names the operator refuses:
+
+```json
+{
+  "capsules": [{ "id": "<capsuleId>", "reason": "your note" }],
+  "sites": [{ "name": "<name>.capsule", "reason": "your note" }]
+}
+```
+
+It is re-read while the relay runs, and what it names is refused at the door,
+dropped from `sites.json` so the relay stops gossiping it, and removed from
+the disk. A denied capsule answers with the same `404` an unknown identifier
+gets, because an operator's refusal is theirs to publish, not the protocol's
+to announce.
+
+Nothing about it is shared. No relay can add to another's list, there is no
+signature and no endpoint that writes to one, and what one relay drops stays
+reachable at every relay that kept it. That is the difference between an exit
+policy and a blocklist, and the reason this is per-operator and nothing else.
 
 ## 5b. Publishing from the web app
 

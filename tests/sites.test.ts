@@ -62,6 +62,12 @@ function relayConfig(storageDir: string): RelayConfig {
     sitesEnabled: true,
     maxSites: 64,
     siteGossipLimit: 32,
+    // Replication reaches across relays, so the tests that want it say so.
+    siteReplication: false,
+    maxReplicaBytes: 1024 * 1024,
+    replicaTtlSeconds: 3_600,
+    denylistFile: join(storageDir, "denylist.json"),
+    denylistReloadMs: 0,
     ipBlind: true,
     mixEnabled: false,
     mixMaxQueued: 16,

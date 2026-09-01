@@ -238,19 +238,40 @@ A conforming production deployment must:
 
 ## 10. Abuse and illegal content
 
-Encryption prevents content-based moderation inside the relay. That protects
-legitimate privacy and can also be abused. The controls are over observable
-behaviour, not inspection of plaintext:
+Two cases that are usually conflated, and are not the same:
+
+- **Capsules.** Encryption prevents content-based moderation inside the relay:
+  the key never arrives, so there is nothing to inspect. The controls are over
+  observable behaviour, not plaintext.
+- **`.capsule` sites.** The record carries the capability and the capability
+  carries the key, so a relay holding a site can read it, and so can anyone
+  who asks that relay for the record. A site is public by construction. With
+  replication on, a relay also holds sites nobody uploaded to it.
+
+The controls, in both cases:
 
 - small maximum TTL and size;
 - rate limiting and quotas per origin, with a documented policy;
 - cleanup of incomplete reservations;
 - a reporting channel that accepts a `capsuleId` without publicly requesting the
   key;
-- the operator's ability to withdraw an identified capsule;
+- **an operator denylist** (`CAPSULE_DENYLIST_FILE`) of capsule identifiers and
+  `.capsule` names: refused at the door, dropped from the gossiped directory,
+  and removed from disk, re-read while running. It is per-operator and shared
+  with nobody — no relay can add to another's, and content one relay drops
+  stays reachable at every relay that kept it. A network-wide list would be a
+  censorship lever with an owner, which is the thing this project exists not
+  to build;
+- bounds on what replication takes on (`CAPSULE_MAX_REPLICA_BYTES`, a renewable
+  lease per copy), and the option not to carry sites at all;
 - minimal log retention, with an explicit and proportionate exception in cases
   of abuse;
 - clear terms that do not claim cryptography avoids liability.
+
+The honest framing for an operator: refusing per item exists so that the
+alternative — shutting the relay down, which drops everyone else's traffic to
+answer one complaint — is not the only working response. It is not a claim that
+the operator is therefore not liable for what they hold.
 
 Blocking by IP can affect NAT, proxies and privacy networks. Every anti-abuse
 control must weigh false positives and must not quietly become a persistent
@@ -359,14 +380,15 @@ be switched off, lose its disk, or be seized. The documentation and the UI say
 Letting anyone run a relay removes a single point of censorship and adds
 surface:
 
-| New risk                                       | Control applied                                                                                    |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| A peer invents relays that do not exist        | Every learned address is probed against `GET /v1/info` and kept only if the identity matches       |
-| An attacker impersonates a relay's identity    | `relayId` is the digest of the public key; the announcement is Ed25519-signed with a ±5 min window |
-| Directory poisoning (Sybil)                    | A `CAPSULE_MAX_PEERS` limit, eviction after repeated failures, and no automatic trust decisions    |
-| SSRF from the relay itself while probing peers | Loopback, link-local, private ranges and CGNAT are refused unless `CAPSULE_ALLOW_PRIVATE_PEERS`    |
-| A mirror widening the observation surface      | Mirroring is explicit and optional; each extra copy is one more operator seeing size and time      |
-| A relay keeps a copy after deletion            | Deletion is best-effort and reported relay by relay; it is never claimed that the copy is gone     |
+| New risk                                       | Control applied                                                                                                                                                                                |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A peer invents relays that do not exist        | Every learned address is probed against `GET /v1/info` and kept only if the identity matches                                                                                                   |
+| An attacker impersonates a relay's identity    | `relayId` is the digest of the public key; the announcement is Ed25519-signed with a ±5 min window                                                                                             |
+| Directory poisoning (Sybil)                    | A `CAPSULE_MAX_PEERS` limit, eviction after repeated failures, and no automatic trust decisions                                                                                                |
+| SSRF from the relay itself while probing peers | Loopback, link-local, private ranges and CGNAT are refused unless `CAPSULE_ALLOW_PRIVATE_PEERS`                                                                                                |
+| SSRF through the relay a site record names     | Same check before replication fetches anything: the record is signed by its publisher, so the URL in it is attacker-chosen. Bodies are capped while reading, not trusted from `Content-Length` |
+| A mirror widening the observation surface      | Mirroring is explicit and optional; each extra copy is one more operator seeing size and time                                                                                                  |
+| A relay keeps a copy after deletion            | Deletion is best-effort and reported relay by relay; it is never claimed that the copy is gone                                                                                                 |
 
 What the network does **not** solve: correlation between relays, real
 jurisdictional diversity, or an operator's reputation. A large directory is not

@@ -275,6 +275,29 @@ version is one click.
 The tab also publishes a **Hello world** in one click, for an hour, so the whole
 path can be seen working before anybody prepares a folder.
 
+### The site does not live on one machine
+
+Publishing puts copies on two other relays by default, and every relay that
+learns the name by gossip fetches the page behind it and answers for it under
+the same identifier. So taking a site down is not a matter of finding the
+machine it was uploaded to — and a visitor whose relay is gone tries the ones
+it knows instead.
+
+Copies are leases, not archives: they are renewed while the record is still
+being gossiped, released when a newer version supersedes them, and bounded by
+what each operator gave up (`CAPSULE_MAX_REPLICA_BYTES`, 256 MB by default).
+Publishing a new sequence is how a publisher withdraws what the network
+copied, and `denylist.json` is how one operator stops carrying something
+without stopping their relay. Neither is a network-wide switch: what one relay
+refuses stays reachable at every relay that kept it.
+
+One thing to be plain about, because it is what makes any of this work: **a
+relay holding a site can read it.** The record carries the capability and the
+capability carries the key, which is what lets a name resolve anywhere without
+a registry. A `.capsule` site is public by construction. Anything that has to
+be private is sent as a capsule, whose key rides in a URL fragment no relay
+ever sees.
+
 ### A directory of sites
 
 ```bash
@@ -434,6 +457,10 @@ every mixed send**: a four-node network is called what it is rather than sold
 as anonymity. Design and limits: [docs/MIXNET.md](docs/MIXNET.md).
 
 ### Survive a relay disappearing
+
+Sites do this on their own: two copies at publish time, plus every relay that
+carries the name afterwards. For a capsule sent as a link, nobody else can
+know it exists, so the copies are yours to ask for.
 
 ```bash
 # Copies on two more relays found in the network

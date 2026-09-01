@@ -210,7 +210,8 @@ export const es: Messages = {
   "publish.workingDetail":
     "Empaquetando el bundle, cifrándolo, y firmando el record que lo apunta.",
   "publish.done": "Publicado",
-  "publish.doneDetail": "Versión {version}, anunciada a {relays} relay(s).",
+  "publish.doneDetail":
+    "Versión {version}, guardada en {copies} relay(s) y anunciada a {relays}. Los relays que aprenden el nombre también guardan una copia.",
   "publish.address": "La dirección",
   "publish.copy": "Copiar",
   "publish.copied": "Copiado",

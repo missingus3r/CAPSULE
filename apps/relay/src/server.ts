@@ -16,12 +16,14 @@ import {
   payloadTooLarge,
 } from "./errors.js";
 import { RelayBridge, loadBridgeKey } from "./bridge.js";
+import { Denylist } from "./denylist.js";
 import { loadRelayIdentity, type RelayIdentity } from "./identity.js";
 import { MixNode, type MixPeer } from "./mix.js";
 import { PeerDirectory, type RelayAnnouncement } from "./peers.js";
 import { PresenceCounter } from "./presence.js";
 import { REALTIME_PAGE } from "./realtime-page.js";
 import { SenderQuota } from "./quota.js";
+import { SiteReplicator } from "./replication.js";
 import { SiteDirectory } from "./sites.js";
 import {
   CapsuleStorage,
@@ -192,7 +194,17 @@ export async function buildRelayServer(
   fastifyOptions: FastifyServerOptions = {},
   runtime: RelayRuntimeOptions = {},
 ): Promise<FastifyInstance> {
-  const storage = new CapsuleStorage(config);
+  // Built before the storage it guards, because the predicate has to exist by
+  // the time a read can happen. It holds no entries until `initialize` runs,
+  // which is after the logger exists and before any route is served.
+  const denylist = new Denylist({
+    path: config.denylistFile,
+    reloadIntervalMs: config.denylistReloadMs,
+    log: (message, details) => app.log.info(details ?? {}, message),
+  });
+  const storage = new CapsuleStorage(config, (capsuleId) =>
+    denylist.deniesCapsule(capsuleId),
+  );
   await storage.initialize();
   const identity =
     runtime.identity ?? (await loadRelayIdentity(config.storageDir));
@@ -305,13 +317,91 @@ export async function buildRelayServer(
 
   const sites = new SiteDirectory({
     maxSites: config.maxSites,
+    denies: (name) => denylist.deniesSite(name),
     // Records live beside the capsules they point at: losing them meant every
     // `.capsule` name a relay knew disappeared on restart, including the ones
     // its own operator had just published.
     storageDir: config.storageDir,
     log: (message, details) => app.log.info(details ?? {}, message),
   });
+  /**
+   * Drops everything the operator now refuses, wherever it already got to.
+   *
+   * Refusing at the door is not enough on its own: a name added to the list
+   * after its record arrived is already held, already being handed to peers,
+   * and — if this relay carries sites — already on the disk. Running the same
+   * purge at startup and on every reload is what makes an entry mean "this
+   * relay does not have that" rather than "this relay stopped accepting more
+   * of that".
+   */
+  const purgeDenied = async (): Promise<void> => {
+    const names = sites.purgeDenied();
+    let capsules = 0;
+    for (const replica of await storage.listReplicas()) {
+      if (!denylist.deniesSite(replica.siteName)) continue;
+      if (await storage.removeAsOperator(replica.capsuleId)) capsules += 1;
+    }
+    for (const capsuleId of denylist.capsuleIds()) {
+      if (await storage.removeAsOperator(capsuleId)) capsules += 1;
+    }
+    if (names.length > 0 || capsules > 0) {
+      app.log.info(
+        { sites: names.length, capsules },
+        "Denied content removed from this relay",
+      );
+    }
+  };
+
+  await denylist.initialize(() => {
+    void purgeDenied().catch((error: unknown) =>
+      app.log.error({ err: error }, "Denylist purge failed"),
+    );
+  });
   if (config.sitesEnabled) await sites.initialize();
+  await purgeDenied();
+
+  /**
+   * Fetches the sites this relay gossips, so a name outlives its origin.
+   *
+   * Runs after each gossip round rather than on a clock of its own: there is
+   * nothing to replicate that did not arrive as a record, and a relay that is
+   * not gossiping is not learning about sites either.
+   */
+  const replicator = new SiteReplicator({
+    config,
+    storage,
+    records: () => sites.all(),
+    deniesSite: (name) => denylist.deniesSite(name),
+    ...(runtime.fetchImpl ? { fetchImpl: runtime.fetchImpl } : {}),
+    log: (message, details) => app.log.info(details ?? {}, message),
+  });
+  let replicationInFlight: Promise<void> | undefined;
+  const runReplication = (): Promise<void> => {
+    if (!config.sitesEnabled || !config.siteReplication)
+      return Promise.resolve();
+    if (replicationInFlight) return replicationInFlight;
+    replicationInFlight = replicator
+      .run()
+      .then((round) => {
+        if (
+          round.adopted !== 0 ||
+          round.released !== 0 ||
+          round.deferred !== 0
+        ) {
+          app.log.info(
+            { ...round, bytes: storage.replicaBytesUsed },
+            "Site replication round completed",
+          );
+        }
+      })
+      .catch((error: unknown) =>
+        app.log.error({ err: error }, "Site replication failed"),
+      )
+      .finally(() => {
+        replicationInFlight = undefined;
+      });
+    return replicationInFlight;
+  };
 
   const isAllowedOrigin = originMatcher(config.corsOrigins);
   // A bridge answers no cross-origin preflight and advertises no policy: those
@@ -656,6 +746,10 @@ ${challenge}`,
             "The site record could not be verified",
           );
         }
+        // A publisher announcing here should not wait for the next gossip
+        // round to be carried, but they should not wait for the download
+        // either: the fetch is started and the answer goes out now.
+        if (outcome === "stored") void runReplication();
         return reply
           .status(outcome === "stored" ? 202 : 200)
           .send({ version: RELAY_API_VERSION, outcome });
@@ -857,6 +951,7 @@ ${challenge}`,
         const records = await syncSites();
         if (records !== 0)
           app.log.info({ records, known: sites.size }, "Site records updated");
+        await runReplication();
       })
       .catch((error: unknown) =>
         app.log.error({ err: error }, "Relay directory sync failed"),
@@ -895,6 +990,7 @@ ${challenge}`,
       void peers
         .sync()
         .then(() => syncSites())
+        .then(() => runReplication())
         .catch((error: unknown) =>
           app.log.warn({ err: error }, "Relay bootstrap attempt failed"),
         )
@@ -1097,8 +1193,10 @@ ${challenge}`,
     bootstrapTimers.clear();
     peers.close();
     mix.stop();
+    denylist.stop();
     await cleanupInFlight;
     await peerSyncInFlight;
+    await replicationInFlight;
     await sites.flush();
   });
 

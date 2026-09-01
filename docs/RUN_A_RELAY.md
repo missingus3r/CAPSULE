@@ -10,8 +10,9 @@ already know, and from there they introduce themselves to each other.
 ## 1. What a relay is and is not
 
 A relay stores ciphertext and hands it to whoever presents the right
-capability. It **cannot** read the content, the filename or the note: all of
-that travels encrypted and the key never leaves the sender's device.
+capability. For a capsule sent as a link it **cannot** read the content, the
+filename or the note: all of that travels encrypted and the key rides in a URL
+fragment that browsers never send to a server.
 
 What your relay does see, and therefore what you take on as an operator:
 
@@ -19,11 +20,18 @@ What your relay does see, and therefore what you take on as an operator:
 - the time and volume of each transfer;
 - the size class of each capsule (the exact size only if the sender did not
   pad);
-- how many times a capsule was read.
+- how many times a capsule was read;
+- **the full content of every `.capsule` site you hold**, because a site
+  record carries the capability and the capability carries the key. That is
+  what makes a name resolvable at any relay without a registry, and it means a
+  site is public to you exactly as it is public to its readers.
 
-Running a relay means hosting data you cannot inspect. Read
-[the threat model](./THREAT_MODEL.md), particularly the section on abuse and
-illegal content, before exposing one to the internet.
+So there are two different jobs in one process. Hosting capsules means holding
+data you cannot inspect. Hosting sites means holding public pages you can read
+and did not choose — including, if replication is on, pages that reached you
+by gossip rather than by upload. Section 6 is about what you can do in each
+case. Read [the threat model](./THREAT_MODEL.md), particularly the section on
+abuse and illegal content, before exposing a relay to the internet.
 
 ## 2. Minimum start
 
@@ -226,10 +234,73 @@ CAPSULE_RATE_LIMIT_MAX=300
 CAPSULE_CREATE_RATE_LIMIT_MAX=30
 ```
 
-You cannot moderate by content: you cannot see it. What you can do is bound
-size, time and frequency, publish a policy and a contact route, and delete by
-`capsuleId` when you receive a well-founded complaint. Write that decision into
-your own policy before the first complaint arrives, not after.
+For capsules you cannot moderate by content: you cannot see it. What you can
+do is bound size, time and frequency, publish a policy and a contact route,
+and refuse a specific `capsuleId` when you receive a well-founded complaint.
+For sites you can also read what you hold, so "I could not know" is not
+available to you the way it is for capsules.
+
+Refusing is a file:
+
+```json
+// data/denylist.json
+{
+  "capsules": [{ "id": "<capsuleId>", "reason": "your note" }],
+  "sites": [{ "name": "<name>.capsule", "reason": "your note" }]
+}
+```
+
+```bash
+CAPSULE_DENYLIST_FILE=./data/denylist.json   # the default, inside your data dir
+CAPSULE_DENYLIST_RELOAD_MS=15000             # re-read while running; 0 = at startup only
+```
+
+Adding an entry does three things at once, and it needs all three to be worth
+anything: the content is refused at the door, dropped from `sites.json` so
+this relay stops gossiping the name, and removed from the disk. Without the
+first, gossip hands the record straight back on the next round. Without the
+third, you are still hosting it. A denied capsule then answers with the same
+`404` as an identifier that was never here.
+
+Two properties worth being explicit about, because they are the reason this is
+a file and not an endpoint:
+
+- **Nobody can add to your list but you.** No relay, no peer, no request. What
+  you refuse says nothing about what anyone else serves, and content you drop
+  stays reachable at every relay that kept it. This is an exit policy, not a
+  blocklist.
+- **It is not a substitute for a policy.** The tool decides nothing for you.
+  Write down what you will act on and where complaints reach you before the
+  first one arrives, not after.
+
+What this replaces is worse: an operator whose only working answer to a
+complaint is `systemctl stop` takes every other capsule on the machine down to
+deal with one.
+
+## 6b. Sites you did not upload
+
+If `CAPSULE_SITES_ENABLED` is on, your relay gossips `.capsule` records. If
+`CAPSULE_SITE_REPLICATION` is also on — it is by default — it fetches the
+pages behind them too, and answers for them under the same identifiers the
+publisher's record names.
+
+```bash
+CAPSULE_SITE_REPLICATION=true
+CAPSULE_MAX_REPLICA_BYTES=268435456   # 256 MB of copies, total
+CAPSULE_REPLICA_TTL_SECONDS=604800    # each copy is a week's lease, renewed while gossiped
+```
+
+This is what makes a `.capsule` name survive the loss of the machine it was
+published to, and it is the only part of the design where you store something
+nobody handed you. Copies are leases: each round renews the ones whose record
+is still being gossiped and releases the rest, so superseded versions go and a
+name the network stops carrying drains away. Private capsules are never
+replicated — their keys never reach any relay — and neither are sharded ones.
+
+Turn it off with `CAPSULE_SITE_REPLICATION=false` and your relay holds only
+what was uploaded to it. Leave it on and the network stops depending on any
+single host, which is the whole point of the thing. Either way, section 6 is
+how you drop one you do not want.
 
 ## 7. Sharded capsules
 
@@ -361,7 +432,12 @@ only network there is.
 - [ ] Size and TTL limits that match your disk.
 - [ ] Capsules without expiry: the 1 GiB default is a decision even when you
       leave it alone. Raise it, lower it, or turn it off, but know which.
-- [ ] An abuse policy and a contact route published.
+- [ ] An abuse policy and a contact route published, and a `denylist.json`
+      path you know how to edit at 3am.
+- [ ] Decided whether you carry sites published elsewhere
+      (`CAPSULE_SITE_REPLICATION`, on by default) and with how much disk
+      (`CAPSULE_MAX_REPLICA_BYTES`, 256 MB by default). Sites you carry are
+      pages you can read and did not pick.
 - [ ] `CAPSULE_ALLOW_PRIVATE_PEERS=false` (this is the anti-SSRF brake).
 - [ ] `curl /v1/info` and `/v1/peers` answer from outside your network.
 - [ ] Decided whether the mix node stays on, and with how much cover.

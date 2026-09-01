@@ -41,6 +41,12 @@ export interface SiteDirectoryOptions {
    */
   storageDir?: string;
   log?: (message: string, details?: Record<string, unknown>) => void;
+  /**
+   * Names this operator will not carry. Asked on every acceptance rather than
+   * filtered on the way out: a record that is merely hidden is still gossiped
+   * onward, and one that is merely deleted comes back on the next round.
+   */
+  denies?: (name: string) => boolean;
   /** Injected in tests. */
   now?: () => number;
 }
@@ -163,6 +169,7 @@ export class SiteDirectory {
 
     const parsed = await parseSiteName(record.name);
     if (!parsed || parsed.name !== record.name) return "rejected";
+    if (this.options.denies?.(parsed.name)) return "rejected";
     if (!(await verifySiteRecord(record, { now: this.now() }))) {
       return "rejected";
     }
@@ -188,6 +195,29 @@ export class SiteDirectory {
       receivedAt,
     });
     return "stored";
+  }
+
+  /**
+   * Drops what the operator has since refused.
+   *
+   * Called when the denylist changes, because acceptance only guards the
+   * door: a name added to the list after its record arrived would otherwise
+   * keep being served, and keep being handed to every peer that asks.
+   */
+  purgeDenied(): string[] {
+    const dropped: string[] = [];
+    for (const name of [...this.records.keys()]) {
+      if (!this.options.denies?.(name)) continue;
+      this.records.delete(name);
+      dropped.push(name);
+    }
+    if (dropped.length > 0) this.schedulePersist();
+    return dropped;
+  }
+
+  /** Every record held, for the replicator. Ordering is not meaningful. */
+  all(): CapsuleSiteRecord[] {
+    return [...this.records.values()].map((entry) => entry.record);
   }
 
   get(name: string): CapsuleSiteRecord | undefined {
