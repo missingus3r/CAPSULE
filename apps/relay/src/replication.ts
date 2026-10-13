@@ -41,6 +41,15 @@ import type { CapsuleStorage } from "./storage.js";
  * - **Anything the operator refuses.** The denylist is consulted for the name
  *   and for the identifier, before a byte is fetched.
  *
+ * It is also where a relay finds out that a site is gone. Looking for a copy
+ * means asking every relay the record names, and when each of them answers
+ * that it has no such capsule — answers, not fails to answer — and this relay
+ * has none either, the record points at nothing. After that has been true for
+ * several rounds in a row the record is forgotten, so this relay stops telling
+ * visitors and peers that the name resolves. A relay that is down, slow or
+ * broken never counts: silence is not the same as "no", and a name must not
+ * be lost to an outage.
+ *
  * And one thing it has to be careful about. The relay a record names is a
  * string its publisher chose, so this is the one place where a relay makes
  * requests to an address an untrusted party picked — the same shape as the
@@ -55,6 +64,8 @@ export interface SiteReplicatorOptions {
   /** The records this relay currently holds. */
   records: () => CapsuleSiteRecord[];
   deniesSite: (name: string) => boolean;
+  /** Stops carrying a record whose site is gone. Returns whether it did. */
+  forget?: (record: CapsuleSiteRecord) => boolean;
   fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>;
   log?: (message: string, details?: Record<string, unknown>) => void;
   now?: () => number;
@@ -71,7 +82,23 @@ export interface ReplicationRound {
   failed: number;
   /** Sites left unfetched because the byte budget is full. */
   deferred: number;
+  /** Records dropped because every relay they name says the site is gone. */
+  forgotten: number;
 }
+
+/**
+ * Rounds in a row a site has to be gone before its record is forgotten.
+ *
+ * One answer is not enough to act on: a relay restarting, or a proxy in front
+ * of it misrouting for a minute, can say "not found" about something that is
+ * there. Forgetting is the one thing here that is not undone by waiting.
+ */
+const GONE_ROUNDS = 3;
+
+/** What a relay says, in its own words, about a capsule it does not have. */
+const GONE_CODES = new Set(["capsule_not_found", "capsule_expired"]);
+
+class CapsuleGone extends Error {}
 
 const STATUS_TIMEOUT_MS = 10_000;
 const TRANSFER_TIMEOUT_MS = 60_000;
@@ -115,6 +142,8 @@ export class SiteReplicator {
   ) => Promise<Response>;
   private readonly now: () => number;
   private running = false;
+  /** Rounds in a row each record's site has been gone, by name and version. */
+  private readonly goneRounds = new Map<string, number>();
 
   constructor(private readonly options: SiteReplicatorOptions) {
     this.request =
@@ -138,6 +167,7 @@ export class SiteReplicator {
       released: 0,
       failed: 0,
       deferred: 0,
+      forgotten: 0,
     };
     if (this.running || !this.options.config.siteReplication) return round;
     this.running = true;
@@ -163,6 +193,7 @@ export class SiteReplicator {
         this.now() + this.options.config.replicaTtlSeconds * 1000,
       ).toISOString();
 
+      const stillGone = new Map<string, number>();
       for (const [capsuleId, record] of wanted) {
         const capability = this.capabilityOf(record);
         if (!capability) continue;
@@ -183,7 +214,25 @@ export class SiteReplicator {
         if (outcome === "stored") round.adopted += 1;
         else if (outcome === "no_space") round.deferred += 1;
         else if (outcome === "failed") round.failed += 1;
+        else if (outcome === "gone") {
+          round.failed += 1;
+          const key = `${record.name}#${record.sequence}`;
+          const rounds = (this.goneRounds.get(key) ?? 0) + 1;
+          if (rounds < GONE_ROUNDS) {
+            stillGone.set(key, rounds);
+          } else if (this.options.forget?.(record)) {
+            round.forgotten += 1;
+            this.options.log?.("Forgot a site that is gone", {
+              name: record.name,
+              sequence: record.sequence,
+            });
+          }
+        }
       }
+      // Whatever was not gone this round starts over: the count is of rounds
+      // in a row, and one good answer breaks the row.
+      this.goneRounds.clear();
+      for (const [key, rounds] of stillGone) this.goneRounds.set(key, rounds);
     } finally {
       this.running = false;
     }
@@ -206,7 +255,7 @@ export class SiteReplicator {
     record: CapsuleSiteRecord,
     capability: CapsuleShareCapability,
     expiresAt: string,
-  ): Promise<"stored" | "held" | "no_space" | "failed"> {
+  ): Promise<"stored" | "held" | "no_space" | "failed" | "gone"> {
     const locations: CapsuleLocation[] = [
       {
         relayUrl: capability.relayUrl,
@@ -215,6 +264,10 @@ export class SiteReplicator {
       },
       ...(capability.mirrors ?? []),
     ];
+    // Gone means every relay the record names said so. One that could not be
+    // asked, did not answer, or has the capsule in any state at all leaves the
+    // question open.
+    let gone = true;
 
     for (const location of locations) {
       if (
@@ -223,14 +276,17 @@ export class SiteReplicator {
           this.options.config.allowPrivatePeers,
         ))
       ) {
+        gone = false;
         continue;
       }
       let status: RemoteStatus;
       try {
         status = await this.json(location, "status");
-      } catch {
+      } catch (error) {
+        if (!(error instanceof CapsuleGone)) gone = false;
         continue;
       }
+      gone = false;
       if (
         status.state !== "ready" ||
         !Number.isSafeInteger(status.chunkCount) ||
@@ -280,7 +336,7 @@ export class SiteReplicator {
         continue;
       }
     }
-    return "failed";
+    return gone ? "gone" : "failed";
   }
 
   private async json<T>(location: CapsuleLocation, path: string): Promise<T> {
@@ -322,8 +378,31 @@ export class SiteReplicator {
       },
     );
     if (!response.ok) {
+      if (await this.saysGone(response)) {
+        throw new CapsuleGone(`${base} no longer has the capsule`);
+      }
       throw new Error(`${base} answered ${response.status} for ${path}`);
     }
     return response;
+  }
+
+  /**
+   * Whether a refusal is a relay saying the capsule does not exist.
+   *
+   * The status alone is not that. A 404 is also what a proxy answers for a
+   * path it does not route and what a host answers after the relay moved, and
+   * neither knows anything about the capsule. Only the relay's own error is
+   * taken as an answer.
+   */
+  private async saysGone(response: Response): Promise<boolean> {
+    if (response.status !== 404 && response.status !== 410) return false;
+    try {
+      const body = JSON.parse(
+        (await readCapped(response, MAX_STATUS_BYTES)).toString("utf8"),
+      ) as { code?: unknown };
+      return typeof body.code === "string" && GONE_CODES.has(body.code);
+    } catch {
+      return false;
+    }
   }
 }

@@ -372,6 +372,7 @@ export async function buildRelayServer(
     storage,
     records: () => sites.all(),
     deniesSite: (name) => denylist.deniesSite(name),
+    forget: (record) => sites.forget(record.name, record.sequence),
     ...(runtime.fetchImpl ? { fetchImpl: runtime.fetchImpl } : {}),
     log: (message, details) => app.log.info(details ?? {}, message),
   });
@@ -386,7 +387,8 @@ export async function buildRelayServer(
         if (
           round.adopted !== 0 ||
           round.released !== 0 ||
-          round.deferred !== 0
+          round.deferred !== 0 ||
+          round.forgotten !== 0
         ) {
           app.log.info(
             { ...round, bytes: storage.replicaBytesUsed },

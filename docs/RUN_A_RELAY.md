@@ -456,7 +456,24 @@ several relays and keep the highest version that verifies. A silent relay is
 indistinguishable from a dead one, and suppressing an update requires every
 relay the visitor asks to be silent.
 
-### 9.3 If you would rather not take part
+### 9.3 A name whose site is gone is forgotten
+
+A record outlives the capsule it points at: the capsule expires or is deleted
+and the signed line saying where it was is still valid. A relay that kept
+serving it would tell every visitor that the name resolves and hand every peer
+the same dead end.
+
+So when your relay looks for a copy of a site and **every relay the record
+names answers that it has no such capsule**, three gossip rounds in a row, and
+yours has none either, it forgets that version of the name. A relay that is
+down or not answering never counts: only a relay's own "not found" does, so an
+outage cannot cost anybody a name. The same version arriving again from a peer
+is declined; the publisher publishing a newer one brings the name back.
+
+This runs as part of carrying sites, so a relay with
+`CAPSULE_SITE_REPLICATION=false` keeps every record it is given.
+
+### 9.4 If you would rather not take part
 
 `CAPSULE_SITES_ENABLED=false` turns off the three endpoints and the record
 gossip. Your relay keeps storing capsules and being a mix node. It is a

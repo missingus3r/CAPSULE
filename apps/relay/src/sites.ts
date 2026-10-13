@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   MAX_SITE_CAPABILITY_LENGTH,
+  MAX_SITE_RECORD_AGE_MS,
   parseSiteName,
   verifySiteRecord,
   type CapsuleSiteRecord,
@@ -56,10 +57,22 @@ export interface StoredSiteRecord {
   receivedAt: number;
 }
 
+/**
+ * A version of a name this relay stopped carrying because the site behind it
+ * is gone. Kept so the same version is not taken back from the next peer that
+ * still gossips it; a newer version from the publisher clears it.
+ */
+interface ForgottenSite {
+  name: string;
+  sequence: number;
+  forgottenAt: number;
+}
+
 export type SiteAcceptance = "stored" | "superseded" | "rejected";
 
 export class SiteDirectory {
   private readonly records = new Map<string, StoredSiteRecord>();
+  private readonly forgotten = new Map<string, ForgottenSite>();
   private readonly now: () => number;
   private readonly path: string | undefined;
   /** A write in flight, and whether another is owed after it. */
@@ -105,6 +118,8 @@ export class SiteDirectory {
       }
       return;
     }
+
+    this.restoreForgotten((parsed as { forgotten?: unknown })?.forgotten);
 
     const entries = (parsed as { records?: unknown })?.records;
     if (!Array.isArray(entries)) return;
@@ -176,6 +191,12 @@ export class SiteDirectory {
 
     const held = this.records.get(parsed.name);
     if (held && held.record.sequence >= record.sequence) return "superseded";
+    // A version whose site is gone is not news, however many peers still
+    // repeat it. Only the publisher moving the sequence forward brings the
+    // name back.
+    const forgotten = this.forgotten.get(parsed.name);
+    if (forgotten && forgotten.sequence >= record.sequence) return "superseded";
+    this.forgotten.delete(parsed.name);
 
     if (!held && this.records.size >= this.options.maxSites) {
       if (!this.evictOldest()) return "rejected";
@@ -213,6 +234,51 @@ export class SiteDirectory {
     }
     if (dropped.length > 0) this.schedulePersist();
     return dropped;
+  }
+
+  /**
+   * Stops carrying a name whose site no longer exists anywhere it was said to
+   * be.
+   *
+   * A record is a pointer, and a pointer to nothing is worse than no answer:
+   * a visitor is told the name resolves and then finds no site behind it, and
+   * every peer that asks is handed the same dead end to pass on. The caller
+   * decides that the site is gone; this only makes the decision stick, for
+   * that version and no later one.
+   */
+  forget(name: string, sequence: number): boolean {
+    const held = this.records.get(name);
+    if (!held || held.record.sequence !== sequence) return false;
+    this.records.delete(name);
+    this.forgotten.delete(name);
+    this.forgotten.set(name, { name, sequence, forgottenAt: this.now() });
+    while (this.forgotten.size > this.options.maxSites) {
+      const oldest = this.forgotten.keys().next().value;
+      if (oldest === undefined) break;
+      this.forgotten.delete(oldest);
+    }
+    this.schedulePersist();
+    return true;
+  }
+
+  /**
+   * Reads back which versions were forgotten, so a restart does not undo it.
+   *
+   * Nothing here is trusted further than it can hurt: an entry can only ever
+   * make this relay decline a version of a name, and it lapses once a record
+   * that old would be refused for its age anyway.
+   */
+  private restoreForgotten(entries: unknown): void {
+    if (!Array.isArray(entries)) return;
+    for (const entry of entries.slice(-this.options.maxSites)) {
+      const { name, sequence, forgottenAt } = (entry ?? {}) as ForgottenSite;
+      if (typeof name !== "string" || !Number.isSafeInteger(sequence)) continue;
+      if (typeof forgottenAt !== "number" || !Number.isFinite(forgottenAt)) {
+        continue;
+      }
+      if (this.now() - forgottenAt > MAX_SITE_RECORD_AGE_MS) continue;
+      this.forgotten.set(name, { name, sequence, forgottenAt });
+    }
   }
 
   /** Every record held, for the replicator. Ordering is not meaningful. */
@@ -275,6 +341,7 @@ export class SiteDirectory {
     const payload = {
       schemaVersion: SITES_SCHEMA_VERSION,
       records: [...this.records.values()],
+      forgotten: [...this.forgotten.values()],
     };
     await mkdir(dirname(path), { recursive: true, mode: 0o700 });
     // Written beside the target and renamed over it, so a relay killed

@@ -8,6 +8,17 @@ what stopped being true. The format follows
 
 ### Fixed
 
+- **A relay kept answering for names with no site behind them.** A record
+  outlives the capsule it points at, so once a site expired or was deleted its
+  name still resolved, to nothing, and was still handed to every peer that
+  asked. The genesis relay was listing three such names and its own index was
+  asking for them every fifteen minutes. A relay now forgets a version of a
+  name when every relay the record names answers that the capsule does not
+  exist, three gossip rounds in a row, and it holds no copy itself. Only a
+  relay's own "not found" counts: one that is down, slow or misrouted leaves
+  the record alone, so an outage cannot cost anybody a name. The forgotten
+  version is declined if a peer gossips it back, and a newer one from the
+  publisher brings the name back.
 - **`.capsule` addresses did not open at all.** The extension declared no host
   permission, and a `declarativeNetRequest` **redirect** rule, unlike `block`,
   only applies where the extension holds host access to the address being

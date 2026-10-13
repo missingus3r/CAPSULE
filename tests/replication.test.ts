@@ -6,12 +6,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { RelayConfig } from "../apps/relay/src/config.js";
 import { buildRelayServer } from "../apps/relay/src/server.js";
 import {
+  type CapsuleOwnerCapability,
   siteContentType,
   type SiteFile,
 } from "../packages/protocol/src/index.js";
 import {
   announceSiteRecord,
   createSiteIdentity,
+  deleteCapsule,
   fetchSiteBundle,
   publishSite,
   resolveSite,
@@ -338,6 +340,88 @@ describe("site replication", () => {
       ),
     ).toBe(false);
     // Still resolvable: refusing to dial an address is not refusing the name.
+    expect(
+      (await resolveSite(identity.name, [carrier.url]))?.record.sequence,
+    ).toBe(1);
+  });
+});
+
+/**
+ * A relay that keeps gossiping, so replication rounds keep coming. The peer it
+ * is pointed at does not exist: nothing here depends on one answering.
+ */
+function gossiping(config: RelayConfig): void {
+  config.peerSyncIntervalMs = 40;
+  config.peers = ["http://127.0.0.1:9"];
+}
+
+describe("a site that is gone", () => {
+  it("is forgotten once every relay it names says so, and not taken back", async () => {
+    const origin = await startRelay(gossiping);
+    const { identity } = await createSiteIdentity();
+
+    const published = await publishSite({
+      identity,
+      files: [page("index.html", "<h1>briefly</h1>")],
+      relayUrl: origin.url,
+      ttlSeconds: 600,
+      sequence: 1,
+    });
+    expect(
+      (await resolveSite(identity.name, [origin.url]))?.record.sequence,
+    ).toBe(1);
+
+    // The capsule goes and the record stays: a name that resolves to nothing,
+    // which is what an expired site looked like to every visitor and to every
+    // peer this relay handed the record to.
+    await deleteCapsule(
+      JSON.parse(published.ownerCapability) as CapsuleOwnerCapability,
+    );
+    await until(
+      async () =>
+        (await resolveSite(identity.name, [origin.url])) === undefined,
+      "the relay to stop answering for a name with no site behind it",
+    );
+
+    // The same version arriving again, as it would from any peer that still
+    // gossips it, is not news.
+    await announceSiteRecord(published.record, [origin.url]);
+    expect(await resolveSite(identity.name, [origin.url])).toBeUndefined();
+
+    // Forgetting a version is not refusing the name: the publisher moving the
+    // sequence forward brings it back.
+    await publishSite({
+      identity,
+      files: [page("index.html", "<h1>again</h1>")],
+      relayUrl: origin.url,
+      ttlSeconds: 600,
+      sequence: 2,
+    });
+    expect(
+      (await resolveSite(identity.name, [origin.url]))?.record.sequence,
+    ).toBe(2);
+  });
+
+  it("is not forgotten because its relay stopped answering", async () => {
+    const origin = await startRelay();
+    const carrier = await startRelay(gossiping);
+    const { identity } = await createSiteIdentity();
+
+    const published = await publishSite({
+      identity,
+      files: [page("index.html", "<h1>offline</h1>")],
+      relayUrl: origin.url,
+      ttlSeconds: 600,
+      sequence: 1,
+    });
+    await origin.app.close();
+    servers.splice(servers.indexOf(origin.app), 1);
+
+    // The carrier never got a copy and cannot get one now. That is an outage,
+    // not an answer: silence from a relay says nothing about what it holds.
+    await announceSiteRecord(published.record, [carrier.url]);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     expect(
       (await resolveSite(identity.name, [carrier.url]))?.record.sequence,
     ).toBe(1);
