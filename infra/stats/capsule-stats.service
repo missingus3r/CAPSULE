@@ -1,0 +1,17 @@
+[Unit]
+Description=Record what the CAPSULE relay's /v1/realtime says
+After=capsule-relay.service
+
+[Service]
+Type=oneshot
+# Any unprivileged account will do: it reads a public endpoint on loopback
+# and appends to one file. StateDirectory creates /var/lib/capsule-stats,
+# owned by that account and readable by everyone, since it holds only counts.
+User=nobody
+StateDirectory=capsule-stats
+StateDirectoryMode=0755
+ExecStart=/usr/bin/python3 /opt/capsule/infra/stats/capsule-stats.py sample
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true

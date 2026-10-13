@@ -278,6 +278,30 @@ nothing: the relay keeps a salted digest of the address for the length of the
 window, which is the same value rate limiting already keeps, and the salt
 rotates, so a digest cannot be followed from one window into the next.
 
+The two peaks and the date counting began are kept in `presence.json` in the
+data directory, so they belong to the relay rather than to the process: a
+restart does not send them back to zero. That file is three numbers and nothing
+about anybody.
+
+**A history, if you want one.** The relay keeps no series of its own, on
+purpose. `infra/stats/` has a small script and a systemd timer that record what
+`/v1/realtime` says every five minutes, as counts in a CSV file an operator
+owns:
+
+```bash
+sudo cp infra/stats/capsule-stats.service infra/stats/capsule-stats.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now capsule-stats.timer
+
+# later: one line per day, average and highest
+python3 infra/stats/capsule-stats.py report
+```
+
+It expects the repository at `/opt/capsule` and the relay on
+`127.0.0.1:8787`; `CAPSULE_STATS_RELAY` and `CAPSULE_STATS_FILE` change either.
+What it writes is what the page already shows to anybody, so it adds nothing a
+visitor could not have collected themselves.
+
 ## 5. Operational privacy
 
 ```bash

@@ -20,7 +20,11 @@ import { Denylist } from "./denylist.js";
 import { loadRelayIdentity, type RelayIdentity } from "./identity.js";
 import { MixNode, type MixPeer } from "./mix.js";
 import { PeerDirectory, type RelayAnnouncement } from "./peers.js";
-import { PresenceCounter } from "./presence.js";
+import {
+  PresenceCounter,
+  readPresenceRecord,
+  writePresenceRecord,
+} from "./presence.js";
 import { REALTIME_PAGE } from "./realtime-page.js";
 import { SenderQuota } from "./quota.js";
 import { SiteReplicator } from "./replication.js";
@@ -453,7 +457,30 @@ export async function buildRelayServer(
    * counts: the realtime page polls itself, and a page watching a number
    * should not be part of the number.
    */
-  const presence = new PresenceCounter();
+  const presence = new PresenceCounter(
+    undefined,
+    undefined,
+    await readPresenceRecord(config.storageDir),
+  );
+  /**
+   * Keeps the peaks and the start of counting across a restart. Only when
+   * they changed, which is rare: a peak is by definition not broken often.
+   */
+  let presenceWrite: Promise<void> = Promise.resolve();
+  const keepPresence = (): Promise<void> => {
+    const record = presence.takeRecord();
+    if (!record) return presenceWrite;
+    presenceWrite = presenceWrite
+      .then(() => writePresenceRecord(config.storageDir, record))
+      .catch((error: unknown) =>
+        app.log.warn(
+          { err: error },
+          "Could not write the presence record; peaks will not survive a restart.",
+        ),
+      );
+    return presenceWrite;
+  };
+  await keepPresence();
   app.addHook("onRequest", async (request) => {
     const url = request.url ?? "";
     if (!url.startsWith("/v1/") || url.startsWith("/v1/realtime")) return;
@@ -561,7 +588,11 @@ export async function buildRelayServer(
     maxChunkCount: config.maxChunkCount,
   });
 
-  app.get("/v1/realtime", async () => presence.snapshot(peers.size));
+  app.get("/v1/realtime", async () => {
+    const snapshot = presence.snapshot(peers.size);
+    void keepPresence();
+    return snapshot;
+  });
 
   /**
    * A page rather than a document nobody reads: an operator, or anybody at
@@ -1200,6 +1231,10 @@ ${challenge}`,
     await peerSyncInFlight;
     await replicationInFlight;
     await sites.flush();
+    // The relay count only reaches the counter when somebody reads it, so it
+    // is read once more here: a peak nobody looked at is still kept.
+    presence.snapshot(peers.size);
+    await keepPresence();
   });
 
   return app;

@@ -59,6 +59,15 @@ what stopped being true. The format follows
 
 ### Added
 
+- **A relay's peaks survive a restart, and an operator can keep a history.**
+  The peaks on `/realtime` and the date counting began went back to zero every
+  time the process restarted, so "peak" meant "since the last deploy". They
+  are now kept in `presence.json` in the data directory: three numbers and
+  nothing about anybody. A peak is also noticed when it happens rather than
+  only when somebody is looking at the page. The relay still keeps no series
+  of its own; `infra/stats/` has a script and a systemd timer for an operator
+  who wants one, recording the same counts the page shows every five minutes.
+
 - **A relay can share a host with another site.** A relay address was an
   origin and nothing else, so a relay needed a hostname to itself. It may now
   carry the path it is mounted under, `https://host.example/relay`, and that

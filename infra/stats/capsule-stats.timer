@@ -1,0 +1,12 @@
+[Unit]
+Description=Sample the CAPSULE relay every five minutes
+
+[Timer]
+# The relay counts addresses seen in the last five minutes, so one sample per
+# window reads each window once.
+OnCalendar=*:0/5
+AccuracySec=10s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

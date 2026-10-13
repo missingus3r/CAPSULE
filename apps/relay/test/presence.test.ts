@@ -1,5 +1,12 @@
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PresenceCounter } from "../src/presence.js";
+import {
+  PresenceCounter,
+  readPresenceRecord,
+  writePresenceRecord,
+} from "../src/presence.js";
 
 /**
  * What the counter must and must not do.
@@ -69,6 +76,74 @@ describe("counting who is here", () => {
     // Everything aged out, so the map is empty rather than holding five
     // hundred digests for the life of the process.
     expect(counter.snapshot(0).clients).toBe(0);
+  });
+});
+
+describe("what survives a restart", () => {
+  it("picks up the peaks and the start of counting where it left them", () => {
+    const counter = new PresenceCounter(60_000, () => 5_000_000, {
+      clientsPeak: 7,
+      relaysPeak: 3,
+      since: "2026-08-30T23:34:00.000Z",
+    });
+    counter.see("a");
+    const snapshot = counter.snapshot(1);
+    // One address now, seven at most ever: the peak is the relay's, not the
+    // process's.
+    expect(snapshot.clients).toBe(1);
+    expect(snapshot.clientsPeak).toBe(7);
+    expect(snapshot.relaysPeak).toBe(3);
+    expect(snapshot.since).toBe("2026-08-30T23:34:00.000Z");
+  });
+
+  it("notices a peak nobody was watching", () => {
+    const counter = new PresenceCounter();
+    counter.takeRecord();
+    counter.see("a");
+    counter.see("b");
+    // Nothing read the counter between those requests and this line.
+    expect(counter.takeRecord()?.clientsPeak).toBe(2);
+  });
+
+  it("asks to be written once per change, not once per request", () => {
+    const counter = new PresenceCounter();
+    // A relay counting for the first time has a start to remember.
+    expect(counter.takeRecord()?.clientsPeak).toBe(0);
+    expect(counter.takeRecord()).toBeUndefined();
+
+    counter.see("a");
+    expect(counter.takeRecord()?.clientsPeak).toBe(1);
+    counter.see("a");
+    counter.snapshot(0);
+    expect(counter.takeRecord()).toBeUndefined();
+  });
+
+  it("keeps three numbers on disk and nothing about anybody", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "capsule-presence-"));
+    try {
+      expect(await readPresenceRecord(directory)).toBeUndefined();
+
+      const counter = new PresenceCounter();
+      counter.see("an-address-digest");
+      const record = counter.takeRecord();
+      if (!record) throw new Error("expected a record to keep");
+      await writePresenceRecord(directory, record);
+
+      const written = await readFile(join(directory, "presence.json"), "utf8");
+      expect(Object.keys(JSON.parse(written) as object).sort()).toEqual([
+        "clientsPeak",
+        "relaysPeak",
+        "since",
+      ]);
+      expect(written).not.toContain("an-address-digest");
+      expect(await readPresenceRecord(directory)).toEqual(record);
+
+      // A file somebody edited by hand costs a peak, not a relay that starts.
+      await writeFile(join(directory, "presence.json"), '{"clientsPeak":-1}');
+      expect(await readPresenceRecord(directory)).toBeUndefined();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
 
