@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path";
+import { canonicalRelayUrl } from "@capsule/protocol";
 
 export interface RelayConfig {
   host: string;
@@ -179,14 +180,15 @@ function originFromEnvironment(
   const raw = environment[name]?.trim();
   if (!raw) return undefined;
   const url = new URL(raw);
-  if (
-    (url.protocol !== "http:" && url.protocol !== "https:") ||
-    url.username ||
-    url.password
-  ) {
-    throw new Error(`${name} must be an HTTP(S) origin without credentials`);
+  // The path survives: a relay behind a proxy that also serves another site is
+  // reached at `https://host/relay`, and that is the address it must announce.
+  const canonical = canonicalRelayUrl(url);
+  if (canonical === undefined) {
+    throw new Error(
+      `${name} must be an HTTP(S) origin, or an origin and the path the relay is mounted under, without credentials, query or fragment`,
+    );
   }
-  return url.origin;
+  return canonical;
 }
 
 function peersFromEnvironment(environment: NodeJS.ProcessEnv): string[] {
@@ -200,7 +202,9 @@ function peersFromEnvironment(environment: NodeJS.ProcessEnv): string[] {
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       throw new Error(`Invalid peer relay: ${value}`);
     }
-    if (!peers.includes(url.origin)) peers.push(url.origin);
+    const peer = canonicalRelayUrl(url);
+    if (peer === undefined) throw new Error(`Invalid peer relay: ${value}`);
+    if (!peers.includes(peer)) peers.push(peer);
   }
   return peers;
 }

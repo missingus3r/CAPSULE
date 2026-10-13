@@ -11,6 +11,7 @@
 import { newRelayChallenge, verifyRelayIdentity } from "@capsule/protocol";
 import {
   RELAY_API_VERSION,
+  canonicalRelayUrl,
   isPublicRelayOrigin,
   isRelayOrigin,
 } from "@capsule/protocol";
@@ -84,7 +85,11 @@ function normalizeOrigin(value: string): string {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("A relay URL must use HTTP or HTTPS");
   }
-  return url.origin;
+  // Keeps the path a relay is mounted under, and nothing else that came with
+  // the address: a query or a fragment is not part of where a relay lives.
+  return (
+    canonicalRelayUrl(new URL(`${url.origin}${url.pathname}`)) ?? url.origin
+  );
 }
 
 function readInteger(value: unknown, minimum = 0): number | undefined {

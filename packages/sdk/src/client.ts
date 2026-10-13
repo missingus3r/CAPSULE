@@ -2,6 +2,7 @@ import {
   RELAY_API_VERSION,
   bridgeCookie,
   bridgeOrigin,
+  canonicalRelayUrl,
   deriveBridgeSecrets,
   type BridgeDescriptor,
   type BridgeSecrets,
@@ -135,18 +136,13 @@ export function normalizeRelayUrl(relayUrl: string): string {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("The relay URL must use HTTP or HTTPS");
   }
-  if (
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    (url.pathname !== "/" && url.pathname !== "")
-  ) {
+  const canonical = canonicalRelayUrl(url);
+  if (canonical === undefined) {
     throw new Error(
-      "The relay URL must be an HTTP(S) origin without credentials, path, query or fragment",
+      "The relay URL must be an HTTP(S) origin, or an origin and the path the relay is mounted under, without credentials, query or fragment",
     );
   }
-  return url.origin;
+  return canonical;
 }
 
 function readPositiveSafeInteger(

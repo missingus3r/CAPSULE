@@ -1,4 +1,8 @@
-import { DEFAULT_SEEDS, defaultSeedOrigins } from "@capsule/protocol";
+import {
+  canonicalRelayUrl,
+  DEFAULT_SEEDS,
+  defaultSeedOrigins,
+} from "@capsule/protocol";
 
 /**
  * What the extension remembers, and deliberately what it does not.
@@ -82,13 +86,18 @@ export function originsOf(relays: readonly string[]): string[] {
   return [...origins];
 }
 
-/** Accepts only an origin: no path, no query, no credentials. */
+/**
+ * Accepts an origin, or an origin and the path a relay is mounted under: no
+ * query, no credentials.
+ */
 export function normalizeRelayUrl(value: string): string | undefined {
   try {
     const url = new URL(value.trim());
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     if (url.username || url.password) return undefined;
-    return url.origin;
+    return (
+      canonicalRelayUrl(new URL(`${url.origin}${url.pathname}`)) ?? url.origin
+    );
   } catch {
     return undefined;
   }

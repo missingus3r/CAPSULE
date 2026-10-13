@@ -1,3 +1,4 @@
+import { canonicalRelayUrl } from "./address.js";
 import {
   asArrayBuffer,
   fromBase64Url,
@@ -594,16 +595,7 @@ export function assertShareCapability(
 
 function isHttpOrigin(value: string): boolean {
   try {
-    const url = new URL(value);
-    return (
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash &&
-      (url.pathname === "/" || url.pathname === "") &&
-      url.origin === value.replace(/\/$/u, "")
-    );
+    return canonicalRelayUrl(new URL(value)) === value.replace(/\/$/u, "");
   } catch {
     return false;
   }

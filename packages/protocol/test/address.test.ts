@@ -84,13 +84,24 @@ describe("relay origin routability", () => {
     "http://2130706433",
     "http://0177.0.0.1",
     "http://user:pass@relay.example.org",
-    "http://relay.example.org/path",
     "http://relay.example.org?query=1",
     "ftp://relay.example.org",
+    // A mount path does not make a local address routable, and has to be made
+    // of plain segments in the one spelling the parser leaves alone.
+    "http://127.0.0.1/relay",
+    "http://relay.example.org/a/../relay",
+    "http://relay.example.org/a//relay",
+    "http://relay.example.org/a%2Frelay",
+    "http://relay.example.org/relay?query=1",
+    "http://relay.example.org/relay#fragment",
   ];
 
   const allowed = [
     "https://relay.example.org",
+    // A relay sharing a host with another site, mounted under a path.
+    "https://relay.example.org/relay",
+    "https://relay.example.org/relay/",
+    "https://relay.example.org/apps/capsule-relay",
     "http://relay.example.org:8787",
     "https://sub.domain.relay.example.org",
     "http://[2606:4700::1111]",

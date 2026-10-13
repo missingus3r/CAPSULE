@@ -153,8 +153,24 @@ describe("seed references", () => {
     // one puts it after the fragment, where a server never sees it.
     for (const origin of defaultSeedOrigins()) {
       expect(origin).not.toContain("#");
-      expect(new URL(`${origin}/v1/info`).pathname).toBe("/v1/info");
+      expect(origin.endsWith("/")).toBe(false);
+      const info = new URL(`${origin}/v1/info`);
+      expect(info.pathname.endsWith("/v1/info")).toBe(true);
+      expect(info.hash).toBe("");
     }
+  });
+
+  it("keeps the path a relay is mounted under as part of its address", () => {
+    // A relay sharing a host with another site is reached under a prefix, and
+    // dropping it would send every request to whatever else that host serves.
+    expect(parseSeedRef("https://host.example/relay#abcdefghijklmnop")).toEqual(
+      { url: "https://host.example/relay", relayId: "abcdefghijklmnop" },
+    );
+    expect(parseSeedRef("https://host.example/relay/")).toEqual({
+      url: "https://host.example/relay",
+    });
+    expect(parseSeedRef("https://host.example/relay?x=1")).toBeUndefined();
+    expect(parseSeedRef("https://host.example/a%2Fb")).toBeUndefined();
   });
 
   it("reads url#relayId, and refuses what it cannot make sense of", () => {
@@ -182,7 +198,62 @@ describe("seed references", () => {
   });
 });
 
+/**
+ * A host that serves another site, with the relay mounted under `/relay`.
+ *
+ * What a reverse proxy does when one machine has two tenants: the prefix is
+ * stripped on the way in, and everything outside it belongs to somebody else.
+ */
+async function startSharedHost(relayUrl: string): Promise<string> {
+  const server = createServer((request, response) => {
+    const url = request.url ?? "/";
+    if (!url.startsWith("/relay/")) {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end("<!doctype html><title>Another site</title>");
+      return;
+    }
+    fetch(`${relayUrl}${url.slice("/relay".length)}`)
+      .then(async (upstream) => {
+        response.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") ?? "text/plain",
+        });
+        response.end(Buffer.from(await upstream.arrayBuffer()));
+      })
+      .catch(() => {
+        response.writeHead(502);
+        response.end();
+      });
+  });
+  impostors.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("no address");
+  return `http://127.0.0.1:${address.port}`;
+}
+
 describe("a pinned seed", () => {
+  it("is reached under the path it is mounted at, on a host it shares", async () => {
+    const relay = await startRelay();
+    const genuine = await fetchRelayInfo(relay.url);
+    const host = await startSharedHost(relay.url);
+
+    const pinned = await fetchRelayInfo(`${host}/relay`, {
+      expectRelayId: genuine.relayId,
+    });
+    expect(pinned.relayId).toBe(genuine.relayId);
+
+    // The host's own root is the other site, and never mistaken for a relay.
+    await expect(
+      fetchRelayInfo(host, { expectRelayId: genuine.relayId }),
+    ).rejects.toThrow();
+
+    const found = await discoverRelays({
+      seeds: [{ url: `${host}/relay`, relayId: genuine.relayId }],
+      allowPrivateRelays: true,
+    });
+    expect(found.map((info) => info.relayId)).toEqual([genuine.relayId]);
+  });
+
   it("accepts the relay that actually holds the key", async () => {
     const relay = await startRelay();
     const announced = await fetchRelayInfo(relay.url);

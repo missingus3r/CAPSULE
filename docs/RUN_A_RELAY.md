@@ -94,6 +94,37 @@ lower it to 0 only on a closed network.
 lets an announced address point back into your own network. Leave it `false` on
 any relay exposed to the internet.
 
+### Sharing a host with another site
+
+A relay does not need a hostname to itself. Behind a reverse proxy that also
+serves something else, mount it under a path and announce that path as part of
+its address:
+
+```bash
+CAPSULE_PUBLIC_URL=https://host.example.org/relay
+```
+
+```nginx
+# The trailing slash on proxy_pass strips the prefix: the relay itself still
+# answers /v1, /health and /realtime and never learns where it is mounted.
+location /relay/ {
+    proxy_pass http://127.0.0.1:8787/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 64m;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    proxy_request_buffering off;
+}
+```
+
+The path is then the relay's address everywhere one is written: seeds
+(`https://host.example.org/relay#<relayId>`), `CAPSULE_PEERS`, `--relay`,
+`VITE_RELAY_URL` and the links a capsule is shared with. Only plain path
+segments are accepted. A client older than this cannot use such an address: it
+accepts an origin and nothing after it.
+
 On each gossip round the relay:
 
 1. greets the configured peers and the ones it already knows;

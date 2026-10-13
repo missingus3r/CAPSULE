@@ -99,7 +99,9 @@ export const REALTIME_PAGE = `<!doctype html>
         };
 
         var tick = function () {
-          fetch("/v1/realtime", { cache: "no-store" })
+          // Relative on purpose: behind a proxy the relay may be mounted under
+          // a path, and this page is then at <mount>/realtime.
+          fetch("v1/realtime", { cache: "no-store" })
             .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
             .then(render)
             .catch(function () {

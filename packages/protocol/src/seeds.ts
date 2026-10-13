@@ -1,3 +1,4 @@
+import { canonicalRelayUrl } from "./address.js";
 import { fromBase64Url, getCrypto, toBase64Url } from "./bytes.js";
 
 /**
@@ -54,16 +55,23 @@ export const DEFAULT_SEEDS: readonly string[] = [
   // IPs through the ordinary flow, and `<ip>.sslip.io` resolves to exactly
   // that IP. Pinned, so seizing the name, the certificate or the host is not
   // enough to stand in for it — only the key can answer the challenge.
-  "https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M",
+  //
+  // It is mounted under `/relay` because the host also serves another site,
+  // and that path is part of the address: every route is appended to it.
+  "https://68.211.136.69.sslip.io/relay#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M",
 ];
 
-/** The seed origins, with no fragment. Use for anything that builds a URL. */
+/**
+ * The seed addresses, with no fragment. Use for anything that builds a URL.
+ * An origin, plus the path the relay is mounted under when it has one.
+ */
 export function defaultSeedOrigins(): string[] {
   return parseSeedRefs(DEFAULT_SEEDS).map((seed) => seed.url);
 }
 
 /**
- * `https://relay.example#<relayId>`, or a bare origin.
+ * `https://relay.example#<relayId>`, or a bare origin. Either may carry the
+ * path a relay is mounted under: `https://host.example/relay#<relayId>`.
  *
  * A bare origin is accepted and is the weaker form: without an id there is
  * nothing to prove, so the client falls back to believing whatever answers.
@@ -73,16 +81,13 @@ export function defaultSeedOrigins(): string[] {
 export function parseSeedRef(value: string): RelaySeedRef | undefined {
   const [rawUrl, relayId, ...rest] = value.trim().split("#");
   if (!rawUrl || rest.length > 0) return undefined;
-  let origin: string;
+  let origin: string | undefined;
   try {
-    const url = new URL(rawUrl);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-    if (url.username || url.password || url.search || url.hash)
-      return undefined;
-    origin = url.origin;
+    origin = canonicalRelayUrl(new URL(rawUrl));
   } catch {
     return undefined;
   }
+  if (origin === undefined) return undefined;
   if (relayId === undefined || relayId === "") return { url: origin };
   if (!/^[A-Za-z0-9_-]{16,64}$/u.test(relayId)) return undefined;
   return { url: origin, relayId };

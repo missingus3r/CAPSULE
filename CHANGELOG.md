@@ -47,6 +47,20 @@ what stopped being true. The format follows
 
 ### Added
 
+- **A relay can share a host with another site.** A relay address was an
+  origin and nothing else, so a relay needed a hostname to itself. It may now
+  carry the path it is mounted under, `https://host.example/relay`, and that
+  path is part of the address wherever one is written: seeds, `CAPSULE_PEERS`,
+  `CAPSULE_PUBLIC_URL`, `--relay`, `VITE_RELAY_URL` and share capabilities.
+  Only plain path segments are accepted, in the one spelling the URL parser
+  leaves alone, so two spellings of an address never compare different and the
+  checks that keep a peer from pointing into a private network read the same
+  host as before. A client older than this refuses such an address.
+
+  The genesis relay moves to `https://68.211.136.69.sslip.io/relay`, because
+  that host also serves another site. Same key, same pin. The bare origin still
+  answers, so capsules and seeds that name it keep working.
+
 - **Relays carry the sites they gossip, instead of only pointing at them.** A
   relay that accepts a `.capsule` record now fetches the capsule behind it and
   stores it under the same `capsuleId` and read token, so it answers for that

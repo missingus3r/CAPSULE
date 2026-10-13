@@ -196,7 +196,7 @@ rather than using it.
 The relay every client starts from:
 
 ```
-https://68.211.136.69.sslip.io#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M
+https://68.211.136.69.sslip.io/relay#W0rKZRPcxcCWT4So5LorArlH4O3slgXiUxs4EWx4n2M
 ```
 
 That is the **genesis relay**, and the part after `#` is not decoration. A
@@ -206,7 +206,9 @@ only the key can answer. Clients use it by default; nothing needs configuring.
 
 The hostname is that address, `68.211.136.69`, spelled so a certificate can
 exist for it: Let's Encrypt does not sign bare IPs through the ordinary flow,
-and `<ip>.sslip.io` resolves to exactly that IP and nothing else.
+and `<ip>.sslip.io` resolves to exactly that IP and nothing else. The `/relay`
+after it is where the relay is mounted, because that host also serves another
+site, and it is part of the address.
 
 **Running your own is the useful thing you can do here.** The genesis relay
 sees the address, the timing and the size of everything sent through it, and

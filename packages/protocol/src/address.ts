@@ -196,10 +196,38 @@ export function classifyHost(hostname: string): AddressVerdict {
   return { routable: true, kind: "name", host };
 }
 
+const RELAY_MOUNT_SEGMENT = /^[A-Za-z0-9_~-][A-Za-z0-9._~-]*$/u;
+const RELAY_MOUNT_MAX_LENGTH = 128;
+
 /**
- * Whether a URL is an origin a public relay could plausibly live at: an HTTP(S)
- * origin with no credentials, path, query or fragment, whose host is not a
- * local or reserved address.
+ * The one spelling of a relay address: its origin, followed by the path it is
+ * mounted under when it shares a host with something else.
+ *
+ * A relay that has a host to itself is just an origin. One behind a reverse
+ * proxy that also serves another site lives at `https://host/relay`, and that
+ * path is part of its address: every route is appended to it. Only plain path
+ * segments are accepted, so two spellings of one address never compare
+ * different and nothing here can be made to climb out of the mount.
+ *
+ * Returns nothing for a URL that is not a relay address at all.
+ */
+export function canonicalRelayUrl(url: URL): string | undefined {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+  if (url.username || url.password || url.search || url.hash) return undefined;
+  const mount = url.pathname.replace(/\/+$/u, "");
+  if (mount === "") return url.origin;
+  if (mount.length > RELAY_MOUNT_MAX_LENGTH) return undefined;
+  for (const segment of mount.slice(1).split("/")) {
+    if (!RELAY_MOUNT_SEGMENT.test(segment)) return undefined;
+  }
+  return `${url.origin}${mount}`;
+}
+
+/**
+ * Whether a URL is an address a public relay could plausibly live at: an
+ * HTTP(S) origin, optionally followed by the path the relay is mounted under,
+ * with no credentials, query or fragment, whose host is not a local or
+ * reserved address.
  */
 export function classifyRelayOrigin(value: string): AddressVerdict {
   let url: URL;
@@ -217,10 +245,14 @@ export function classifyRelayOrigin(value: string): AddressVerdict {
   if (url.search || url.hash) {
     return { routable: false, reason: "URL carries a query or fragment" };
   }
-  if (url.pathname !== "/" && url.pathname !== "") {
-    return { routable: false, reason: "URL carries a path" };
+  const canonical = canonicalRelayUrl(url);
+  if (canonical === undefined) {
+    return {
+      routable: false,
+      reason: "URL carries a path a relay cannot be mounted under",
+    };
   }
-  if (url.origin !== value.replace(/\/$/u, "")) {
+  if (canonical !== value.replace(/\/$/u, "")) {
     // Catches decimal, octal and hexadecimal spellings of an address, which
     // the URL parser normalises into a different string than the input.
     return { routable: false, reason: "URL is not a canonical origin" };

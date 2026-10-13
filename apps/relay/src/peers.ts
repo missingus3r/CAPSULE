@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  canonicalRelayUrl,
   classifyHost,
   classifyRelayOrigin,
   parseIpv4,
@@ -116,11 +117,7 @@ export async function isFetchableRelayOrigin(
 function tryParseOrigin(value: string): URL | undefined {
   try {
     const url = new URL(value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-    if (url.username || url.password || url.search || url.hash)
-      return undefined;
-    if (url.pathname !== "/" && url.pathname !== "") return undefined;
-    if (url.origin !== value.replace(/\/$/u, "")) return undefined;
+    if (canonicalRelayUrl(url) !== value.replace(/\/$/u, "")) return undefined;
     return url;
   } catch {
     return undefined;

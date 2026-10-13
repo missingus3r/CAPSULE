@@ -80,7 +80,8 @@ describe("the page it is drawn on", () => {
     const urls = [...REALTIME_PAGE.matchAll(/fetch\("([^"]+)"/gu)].map(
       (m) => m[1],
     );
-    expect(urls).toEqual(["/v1/realtime"]);
+    // Relative, so it stays under whatever path the relay is mounted at.
+    expect(urls).toEqual(["v1/realtime"]);
     expect(REALTIME_PAGE).not.toMatch(/https?:\/\//u);
   });
 
