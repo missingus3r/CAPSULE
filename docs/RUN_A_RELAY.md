@@ -464,7 +464,8 @@ serving it would tell every visitor that the name resolves and hand every peer
 the same dead end.
 
 So when your relay looks for a copy of a site and **every relay the record
-names answers that it has no such capsule**, three gossip rounds in a row, and
+names answers that it has no such capsule**, three gossip rounds in a row over
+at least two gossip intervals (ten minutes by default), and
 yours has none either, it forgets that version of the name. A relay that is
 down or not answering never counts: only a relay's own "not found" does, so an
 outage cannot cost anybody a name. The same version arriving again from a peer

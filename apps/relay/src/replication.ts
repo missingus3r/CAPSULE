@@ -92,8 +92,14 @@ export interface ReplicationRound {
  * One answer is not enough to act on: a relay restarting, or a proxy in front
  * of it misrouting for a minute, can say "not found" about something that is
  * there. Forgetting is the one thing here that is not undone by waiting.
+ *
+ * Rounds alone do not measure that, because they are not evenly spaced: a
+ * relay that just started gossips several times in its first seconds. So the
+ * answers also have to span two ordinary gossip intervals, which is what makes
+ * "three in a row" mean minutes on a relay with the default settings.
  */
 const GONE_ROUNDS = 3;
+const GONE_INTERVALS = 2;
 
 /** What a relay says, in its own words, about a capsule it does not have. */
 const GONE_CODES = new Set(["capsule_not_found", "capsule_expired"]);
@@ -143,7 +149,10 @@ export class SiteReplicator {
   private readonly now: () => number;
   private running = false;
   /** Rounds in a row each record's site has been gone, by name and version. */
-  private readonly goneRounds = new Map<string, number>();
+  private readonly goneRounds = new Map<
+    string,
+    { rounds: number; since: number }
+  >();
 
   constructor(private readonly options: SiteReplicatorOptions) {
     this.request =
@@ -193,7 +202,8 @@ export class SiteReplicator {
         this.now() + this.options.config.replicaTtlSeconds * 1000,
       ).toISOString();
 
-      const stillGone = new Map<string, number>();
+      const stillGone = new Map<string, { rounds: number; since: number }>();
+      const goneFor = GONE_INTERVALS * this.options.config.peerSyncIntervalMs;
       for (const [capsuleId, record] of wanted) {
         const capability = this.capabilityOf(record);
         if (!capability) continue;
@@ -217,9 +227,11 @@ export class SiteReplicator {
         else if (outcome === "gone") {
           round.failed += 1;
           const key = `${record.name}#${record.sequence}`;
-          const rounds = (this.goneRounds.get(key) ?? 0) + 1;
-          if (rounds < GONE_ROUNDS) {
-            stillGone.set(key, rounds);
+          const seen = this.goneRounds.get(key);
+          const rounds = (seen?.rounds ?? 0) + 1;
+          const since = seen?.since ?? this.now();
+          if (rounds < GONE_ROUNDS || this.now() - since < goneFor) {
+            stillGone.set(key, { rounds, since });
           } else if (this.options.forget?.(record)) {
             round.forgotten += 1;
             this.options.log?.("Forgot a site that is gone", {
@@ -232,7 +244,7 @@ export class SiteReplicator {
       // Whatever was not gone this round starts over: the count is of rounds
       // in a row, and one good answer breaks the row.
       this.goneRounds.clear();
-      for (const [key, rounds] of stillGone) this.goneRounds.set(key, rounds);
+      for (const [key, seen] of stillGone) this.goneRounds.set(key, seen);
     } finally {
       this.running = false;
     }
