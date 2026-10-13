@@ -744,7 +744,8 @@
         font-size: 12.5px;
       }
       .step a {
-        display: inline-block;
+        display: block;
+        width: fit-content;
         margin-top: 6px;
         color: var(--accent);
         font-size: 13px;
@@ -1973,7 +1974,8 @@
           <b>Runtime</b><span>TypeScript, Node 22, Fastify 5</span>
         </div>
         <div class="row">
-          <b>Clients</b><span>CLI, React 19 web, MV3 extension</span>
+          <b>Clients</b
+          ><span>CLI, React 19 web, MV3 extension (Chromium only)</span>
         </div>
       </div>
 
@@ -1995,6 +1997,15 @@
           name, the certificate or the host is not enough to stand in for it:
           only the key can answer. The hostname is that address,
           <code>68.211.136.69</code>, spelled so a certificate can exist for it.
+          The <code>/relay</code> after it is where the relay is mounted,
+          because that host also serves another site, and it is part of the
+          address.
+        </p>
+        <p>
+          Whether it is carrying anything right now is public:
+          <a href="https://68.211.136.69.sslip.io/relay/realtime"
+            >addresses seen in the last five minutes, and relays it knows</a
+          >.
         </p>
         <p class="genesis-warn">
           One relay run by one person is not a network. It sees the address, the
@@ -2104,7 +2115,9 @@ capsule-id/
           A signed statement: <b>version N of this name is that capability</b>.
           Relays store and gossip it. They cannot forge one, and a client keeps
           the highest sequence number it has seen, so a relay cannot quietly
-          serve yesterday's version either.
+          serve yesterday's version either. A record outlives the capsule it
+          points at, so a relay forgets one once every relay it names says the
+          site is gone: a name that resolves leads somewhere.
         </p>
         <h4>What the extension does before rendering</h4>
         <table>
