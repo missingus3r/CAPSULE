@@ -150,6 +150,19 @@ finishes.
 Requires **Node.js 22 or newer**. Nothing else: no database, no account, no
 API key.
 
+What there is to run, and what there is not:
+
+| Piece             | Where it runs                                           |
+| ----------------- | ------------------------------------------------------- |
+| Command line      | Windows, Linux, macOS: anywhere Node 22 does            |
+| Web app           | Any current browser, served from your own machine       |
+| `.capsule` viewer | Chrome, Edge, Brave and other Chromium browsers         |
+| Relay             | Anything that runs Node 22 and can be reached by others |
+
+There is **no desktop app** and **no Firefox or Safari extension** yet: opening
+a `.capsule` site needs a Chromium browser. Sending and receiving files does
+not need the extension at all.
+
 ### 1. Install
 
 ```bash
@@ -193,6 +206,56 @@ or `VITE_RELAY_URL` for the web app.
 Everything above already works. This section is about **adding** to the network
 rather than using it.
 
+#### The short version
+
+You need a machine other people can reach from the internet, with a public
+address of its own (a small VPS is enough; a laptop behind a home router is
+not, unless you forward a port to it). Then, after the install in step 1:
+
+Linux or macOS:
+
+```bash
+export CAPSULE_HOST="0.0.0.0"                                 # listen for others, not just this machine
+export CAPSULE_PUBLIC_URL="https://your-address.example"      # how others reach this machine
+export CAPSULE_PEERS="https://68.211.136.69.sslip.io/relay"   # the genesis relay
+node apps/relay/dist/main.js
+```
+
+Windows (PowerShell):
+
+```powershell
+$env:CAPSULE_HOST = "0.0.0.0"
+$env:CAPSULE_PUBLIC_URL = "https://your-address.example"
+$env:CAPSULE_PEERS = "https://68.211.136.69.sslip.io/relay"
+node apps/relay/dist/main.js
+```
+
+That is a running relay, answering on port `8787`. For a first try
+`CAPSULE_PUBLIC_URL` can be `http://<your-public-ip>:8787`. For anything people
+will use, put a reverse proxy with HTTPS in front of it and announce that
+address instead; then leave `CAPSULE_HOST` out, so only the proxy reaches the
+relay.
+
+**Then check that it worked**, from any other machine:
+
+1. Open `https://your-address.example/health`. It answers `"status":"ok"` when
+   the relay is up and reachable.
+2. Open `https://your-address.example/realtime`. A page with live numbers:
+   addresses seen in the last five minutes, and relays yours knows about.
+3. Ask the genesis relay whether it lists you. Within a few minutes of starting,
+   your relay should be in the output:
+
+   ```bash
+   node apps/cli/dist/index.js relays --seed https://68.211.136.69.sslip.io/relay
+   ```
+
+If step 3 never shows you, the genesis relay could not reach
+`CAPSULE_PUBLIC_URL` from its side: that address is what it checks before it
+believes you. What happens in between, and everything else an operator should
+know, is in [docs/RUN_A_RELAY.md](docs/RUN_A_RELAY.md).
+
+#### The longer version
+
 The relay every client starts from:
 
 ```
@@ -221,7 +284,7 @@ one you already know and they introduce themselves with signed announcements.
 
 ```bash
 export CAPSULE_PUBLIC_URL="https://relay.example.org"   # where others reach you
-export CAPSULE_PEERS="https://relay-you-already-know.example"
+export CAPSULE_PEERS="https://68.211.136.69.sslip.io/relay"   # or any relay you know
 node apps/relay/dist/main.js
 ```
 
@@ -267,6 +330,12 @@ node apps/cli/dist/index.js site publish ./www --key site.capsulekey --ttl 7d
 # 3. Update it later: the name stays, the version goes up
 node apps/cli/dist/index.js site publish ./www --key site.capsulekey
 ```
+
+Two things in those commands are yours to choose and neither is a placeholder
+for a secret. `./www` is any folder on your machine with an `index.html` in it,
+plus whatever that page uses: images, CSS, other pages. `site.capsulekey` is
+the name of the **file** step 1 writes; you pass the same file name back in
+step 2, you never paste a key anywhere.
 
 Or do the whole thing from the web app: the **Publish** tab takes a folder or a
 `.zip`, packs and encrypts it in the page, and hands you the address. A new name

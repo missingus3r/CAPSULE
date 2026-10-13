@@ -69,9 +69,53 @@ Two variables are enough:
 # nobody can announce you: you are only a consumer of the directory.
 CAPSULE_PUBLIC_URL=https://relay.example.org
 
-# Relays you already know. One is enough.
-CAPSULE_PEERS=https://a-relay-someone-told-you-about.example
+# Relays you already know. One is enough. If you know none, this is the
+# genesis relay, the one every client starts from:
+CAPSULE_PEERS=https://68.211.136.69.sslip.io/relay
 ```
+
+### What happens after you start it
+
+Nothing has to be registered and nobody approves you. The relay does this on
+its own, at start and then every five minutes:
+
+1. **It asks each relay in `CAPSULE_PEERS` who it is**, by reading its
+   `/v1/info`, and remembers it.
+2. **It introduces itself**: it sends that relay an announcement carrying your
+   `CAPSULE_PUBLIC_URL`, signed with your relay's key, with a little proof of
+   work attached so that inventing a thousand relays is not free.
+3. **The other relay checks you before it believes you.** A signature only
+   proves who wrote the message, not that the address in it is yours, so it
+   connects to your `CAPSULE_PUBLIC_URL` and reads `/v1/info` there. If the
+   same identity answers, you are in its directory.
+4. **It hands back the relays it knows**, and yours greets those in turn. From
+   then on every relay that lists you tells the clients and relays that ask it.
+
+Step 3 is where a new relay usually fails: the address has to work **from the
+other relay's side**, not from your own machine. `localhost`, a private network
+address, or a port your firewall does not let in are all refused. A relay that
+stops answering is dropped after five rounds in a row and comes back on its own
+once it answers again.
+
+### Checking that it worked
+
+From a machine that is not the relay:
+
+```bash
+# 1. It is up and reachable at the address you announced.
+curl https://relay.example.org/health          # → {"status":"ok",...}
+
+# 2. It knows other relays: peerCount is above zero.
+curl https://relay.example.org/v1/info
+
+# 3. Others know it: your relay is in the list the genesis relay gives out.
+node apps/cli/dist/index.js relays --seed https://68.211.136.69.sslip.io/relay
+```
+
+For numbers that move, open `https://relay.example.org/realtime` in a browser
+(section 4c): addresses seen in the last five minutes and relays in your
+directory. That page is the answer to "is it carrying traffic, or merely
+running".
 
 Optional:
 

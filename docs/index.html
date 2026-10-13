@@ -743,6 +743,12 @@
         color: var(--accent);
         font-size: 12.5px;
       }
+      .step a {
+        display: inline-block;
+        margin-top: 6px;
+        color: var(--accent);
+        font-size: 13px;
+      }
 
       .terminal {
         margin: 34px auto 0;
@@ -1776,6 +1782,7 @@
               <code>npm install</code>, <code>npm run build</code>. No database,
               no accounts, no keys to obtain.</span
             >
+            <a href="https://github.com/missingus3r/CAPSULE#1-install">Install, step by step →</a>
           </div>
         </div>
         <div class="step">
@@ -1786,6 +1793,7 @@
               ><code>capsule send secret.pdf --anonymous</code> prints a link.
               The person you give it to needs nothing installed.</span
             >
+            <a href="https://github.com/missingus3r/CAPSULE#2-use-it">Send, receive and delete →</a>
           </div>
         </div>
         <div class="step">
@@ -1796,7 +1804,11 @@
               >One process with a public URL. It joins the network by gossip,
               stores only ciphertext, and keeps no addresses in its logs by
               default. Until you do, clients reach the network through the
-              genesis relay below.</span
+              genesis relay below. It needs a machine others can reach from
+              the internet.</span
+            >
+            <a href="https://github.com/missingus3r/CAPSULE#3-run-a-relay-optional"
+              >Run one and check that it joined →</a
             >
           </div>
         </div>
@@ -1808,8 +1820,11 @@
               ><code>capsule site key</code> then
               <code>capsule site publish ./www</code>. Load the extension from
               <code>apps/extension/dist</code> and open the address it
-              printed.</span
+              printed. <code>./www</code> is any folder with an
+              <code>index.html</code> in it; the viewer needs a Chromium
+              browser.</span
             >
+            <a href="https://github.com/missingus3r/CAPSULE#publish-a-capsule-site">Publish and read a site →</a>
           </div>
         </div>
       </div>
@@ -1826,7 +1841,9 @@
         </div>
         <div>
           <span class="prompt">$</span> npm run dev:relay
-          <span class="flag"># a relay on :8787</span>
+          <span class="flag"
+            ># a local relay on :8787, for trying things out</span
+          >
         </div>
         <div>
           <span class="prompt">$</span> node apps/cli/dist/index.js site key
@@ -1836,6 +1853,7 @@
             Name:
             6dijvuvwrd5jqp4efjbb4hwcsmtsf6sgi3at4jeto63k7x5fkbwat2yb.capsule
           </div>
+          <div>Key: site.capsulekey</div>
         </div>
         <div>
           <span class="prompt">$</span> node apps/cli/dist/index.js site publish
@@ -1848,10 +1866,15 @@
         </div>
       </div>
       <p class="compare-note">
-        To join the public network instead of running alone, point your relay at
-        a peer with
-        <code class="inline">CAPSULE_PEERS</code> and set
-        <code class="inline">CAPSULE_PUBLIC_URL</code>. Gossip does the rest.
+        <code class="inline">npm run dev:relay</code> is a relay only your own
+        machine can reach. To join the public network, set
+        <code class="inline">CAPSULE_PUBLIC_URL</code> to an address others can
+        reach and point
+        <code class="inline">CAPSULE_PEERS</code> at the genesis relay below.
+        Gossip does the rest:
+        <a href="https://github.com/missingus3r/CAPSULE/blob/main/docs/RUN_A_RELAY.md#3-joining-the-network"
+          >what happens next, and how to check it worked</a
+        >.
       </p>
     </section>
 

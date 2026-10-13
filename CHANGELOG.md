@@ -215,6 +215,14 @@ what stopped being true. The format follows
 
 ### Changed
 
+- **Running a relay is explained for somebody who has not run one** (#1). The
+  README has a short version for Linux, macOS and Windows that names the
+  genesis relay as the peer instead of a placeholder, and three checks that say
+  whether it worked. The operator guide says what happens after a relay
+  starts, step by step, and where a new one usually fails: its public address
+  has to answer from the other relay's side. The steps on the project page link
+  to the instructions behind them, and the README says plainly what exists to
+  run: no desktop app, and no Firefox or Safari extension yet.
 - **Publishing a site puts it on three relays, not one.** The web app and
   `capsule site publish` now default to two mirrors besides the relay being
   published through; `--mirror 0` opts out. The old default of none was what
